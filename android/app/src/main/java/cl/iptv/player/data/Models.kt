@@ -123,3 +123,7 @@ fun Item.catchupUrlFor(prog: Programme, now: Long = System.currentTimeMillis()):
     val minutes = ((minOf(prog.stop, now) - prog.start + 59_999) / 60_000).coerceAtLeast(1)
     return catchup.replace("{start}", fmt.format(java.util.Date(prog.start))).replace("{dur}", minutes.toString())
 }
+
+
+/** Perfil de quien ve: favoritos y "Seguir viendo" propios. Infantil = nunca muestra contenido para adultos. */
+data class Profile(val id: String, val name: String, val kid: Boolean = false)

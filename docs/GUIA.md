@@ -126,7 +126,7 @@ Dentro de TV en vivo, Películas y Series aparece una barra con las categorías 
 - **Privacidad**: el texto se lee en tu equipo. En Android con ML Kit (el modelo viene dentro de la app y funciona sin Internet). En la web con Tesseract.js: si abres la app con `iniciar.bat` o tu servidor, el lector se instala ahí; si no, se descarga de jsDelivr la primera vez. La imagen nunca se envía a ningún servidor.
 - Consejo: recorta la imagen para que sólo se vean los datos, y evita fotos movidas o con reflejos.
 
-## 10. Guía en grilla y TV en diferido (Android)
+## 10. Guía en grilla y TV en diferido
 
 En **TV en vivo**, el botón **📅 Guía** de la barra de categorías abre la grilla: canales a la izquierda y programas en una línea de tiempo (de 2 horas atrás a 12 horas adelante), con una línea que marca la hora actual. Muestra los canales de la categoría elegida.
 
@@ -140,7 +140,15 @@ En **TV en vivo**, el botón **📅 Guía** de la barra de categorías abre la g
 - **Seguir viendo:** películas y episodios continúan donde quedaste. Las carátulas muestran una barra de avance y hay un filtro **▶ Seguir viendo** en Películas y Series.
 - **Respaldo** (Android, Ajustes → Datos): **Exportar respaldo** guarda listas (con contraseñas), favoritos, Seguir viendo y ajustes en un archivo `.json`; **Importar respaldo** los restaura en otro equipo. Guárdalo en un lugar privado.
 
-## 12. Idioma
+## 12. Fichas, grabación, perfiles y tamaño de los controles
+
+- **Fichas:** al elegir una película se ve su ficha (sinopsis, año, puntuación, género, reparto) con **▶ Ver** o **▶ Continuar**. En series, el botón **ⓘ Ficha** junto a «Volver». Las cuentas Xtream ya traen fichas; para listas M3U agrega una clave gratuita de [TMDB](https://www.themoviedb.org/settings/api) en **Ajustes → Fichas** (ahí también puedes desactivar la ficha y reproducir directo).
+- **Grabación (Android):** en un canal en vivo, el botón **●** del reproductor graba en *Descargas/VibeIPTV* (archivo `.ts`, se abre con VLC). Mientras graba se ve «● REC» con el tiempo y el tamaño. Usa una conexión aparte: si tu cuenta admite una sola, la imagen puede cortarse. Mantén la app abierta mientras graba.
+- **Perfiles (Android):** en la pantalla de listas (botón 👤) o en **Ajustes → Control parental → Perfil**. Cada perfil tiene sus favoritos y su «Seguir viendo». Un perfil **infantil** nunca muestra contenido para adultos y, si hay PIN, salir de él lo pide.
+- **Tamaño de los controles del reproductor:** **Ajustes → Reproducción**, de 70 % a 150 % en Android y de 80 % a 140 % en la web. Útil en TV grandes o en celulares.
+- **Lista de canales en el reproductor:** muestra logo, nombre (sin número) y el programa actual con su avance.
+
+## 13. Idioma
 
 La app está en **español** y en **inglés**. Por defecto sigue el idioma del sistema (español si el equipo está en español; si no, inglés) y se puede fijar en **Ajustes → Apariencia → Idioma**. Las traducciones están en `i18n/en.json`, un solo diccionario para la web y Android: para corregir o agregar un texto, edítalo ahí y ejecuta `node i18n/build.mjs`.
 

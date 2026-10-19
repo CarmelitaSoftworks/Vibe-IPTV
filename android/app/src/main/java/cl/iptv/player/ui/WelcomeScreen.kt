@@ -60,6 +60,8 @@ private sealed interface WelcomeDialog {
 fun WelcomeScreen(vm: AppViewModel) {
     val c = LocalIptv.current
     var dialog by remember { mutableStateOf<WelcomeDialog>(WelcomeDialog.None) }
+    var showProfiles by remember { mutableStateOf(false) }
+    if (showProfiles) ProfilesDialog(vm) { showProfiles = false }
     val firstOption = remember { FocusRequester() }
     val currentList = remember { FocusRequester() }
     val sources = vm.sources
@@ -90,6 +92,7 @@ fun WelcomeScreen(vm: AppViewModel) {
                         color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = if (narrow) 15.sp else 19.sp,
                     )
                 }
+                Pill((if (vm.profile.kid) "🧒 " else "👤 ") + vm.profile.name) { showProfiles = true }
                 if (vm.source != null && !narrow) Pill("‹ Volver al menú") { vm.showWelcome = false }
                 RoundButton(Icons.Filled.Settings, "Ajustes", size = if (narrow) 48 else 58) { vm.showSettings = true }
             }

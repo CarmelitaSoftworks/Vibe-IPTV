@@ -53,7 +53,7 @@ private sealed class Row(val label: String, val desc: String = "") {
 private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
 private class Section(val id: String, val name: String, val icon: SecIcon, val rows: List<Row>)
 
-private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}): List<Section> {
+private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}, onProfiles: () -> Unit = {}): List<Section> {
     val offsets = (-3..3).map { h -> h.toString() to if (h == 0) "Sin desfase" else "${if (h > 0) "+" else ""}$h h" }
     return listOf(
         Section("quick", "Rápido", SecIcon.QUICK, listOf(
@@ -106,6 +106,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
                 secret = true, get = { it.tmdbKey }, set = { s, v -> s.copy(tmdbKey = v) }),
         )),
         Section("parental", "Control parental", SecIcon.LOCK, listOf(
+            Row.Action("Perfil", "Favoritos y Seguir viendo por persona; perfil infantil sin contenido para adultos",
+                value = { (if (vm.profile.kid) "🧒 " else "👤 ") + vm.profile.name }, arrow = true) { onProfiles() },
             Row.TextField("PIN de control parental", "4 dígitos. Con PIN, las categorías para adultos (XXX, Adultos, +18…) quedan ocultas. Vacío = desactivado.",
                 secret = true, get = { it.parentalPin }, set = { s, v -> s.copy(parentalPin = v.filter(Char::isDigit).take(8)) }),
             Row.Action("Contenido para adultos", "Se desbloquea con el PIN desde la barra de categorías, hasta cerrar la app",
@@ -153,7 +155,10 @@ fun SettingsScreen(vm: AppViewModel) {
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")) { uri -> if (uri != null) vm.exportBackup(uri) }
     val importer = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importBackup(uri) }
+    var showProfiles by remember { mutableStateOf(false) }
+    if (showProfiles) ProfilesDialog(vm) { showProfiles = false }
     val all = sections(vm, ctx, (ctx as? cl.iptv.player.MainActivity)?.isTv == true,
+        onProfiles = { showProfiles = true },
         onExport = {
             try { exporter.launch("vibe-iptv-respaldo-${java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())}.json") }
             catch (e: android.content.ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }

@@ -49,8 +49,33 @@ class Storage(private val ctx: Context) {
 
     fun localM3u(id: String) = File(ctx.filesDir, "m3u_$id.m3u")
 
-    fun favorites(sourceId: String): Set<String> = prefs.getStringSet("favs_$sourceId", emptySet())!!.toSet()
-    fun saveFavorites(sourceId: String, set: Set<String>) = prefs.edit().putStringSet("favs_$sourceId", set).apply()
+    // ---------- Perfiles ----------
+    /** Perfil activo ("" = Principal). Favoritos y "Seguir viendo" se guardan por perfil. */
+    var profileId: String
+        get() = prefs.getString("profile", "") ?: ""
+        set(v) = prefs.edit().putString("profile", v).apply()
+    private fun suffix() = profileId.takeIf { it.isNotBlank() }?.let { "@$it" } ?: ""
+    private fun fk(sourceId: String) = "favs_$sourceId${suffix()}"
+    private fun pk(sourceId: String) = "pos_$sourceId${suffix()}"
+
+    fun profiles(): List<Profile> {
+        val arr = runCatching { JSONArray(prefs.getString("profiles", "[]")) }.getOrDefault(JSONArray())
+        return listOf(Profile("", "Principal")) + (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+            .map { Profile(it.optString("id"), it.optString("name"), it.optBoolean("kid")) }
+    }
+    fun saveProfiles(list: List<Profile>) {
+        val arr = JSONArray()
+        list.filter { it.id.isNotBlank() }.forEach { arr.put(JSONObject().put("id", it.id).put("name", it.name).put("kid", it.kid)) }
+        prefs.edit().putString("profiles", arr.toString()).apply()
+    }
+    fun removeProfileData(id: String) {
+        val e = prefs.edit()
+        prefs.all.keys.filter { it.endsWith("@$id") }.forEach { e.remove(it) }
+        e.apply()
+    }
+
+    fun favorites(sourceId: String): Set<String> = prefs.getStringSet(fk(sourceId), emptySet())!!.toSet()
+    fun saveFavorites(sourceId: String, set: Set<String>) = prefs.edit().putStringSet(fk(sourceId), set).apply()
 
     var lastSourceId: String?
         get() = prefs.getString("last_source", null)
@@ -89,11 +114,11 @@ class Storage(private val ctx: Context) {
         get() = prefs.getString("last_item", null)
         set(v) = prefs.edit().putString("last_item", v).apply()
 
-    fun clearFavorites(sourceId: String) = prefs.edit().remove("favs_$sourceId").apply()
+    fun clearFavorites(sourceId: String) = prefs.edit().remove(fk(sourceId)).apply()
 
     // ---------- Seguir viendo ----------
     fun resume(sourceId: String): Map<String, Resume> {
-        val o = runCatching { org.json.JSONObject(prefs.getString("pos_$sourceId", "{}")!!) }.getOrNull() ?: return emptyMap()
+        val o = runCatching { org.json.JSONObject(prefs.getString(pk(sourceId), "{}")!!) }.getOrNull() ?: return emptyMap()
         return o.keys().asSequence().mapNotNull { k ->
             o.optJSONArray(k)?.let { a -> k to Resume(a.optLong(0), a.optLong(1), a.optLong(2), a.optString(3, "")) }
         }.toMap()
@@ -104,9 +129,9 @@ class Storage(private val ctx: Context) {
         map.entries.sortedByDescending { it.value.at }.take(200).forEach { (k, r) ->
             o.put(k, org.json.JSONArray().put(r.pos).put(r.dur).put(r.at).put(r.parent))
         }
-        prefs.edit().putString("pos_$sourceId", o.toString()).apply()
+        prefs.edit().putString(pk(sourceId), o.toString()).apply()
     }
-    fun clearResume(sourceId: String) = prefs.edit().remove("pos_$sourceId").apply()
+    fun clearResume(sourceId: String) = prefs.edit().remove(pk(sourceId)).apply()
 
     // ---------- Respaldo ----------
     /** Todo lo guardado (listas con contraseñas, favoritos, "Seguir viendo", ajustes y listas en archivo) en un JSON. */

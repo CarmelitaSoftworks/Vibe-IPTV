@@ -305,3 +305,44 @@ fun PinDialog(onDismiss: () -> Unit, onPin: (String) -> Boolean) {
         }
     }
 }
+
+
+/** Elegir, crear y borrar perfiles. */
+@Composable
+fun ProfilesDialog(vm: AppViewModel, onDismiss: () -> Unit) {
+    val c = LocalIptv.current
+    var adding by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var kid by remember { mutableStateOf(false) }
+    var askPinFor by remember { mutableStateOf<cl.iptv.player.data.Profile?>(null) }
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { delay(80); runCatching { first.requestFocus() } }
+    Sheet("Perfiles", onDismiss) {
+        Text("Cada perfil tiene sus favoritos y su «Seguir viendo». Un perfil infantil nunca muestra contenido para adultos.", color = c.inkSoft, fontSize = 13.sp)
+        Spacer(Modifier.height(10.dp))
+        vm.profiles.forEachIndexed { i, p ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+                ActionButton((if (p.id == vm.profile.id) "● " else "") + (if (p.kid) "🧒 " else "👤 ") + p.name,
+                    Modifier.weight(1f).then(if (i == 0) Modifier.focusRequester(first) else Modifier), ghost = p.id != vm.profile.id) {
+                    if (p.id == vm.profile.id) onDismiss()
+                    else if (vm.switchProfile(p)) onDismiss() else askPinFor = p
+                }
+                if (p.id.isNotBlank()) ActionButton("Borrar", danger = true) { vm.deleteProfile(p) }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        if (!adding) ActionButton("＋ Nuevo perfil", ghost = true) { adding = true }
+        else {
+            Field(name, { name = it }, "Nombre del perfil")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Pill(if (kid) "🧒 Infantil: sí" else "🧒 Infantil: no", active = kid) { kid = !kid }
+                Spacer(Modifier.weight(1f))
+                ActionButton("Cancelar", ghost = true) { adding = false }
+                ActionButton("Crear") { vm.addProfile(name, kid); adding = false; name = ""; kid = false }
+            }
+        }
+    }
+    askPinFor?.let { target ->
+        PinDialog(onDismiss = { askPinFor = null }) { pin -> if (vm.switchProfile(target, pin)) { askPinFor = null; onDismiss(); true } else false }
+    }
+}

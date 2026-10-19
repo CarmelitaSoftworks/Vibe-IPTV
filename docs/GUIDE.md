@@ -126,7 +126,7 @@ Did your provider send the details over WhatsApp, email or as an image? Use **Fr
 - **Privacy**: text is read on your device. On Android with ML Kit (the model ships inside the app and works offline). On the web with Tesseract.js: if you open the app with `iniciar.bat` or your server, the reader is installed there; otherwise it's downloaded from jsDelivr the first time. The image is never sent to any server.
 - Tip: crop the image so only the details show, and avoid blurry photos or glare.
 
-## 10. Grid guide and catch-up TV (Android)
+## 10. Grid guide and catch-up TV
 
 In **Live TV**, the **📅 Guide** button on the category bar opens the grid: channels on the left and shows on a timeline (from 2 hours ago to 12 hours ahead), with a line marking the current time. It shows the channels of the selected category.
 
@@ -140,7 +140,15 @@ In **Live TV**, the **📅 Guide** button on the category bar opens the grid: ch
 - **Continue watching:** movies and episodes resume where you left off. Posters show a progress bar and there's a **▶ Continue watching** filter in Movies and Series.
 - **Backup** (Android, Settings → Data): **Export backup** saves lists (with passwords), favorites, Continue watching and settings to a `.json` file; **Import backup** restores them on another device. Keep it somewhere private.
 
-## 12. Language
+## 12. Info pages, recording, profiles and controls size
+
+- **Info pages:** choosing a movie shows its info (synopsis, year, rating, genre, cast) with **▶ Play** or **▶ Resume**. For series, the **ⓘ Info** button next to "Back". Xtream accounts already include info; for M3U lists add a free [TMDB](https://www.themoviedb.org/settings/api) key in **Settings → Info pages** (where you can also turn the page off and play directly).
+- **Recording (Android):** on a live channel, the player's **●** button records to *Downloads/VibeIPTV* (`.ts` file, opens with VLC). While recording you see "● REC" with time and size. It uses a separate connection: if your account allows only one, the picture may drop. Keep the app open while recording.
+- **Profiles (Android):** on the lists screen (👤 button) or **Settings → Parental control → Profile**. Each profile has its own favorites and "Continue watching". A **kids** profile never shows adult content and, with a PIN, leaving it asks for the PIN.
+- **Player controls size:** **Settings → Playback**, 70 %–150 % on Android and 80 %–140 % on the web. Handy on large TVs or phones.
+- **Channel list in the player:** shows logo, name (no number) and the current show with its progress.
+
+## 13. Language
 
 The app is available in **Spanish** and **English**. By default it follows the system language (Spanish if the device is in Spanish, otherwise English) and it can be set in **Settings → Appearance → Language**. Translations live in `i18n/en.json`, a single dictionary for both the web app and Android: to fix or add a text, edit it there and run `node i18n/build.mjs`.
 

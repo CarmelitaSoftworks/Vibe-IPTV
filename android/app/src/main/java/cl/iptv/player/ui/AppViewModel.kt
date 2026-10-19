@@ -52,6 +52,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** "Seguir viendo": dónde quedó cada película o episodio de esta lista. */
     var resume by mutableStateOf<Map<String, Resume>>(emptyMap()); private set
 
+    // ---------- Perfiles ----------
+    var profiles by mutableStateOf(store.profiles()); private set
+    var profile by mutableStateOf(store.profiles().firstOrNull { it.id == store.profileId } ?: Profile("", "Principal")); private set
+    /** Cambia de perfil. Salir de un perfil infantil pide el PIN si hay uno (devuelve false si no coincide). */
+    fun switchProfile(p: Profile, pin: String? = null): Boolean {
+        if (profile.kid && !p.kid && parentalOn && pin != settings.parentalPin) return false
+        store.profileId = p.id; profile = p
+        source?.let { favorites = store.favorites(it.id); resume = store.resume(it.id) }
+        adultUnlocked = false; applyParental()
+        message = "Perfil: ${p.name}"
+        return true
+    }
+    fun addProfile(name: String, kid: Boolean) {
+        val p = Profile("p" + System.currentTimeMillis().toString(36), name.trim().ifBlank { "Perfil" }.take(24), kid)
+        store.saveProfiles(profiles + p); profiles = store.profiles()
+    }
+    fun deleteProfile(p: Profile) {
+        if (p.id.isBlank()) return
+        store.saveProfiles(profiles.filter { it.id != p.id }); store.removeProfileData(p.id); profiles = store.profiles()
+        if (profile.id == p.id) switchProfile(profiles.first(), settings.parentalPin)
+    }
+
     // ---------- Control parental ----------
     /** Toda la lista; [items] es lo visible (sin contenido para adultos si hay PIN y está bloqueado). */
     private var allItems: List<Item> = emptyList()
@@ -59,14 +81,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var hiddenAdult by mutableStateOf(0); private set
     val parentalOn: Boolean get() = settings.parentalPin.isNotBlank()
     private fun applyParental() {
-        items = if (parentalOn && !adultUnlocked) allItems.filterNot { it.isAdult() } else allItems
+        // Perfil infantil: el contenido para adultos nunca se muestra
+        items = if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems
         hiddenAdult = allItems.size - items.size
         if (category != CAT_ALL && category != CAT_FAV && category != CAT_RESUME && items.none { it.cat == category }) { category = CAT_ALL; subcategory = "" }
         recompute(false)
     }
     /** Devuelve false si el PIN no coincide. */
     fun unlockAdult(pin: String): Boolean {
-        if (pin != settings.parentalPin) return false
+        if (pin != settings.parentalPin || profile.kid) return false
         adultUnlocked = true; applyParental(); message = "Contenido para adultos visible hasta cerrar la app"; return true
     }
     fun lockAdult() { adultUnlocked = false; applyParental(); message = "Contenido para adultos oculto" }

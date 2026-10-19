@@ -140,7 +140,7 @@ private fun CategoryBar(vm: AppViewModel) {
             if (nFav > 0) item { Pill("★ Favoritos  $nFav", active = vm.category == CAT_FAV) { vm.selectCategory(CAT_FAV) } }
             items(cats, key = { it.first }) { (c, n) -> Pill("$c  $n", active = vm.category == c) { vm.selectCategory(c) } }
             // Control parental: categorías para adultos ocultas con PIN
-            if (vm.parentalOn && !vm.adultUnlocked && vm.hiddenAdult > 0) item { Pill("🔒 Adultos") { askPin = true } }
+            if (vm.parentalOn && !vm.adultUnlocked && !vm.profile.kid && vm.hiddenAdult > 0) item { Pill("🔒 Adultos") { askPin = true } }
             if (vm.parentalOn && vm.adultUnlocked) item { Pill("🔓 Ocultar adultos") { vm.lockAdult() } }
         }
         if (subs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(3.dp)) {
