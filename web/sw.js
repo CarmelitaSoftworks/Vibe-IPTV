@@ -1,7 +1,7 @@
 // Service worker mínimo: cachea sólo la interfaz (nunca streams ni listas)
-const CACHE = 'vibe-shell-v6';
+const CACHE = 'vibe-shell-v7';
 const SHELL = ['./', 'index.html', 'css/styles.css', 'js/app.js', 'js/m3u.js', 'js/xtream.js', 'js/epg.js',
-  'js/player.js', 'js/net.js', 'js/nav.js', 'js/storage.js', 'js/subtitles.js', 'js/settings.js', 'js/demo.js', 'js/i18n.js', 'js/i18n-en.js', 'js/ocr.js', 'js/ocr-parse.js',
+  'js/player.js', 'js/net.js', 'js/nav.js', 'js/storage.js', 'js/subtitles.js', 'js/settings.js', 'js/demo.js', 'js/i18n.js', 'js/i18n-en.js', 'js/ocr.js', 'js/ocr-parse.js', 'js/extras.js',
   'vendor/hls.min.js', 'vendor/mpegts.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));

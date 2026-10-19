@@ -10,6 +10,7 @@ import * as store from './storage.js';
 import * as subs from './subtitles.js';
 import { demoM3U, demoEpg, DEMO_SOURCE } from './demo.js';
 import { readScreenshot } from './ocr.js';
+import { openGuide, openDetails, catchupUrl, exportBackup, importBackup } from './extras.js';
 
 // En la versión artefacto (vista previa dentro de Claude) se define __ARTIFACT__ al empaquetar
 const IS_ARTIFACT = typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__;
@@ -443,6 +444,7 @@ function renderCatBar() {
   row1.innerHTML = ''; row2.innerHTML = '';
   row1.append(chip('Todos', state.category === ALL, () => selectCategory(ALL), items.length));
   const nFav = items.filter((i) => state.favs.has(i.id)).length;
+  if (state.section === 'live') row1.append(chip('📅 Guía', false, showGuide));
   const rids = resumeIds();
   const nRes = items.filter((i) => rids.has(i.id)).length;
   if (nRes) row1.append(chip('▶ Seguir viendo', state.category === RESUME, () => selectCategory(RESUME), nRes));
@@ -616,9 +618,11 @@ function updateFocusInfo(item) {
   $('fiEpg').textContent = extra;
 }
 
-async function activate(idx) {
+async function activate(idx, skipDetails = false) {
   const item = state.view[idx];
   if (!item) return;
+  // Películas: ficha antes de reproducir (Ajustes → Fichas)
+  if (item.kind === 'movie' && cfg().showDetails && !skipDetails && !String(item.id).startsWith('cu_')) return showDetailsFor(item, idx);
   if (item.kind === 'series') {
     loader(true, 'Cargando episodios…');
     try {
@@ -631,6 +635,48 @@ async function activate(idx) {
     return;
   }
   openPlayer(item, state.view.filter((i) => i.kind === item.kind), state.view.filter((i) => i.kind === item.kind).indexOf(item));
+}
+
+/* ---------- fichas, guía en grilla, diferido y respaldo ---------- */
+function showDetailsFor(item, idx = state.view.indexOf(item)) {
+  const back = document.activeElement;
+  openDetails(item, {
+    xt: state.xt, tmdbKey: cfg().tmdbKey, lang: getLangCode(),
+    resume: item.kind !== 'series' ? state.resume?.[item.id] : null,
+    fav: () => state.favs.has(item.id),
+    toggleFav: () => toggleFavorite(item),
+    play: () => activate(idx, true),
+    playFromStart: () => { delete state.resume[item.id]; store.saveResume(state.source.id, state.resume); activate(idx, true); },
+    openEpisodes: () => { if (state.series !== item) activate(idx, true); },
+    fmtDur,
+  }, () => back?.focus?.());
+}
+const getLangCode = () => (document.documentElement.lang === 'en' ? 'en-US' : 'es-MX');
+
+function guideChannels() {
+  return !state.home && state.section === 'live' && !state.series && !state.query ? state.view.filter((i) => i.kind === 'live') : state.items.filter((i) => i.kind === 'live');
+}
+function showGuide() {
+  const back = document.activeElement;
+  const channels = guideChannels();
+  openGuide({
+    channels, epg: state.epg, shift: epgShift(), fmtTime, toast,
+    play: (ch, list) => openPlayer(ch, list, list.indexOf(ch)),
+    playCatchup: (ch, prog) => {
+      const url = catchupUrl(ch, prog);
+      if (!url) return toast(t('Este canal no tiene TV en diferido.'));
+      const it = { ...ch, id: `cu_${ch.id}_${prog.start}`, kind: 'movie', url, name: `${prog.title} · ${ch.name}`, num: null };
+      openPlayer(it, [it], 0);
+    },
+  }, () => back?.focus?.());
+}
+
+async function doImportBackup() {
+  try {
+    const n = await importBackup();
+    toast(t(`Respaldo restaurado: ${n} listas`));
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { if (e) toast(t(`No se pudo restaurar: ${e.message}`)); }
 }
 
 function closeSeries(rerender = true) {
@@ -1206,6 +1252,7 @@ $('welcomeSettings').onclick = () => openSettings();
 $('btnCategories').onclick = () => state.source ? openSheet('catSheet') : showWelcome(true);
 $('btnSearch').onclick = () => openSheet('searchSheet');
 $('btnCrumbBack').onclick = () => closeSeries();
+$('btnCrumbInfo').onclick = () => { if (state.series) showDetailsFor(state.series); };
 $('backdrop').onclick = () => closeSheets();
 $('pgPrev').onclick = () => goPage(-1);
 $('pgNext').onclick = () => goPage(1);
@@ -1299,6 +1346,8 @@ const settingsCtx = {
   toast,
   apply: (key) => applySettings(key),
   clearEpgCache: async () => { for (const s of store.getSources()) await store.idbDel(`epg:${s.id}`).catch(() => {}); },
+  exportBackup: () => exportBackup().then(() => toast(t('Respaldo guardado. Contiene tus contraseñas: guárdalo en un lugar privado.'), 6000)),
+  importBackup: () => doImportBackup(),
   clearResume: () => { store.clearResume(state.source.id); state.resume = {}; refresh(); },
   clearFavorites: () => { if (!state.source) return; for (const id of [...state.favs]) store.toggleFav(state.source.id, id); state.favs = new Set(); refresh(); },
 };

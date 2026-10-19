@@ -75,11 +75,17 @@ function sections() {
     { id: 'startup', name: 'Inicio de la app', rows: [
       { type: 'choice', key: 'startup', label: 'Al abrir la app', options: [['home', 'Inicio de la última lista'], ['welcome', 'Pantalla de mis listas'], ['lastChannel', 'Último canal visto']] },
     ] },
+    { id: 'meta', name: 'Fichas', rows: [
+      { type: 'toggle', key: 'showDetails', label: 'Mostrar la ficha de las películas', desc: 'Al elegir una película se ve su sinopsis antes de reproducir' },
+      { type: 'text', key: 'tmdbKey', label: 'Clave de TMDB (opcional)', desc: 'Gratis en themoviedb.org → Ajustes → API. Las cuentas Xtream ya traen fichas; la clave sirve para listas M3U.', secret: true },
+    ] },
     { id: 'parental', name: 'Control parental', rows: [
       { type: 'text', key: 'parentalPin', label: 'PIN de control parental', desc: '4 dígitos. Con PIN, las categorías para adultos (XXX, Adultos, +18…) quedan ocultas. Vacío = desactivado.', secret: true },
       { type: 'info', label: 'Contenido para adultos', value: () => { const s = st; return !store.getSettings().parentalPin ? 'Visible (sin PIN)' : s.adultUnlocked ? 'Desbloqueado' : `Oculto (${s.hiddenAdult || 0})`; } },
     ] },
     { id: 'data', name: 'Datos', rows: [
+      { type: 'action', label: 'Exportar respaldo', desc: 'Listas (con contraseñas), favoritos, Seguir viendo y ajustes en un archivo', arrow: true, run: () => ctx.exportBackup() },
+      { type: 'action', label: 'Importar respaldo', desc: 'Reemplaza lo guardado en este equipo por el del archivo', arrow: true, run: () => ctx.importBackup() },
       { type: 'danger', label: 'Borrar "Seguir viendo"', desc: 'Olvida dónde quedaste en películas y series de esta lista', run: () => { if (!st.source) return ctx.toast('Abre una lista primero'); ctx.clearResume(); ctx.toast('"Seguir viendo" borrado'); } },
       { type: 'danger', label: 'Borrar guías guardadas', desc: 'Se vuelven a descargar al abrir cada lista', run: async () => { await ctx.clearEpgCache(); ctx.toast('Guías guardadas borradas'); } },
       { type: 'danger', label: 'Borrar favoritos de esta lista', run: () => { if (!st.source) return ctx.toast('Abre una lista primero'); ctx.clearFavorites(); ctx.toast('Favoritos borrados'); } },

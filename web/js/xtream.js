@@ -47,6 +47,7 @@ export class XtreamClient {
         if (Number(info.user_info.auth) !== 1) throw new Error('Usuario o contraseña incorrectos');
         if (info.user_info.status && !/active/i.test(info.user_info.status)) throw new Error(`La cuenta está ${String(info.user_info.status).toLowerCase()}`);
         this.workingBase = base;
+        this.serverTz = info.server_info?.timezone || '';
         // Usar un formato que la cuenta permita (algunas sólo aceptan .ts)
         const allowed = (info.user_info.allowed_output_formats || []).map(String);
         if (allowed.length && !allowed.includes(this.liveFormat)) this.liveFormat = allowed.includes('m3u8') ? 'm3u8' : allowed.includes('ts') ? 'ts' : this.liveFormat;
@@ -81,6 +82,10 @@ export class XtreamClient {
       id: `l${s.stream_id}`, kind: 'live', name: s.name || 'Canal', logo: s.stream_icon || '',
       group: lcm.get(String(s.category_id)) || 'Sin categoría', tvgId: s.epg_channel_id || '', tvgName: s.name || '',
       url: this.liveUrl(s.stream_id), num: s.num,
+      // TV en diferido (catch-up)
+      archiveDays: String(s.tv_archive) === '1' ? Number(s.tv_archive_duration) || 0 : 0,
+      catchup: String(s.tv_archive) === '1' ? `${this.base}/timeshift/${this.u}/${this.p}/{dur}/{start}/${s.stream_id}.ts` : '',
+      catchupTz: this.serverTz || '',
     });
     for (const s of arr(vs)) items.push({
       id: `v${s.stream_id}`, kind: 'movie', name: s.name || 'Película', logo: s.stream_icon || '',

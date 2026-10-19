@@ -621,3 +621,52 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 
 /* ===== Tamaño de los controles del reproductor (Ajustes → Reproducción) ===== */
 #playerView .osd > *, #playerView .plist, #playerView .pmenu, #playerView .pinfo, #playerView .perror { zoom: var(--hud, 1); }
+
+/* ===== Guía en grilla ===== */
+.guide-view { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; color: var(--ink);
+  background: repeating-linear-gradient(0deg, var(--bg-lines) 0 1px, transparent 1px 4px), var(--bg); outline: none; }
+.guide-head { display: flex; align-items: center; gap: 16px; padding: 14px 24px 6px; }
+.guide-head h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.guide-head small { color: var(--accent-deep); font-weight: 700; }
+.guide-head > div { flex: 1; min-width: 0; }
+.guide-clock { font-size: 20px; }
+.guide-info { min-height: 52px; padding: 2px 28px 8px; font-size: 15px; line-height: 1.35; }
+.guide-info small { color: var(--ink-soft); display: block; max-height: 2.7em; overflow: hidden; }
+.guide-scroll { flex: 1; overflow: auto; padding: 0 12px 24px 16px; scroll-behavior: smooth; }
+.guide-ruler { position: sticky; top: 0; z-index: 3; display: flex; height: 28px; background: var(--bg); }
+.gc-spacer { position: sticky; left: 0; z-index: 2; flex: 0 0 216px; background: var(--bg); }
+.gr-times { position: relative; height: 100%; }
+.gr-times span { position: absolute; top: 4px; padding-left: 4px; font-size: 12px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+.g-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 1; pointer-events: none; }
+.g-row { display: flex; height: 62px; margin-top: 6px; }
+.g-chan { position: sticky; left: 0; z-index: 2; flex: 0 0 210px; margin-right: 6px; display: flex; align-items: center; gap: 8px; padding: 0 8px;
+  border-radius: 12px; border: 1px solid var(--tile-edge); background: var(--tile-a); font-weight: 800; font-size: 13px; overflow: hidden; }
+.g-chan img { width: 40px; height: 30px; object-fit: contain; flex: none; }
+.g-chan span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.15; }
+.g-chan small { display: block; color: var(--accent-deep); font-size: 10px; }
+.g-progs { position: relative; height: 100%; flex: none; }
+.g-prog { position: absolute; top: 2px; bottom: 2px; border-radius: 10px; border: 1px solid var(--tile-edge); background: var(--tile-a);
+  color: var(--ink); font: 700 13px/1.15 inherit; text-align: left; padding: 0 8px; overflow: hidden; cursor: pointer;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.g-prog.now { background: color-mix(in srgb, var(--accent) 22%, var(--tile-a)); border-color: var(--accent); font-weight: 800; }
+.g-prog.past { background: color-mix(in srgb, var(--tile-b) 60%, transparent); color: var(--ink-soft); }
+.g-prog.past.archive { color: var(--ink); background: var(--tile-b); }
+.g-prog:focus, .g-prog:hover { outline: none; background: #fff; border: 3px solid var(--focus); color: #1a1f23; z-index: 2; }
+.guide-more { height: 1px; }
+
+/* ===== Ficha de película / serie ===== */
+.details-view { position: fixed; inset: 0; z-index: 60; background: #101417; color: #fff; overflow: hidden; outline: none; }
+.d-back { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: .35; }
+.d-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(16,20,23,.95), rgba(16,20,23,.7) 55%, rgba(16,20,23,.25)); }
+.d-body { position: relative; display: flex; gap: clamp(18px, 3vw, 40px); height: 100%; padding: clamp(18px, 4vw, 48px); box-sizing: border-box; }
+.d-poster { height: 100%; max-height: 640px; aspect-ratio: 2/3; object-fit: cover; border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,.5); flex: none; }
+.d-text { flex: 1; min-width: 0; overflow: auto; }
+.d-text h2 { margin: 0 0 6px; font-size: clamp(24px, 3.4vw, 40px); font-weight: 800; line-height: 1.1; }
+.d-line { color: #3fd2ff; font-weight: 700; margin: 0 0 16px; }
+.d-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.d-plot { font-size: 16px; line-height: 1.55; opacity: .92; max-width: 760px; }
+.d-meta { font-size: 14px; opacity: .85; margin: 6px 0; }
+.d-muted { opacity: .7; }
+.d-source { font-size: 11px; opacity: .4; }
+.details-view .btn.ghost { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.25); }
+@media (max-width: 640px) { .d-body { flex-direction: column; overflow: auto; } .d-poster { height: 240px; align-self: center; } }
