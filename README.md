@@ -61,6 +61,8 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Desde una captura de pantalla**: sube la foto o captura del mensaje de tu proveedor y el servidor, usuario, contraseña, enlace M3U y guía se rellenan solos. La lectura se hace en tu equipo (ML Kit en Android, Tesseract.js en la web): la imagen no se envía a ningún servidor.
 - **Varias listas guardadas** y cambio rápido entre ellas.
 - **Guía de programación XMLTV** (también comprimida en .gz) que se **actualiza sola** al agregar una lista y al abrir la app. Admite varias guías combinadas y ajuste de horario.
+- **Guía en grilla** (Android): canales y programas en una línea de tiempo, navegable con el control.
+- **TV en diferido** (catch-up de Xtream): los programas ya emitidos se ven desde el inicio, si tu cuenta lo permite.
 - Compatible con guías generadas con el proyecto libre [iptv-org/epg](https://github.com/iptv-org/epg).
 
 ### 💬 Subtítulos
@@ -76,6 +78,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 ### 🔒 Privacidad
 - **Sin cuentas, sin anuncios y sin telemetría.** Tus listas, favoritos y ajustes se guardan solo en tu equipo ([política de privacidad](PRIVACIDAD.md)).
 - **Control parental:** con un PIN, las categorías para adultos quedan ocultas.
+- **Respaldo** (Android): exporta e importa listas, favoritos, «Seguir viendo» y ajustes en un archivo, por ejemplo al cambiar de TV.
 - Las contraseñas de Xtream se ocultan en mensajes de error y registros.
 
 ---

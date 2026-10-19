@@ -74,7 +74,12 @@ function sections() {
     { id: 'startup', name: 'Inicio de la app', rows: [
       { type: 'choice', key: 'startup', label: 'Al abrir la app', options: [['home', 'Inicio de la última lista'], ['welcome', 'Pantalla de mis listas'], ['lastChannel', 'Último canal visto']] },
     ] },
+    { id: 'parental', name: 'Control parental', rows: [
+      { type: 'text', key: 'parentalPin', label: 'PIN de control parental', desc: '4 dígitos. Con PIN, las categorías para adultos (XXX, Adultos, +18…) quedan ocultas. Vacío = desactivado.', secret: true },
+      { type: 'info', label: 'Contenido para adultos', value: () => { const s = st; return !store.getSettings().parentalPin ? 'Visible (sin PIN)' : s.adultUnlocked ? 'Desbloqueado' : `Oculto (${s.hiddenAdult || 0})`; } },
+    ] },
     { id: 'data', name: 'Datos', rows: [
+      { type: 'danger', label: 'Borrar "Seguir viendo"', desc: 'Olvida dónde quedaste en películas y series de esta lista', run: () => { if (!st.source) return ctx.toast('Abre una lista primero'); ctx.clearResume(); ctx.toast('"Seguir viendo" borrado'); } },
       { type: 'danger', label: 'Borrar guías guardadas', desc: 'Se vuelven a descargar al abrir cada lista', run: async () => { await ctx.clearEpgCache(); ctx.toast('Guías guardadas borradas'); } },
       { type: 'danger', label: 'Borrar favoritos de esta lista', run: () => { if (!st.source) return ctx.toast('Abre una lista primero'); ctx.clearFavorites(); ctx.toast('Favoritos borrados'); } },
       { type: 'danger', label: 'Restablecer ajustes', desc: 'Vuelve a los valores de fábrica (no borra tus listas)', run: () => { store.resetSettings(); ctx.apply(); ctx.toast('Ajustes restablecidos'); renderAll(); } },

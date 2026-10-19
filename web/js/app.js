@@ -22,7 +22,41 @@ const SECTION_ICONS = {
   movie: '<svg viewBox="0 0 48 48"><rect x="6" y="16" width="36" height="25" rx="4"/><path d="m6 16 4-9 34 0-3 9M14 7l5 9M24 7l5 9M34 7l5 9"/><path d="m21 24 8 4.5-8 4.5z" fill="currentColor"/></svg>',
   series: '<svg viewBox="0 0 48 48"><rect x="4" y="15" width="30" height="22" rx="4"/><path d="M10 10h28a4 4 0 0 1 4 4v18M16 5h26a4 4 0 0 1 4 4v16"/><path d="m16 22 7 4-7 4z" fill="currentColor"/></svg>',
 };
-const ALL = '__all__', FAV = '__fav__';
+const ALL = '__all__', FAV = '__fav__', RESUME = '__resume__';
+
+/* ---------- control parental ---------- */
+const ADULT = /(^|[^a-z])(xxx|adult[oa]?s?|adults?|er[oó]tic[oa]s?|porno?|hentai|playboy|\+ ?18|18 ?\+|for adults|para adultos)([^a-z]|$)/i;
+const isAdult = (i) => ADULT.test(i.group || '') || ADULT.test(i.cat || '') || ADULT.test(i.sub || '');
+const parentalOn = () => !!store.getSettings().parentalPin;
+function applyParental() {
+  const all = state.allItems || [];
+  state.items = parentalOn() && !state.adultUnlocked ? all.filter((i) => !isAdult(i)) : all;
+  state.hiddenAdult = all.length - state.items.length;
+  if (![ALL, FAV, RESUME].includes(state.category) && !state.items.some((i) => i.cat === state.category)) { state.category = ALL; state.sub = ''; }
+}
+function unlockAdult() {
+  const pin = prompt(t('Escribe el PIN para ver el contenido para adultos hasta cerrar la app.'));
+  if (pin == null) return;
+  if (pin !== store.getSettings().parentalPin) return toast(t('PIN incorrecto'));
+  state.adultUnlocked = true; applyParental(); renderTabs(); refresh(true); toast(t('Contenido para adultos visible hasta cerrar la app'));
+}
+function lockAdult() { state.adultUnlocked = false; applyParental(); renderTabs(); refresh(true); toast(t('Contenido para adultos oculto')); }
+
+/* ---------- seguir viendo ---------- */
+function savePosition(item) {
+  if (!item || item.kind === 'live' || !state.source || !isFinite(video.duration) || video.duration <= 0) return;
+  const pos = video.currentTime * 1000, dur = video.duration * 1000;
+  const map = state.resume;
+  const done = pos > dur - 90_000 || pos > dur * 0.95;
+  if (done || pos < 30_000) delete map[item.id];
+  else map[item.id] = { pos, dur, at: Date.now(), parent: state.series?.id || map[item.id]?.parent || '' };
+  store.saveResume(state.source.id, map);
+}
+function resumeIds() {
+  const ids = new Set(Object.keys(state.resume));
+  for (const r of Object.values(state.resume)) if (r.parent) ids.add(r.parent);
+  return ids;
+}
 
 const state = {
   source: null, items: [], epg: new Epg(), xt: null,
@@ -72,6 +106,7 @@ function applySettings(key) {
   body.classList.toggle('no-epginfo', !s.showEpgInfo);
   root.style.setProperty('--cue-size', { small: '.8em', normal: '1em', large: '1.3em', xlarge: '1.6em' }[s.subSize] || '1em');
   if (key === 'tileSize' && state.source) refresh();
+  if (key === 'parentalPin' && state.source) { state.adultUnlocked = false; applyParental(); renderTabs(); refresh(true); }
   if (key === 'epgOffset') updateFocusInfo();
   if (key === 'liveFormat' && state.source?.type === 'xtream') openSource(state.source);
 }
@@ -133,6 +168,8 @@ async function openSource(src) {
   state.epg = new Epg();
   state.epgUrls = ''; state.epgAt = 0; state.epgStatus = '';
   state.favs = store.getFavs(src.id);
+  state.resume = store.getResume(src.id);
+  state.allItems = [];
   if (!src.demo) loadCachedEpg(src); // la última guía guardada se muestra al instante
   $('sourceName').textContent = src.name;
   store.saveLast({ sourceId: src.id });
@@ -160,6 +197,7 @@ async function openSource(src) {
       epgUrl ||= parsed.epgUrl;
     }
     for (const it of state.items) Object.assign(it, splitGroup(it.group));   // categoría y subcategoría
+    state.allItems = state.items; applyParental();                            // control parental
     const kinds = Object.keys(SECTIONS).filter((k) => state.items.some((i) => i.kind === k));
     state.section = kinds.includes(state.section) ? state.section : (kinds[0] || 'live');
     state.category = ALL; state.sub = '';
@@ -356,6 +394,11 @@ function computeView() {
     list = list.filter((i) => norm(i.name).includes(q));
   } else if (!state.series) {
     if (state.category === FAV) list = list.filter((i) => state.favs.has(i.id));
+    else if (state.category === RESUME) {
+      const ids = resumeIds();
+      const at = (i) => state.resume[i.id]?.at || Math.max(0, ...Object.values(state.resume).filter((r) => r.parent === i.id).map((r) => r.at));
+      list = list.filter((i) => ids.has(i.id)).sort((a, b) => at(b) - at(a));
+    }
     else if (state.category !== ALL) {
       list = list.filter((i) => i.cat === state.category);
       if (state.sub) list = list.filter((i) => i.sub === state.sub);
@@ -370,6 +413,7 @@ function categoryLabel() {
   if (state.series) return state.series.name;
   if (state.category === ALL) return `${SECTIONS[state.section]} · Todos`;
   if (state.category === FAV) return 'Favoritos';
+  if (state.category === RESUME) return 'Seguir viendo';
   return state.sub ? `${state.category} · ${state.sub}` : state.category;
 }
 
@@ -398,11 +442,16 @@ function renderCatBar() {
   row1.innerHTML = ''; row2.innerHTML = '';
   row1.append(chip('Todos', state.category === ALL, () => selectCategory(ALL), items.length));
   const nFav = items.filter((i) => state.favs.has(i.id)).length;
+  const rids = resumeIds();
+  const nRes = items.filter((i) => rids.has(i.id)).length;
+  if (nRes) row1.append(chip('▶ Seguir viendo', state.category === RESUME, () => selectCategory(RESUME), nRes));
   if (nFav) row1.append(chip('★ Favoritos', state.category === FAV, () => selectCategory(FAV), nFav));
   for (const [cat, n] of counts) row1.append(chip(cat, state.category === cat, () => selectCategory(cat), n));
+  if (parentalOn() && !state.adultUnlocked && state.hiddenAdult) row1.append(chip('🔒 Adultos', false, unlockAdult));
+  if (parentalOn() && state.adultUnlocked) row1.append(chip('🔓 Ocultar adultos', false, lockAdult));
   // Subcategorías de la categoría elegida (si la lista las trae)
   const subs = new Map();
-  if (state.category !== ALL && state.category !== FAV) for (const it of items) if (it.cat === state.category && it.sub) subs.set(it.sub, (subs.get(it.sub) || 0) + 1);
+  if (![ALL, FAV, RESUME].includes(state.category)) for (const it of items) if (it.cat === state.category && it.sub) subs.set(it.sub, (subs.get(it.sub) || 0) + 1);
   row2.hidden = subs.size === 0;
   if (subs.size) {
     row2.append(chip('Todas', !state.sub, () => selectCategory(state.category, '')));
@@ -472,6 +521,8 @@ function tileFor(item, idxInView) {
   const fav = state.favs.has(item.id) ? '<span class="fav">★</span>' : '';
   const num = item.kind === 'live' && item.num ? `<span class="num">${esc(item.num)}</span>` : '';
   b.innerHTML = `${num}${fav}${item.logo ? `<img loading="lazy" alt="" src="${esc(item.logo)}">` : `<span class="initials">${esc(initials(item.name))}</span>`}<span class="label">${esc(item.name)}</span>`;
+  const r = state.resume?.[item.id];
+  if (r?.dur) b.insertAdjacentHTML('beforeend', `<span class="progress"><i style="width:${Math.min(100, (r.pos / r.dur) * 100).toFixed(1)}%"></i></span>`);
   const img = b.querySelector('img');
   if (img) img.onerror = () => { b.classList.remove('poster'); img.replaceWith(Object.assign(document.createElement('span'), { className: 'initials', textContent: initials(item.name) })); };
   b.addEventListener('click', () => activate(idxInView));
@@ -700,6 +751,13 @@ function playCurrent() {
   store.saveLast({ itemId: item.id });
   if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: item.name, artist: item.group, artwork: item.logo ? [{ src: item.logo }] : [] });
   player.play(item);
+  // Seguir viendo: continuar donde quedó
+  const saved = item.kind !== 'live' ? state.resume?.[item.id] : null;
+  if (saved) video.addEventListener('loadedmetadata', function seek() {
+    if (state.playing === item && isFinite(video.duration) && saved.pos < video.duration * 1000) {
+      video.currentTime = saved.pos / 1000; toast(t(`Continuando desde ${fmtDur(saved.pos / 1000)}`));
+    }
+  }, { once: true });
   showOsd();
 }
 
@@ -762,11 +820,13 @@ async function showPlayError(msg) {
 
 function zap(delta) {
   if (state.playList.length < 2) return;
+  savePosition(state.playing);
   state.playIndex = (state.playIndex + delta + state.playList.length) % state.playList.length;
   playCurrent();
 }
 
 function closePlayer() {
+  savePosition(state.playing);
   player.destroy();
   closePlayerMenu(); $('pListPanel').hidden = true;
   if (!$('pInfo').hidden) toggleInfo();
@@ -942,7 +1002,9 @@ video.addEventListener('ended', () => {
     zap(1);
   }
 });
+let lastSave = 0;
 video.addEventListener('timeupdate', () => {
+  if (Date.now() - lastSave > 10_000) { lastSave = Date.now(); savePosition(state.playing); }
   if (!isFinite(video.duration)) return;
   if (document.activeElement !== $('pSeek')) $('pSeek').value = (video.currentTime / video.duration) * 1000 || 0;
   $('pTimeCur').textContent = fmtDur(video.currentTime);
@@ -1236,6 +1298,7 @@ const settingsCtx = {
   toast,
   apply: (key) => applySettings(key),
   clearEpgCache: async () => { for (const s of store.getSources()) await store.idbDel(`epg:${s.id}`).catch(() => {}); },
+  clearResume: () => { store.clearResume(state.source.id); state.resume = {}; refresh(); },
   clearFavorites: () => { if (!state.source) return; for (const id of [...state.favs]) store.toggleFav(state.source.id, id); state.favs = new Set(); refresh(); },
 };
 initSettings(settingsCtx);

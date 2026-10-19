@@ -126,7 +126,21 @@ Did your provider send the details over WhatsApp, email or as an image? Use **Fr
 - **Privacy**: text is read on your device. On Android with ML Kit (the model ships inside the app and works offline). On the web with Tesseract.js: if you open the app with `iniciar.bat` or your server, the reader is installed there; otherwise it's downloaded from jsDelivr the first time. The image is never sent to any server.
 - Tip: crop the image so only the details show, and avoid blurry photos or glare.
 
-## 10. Language
+## 10. Grid guide and catch-up TV (Android)
+
+In **Live TV**, the **📅 Guide** button on the category bar opens the grid: channels on the left and shows on a timeline (from 2 hours ago to 12 hours ahead), with a line marking the current time. It shows the channels of the selected category.
+
+- ▲▼ changes channel, ◄► moves through shows, and the top shows the title, time and description.
+- **OK on the show on air** opens the channel live.
+- **Shows already aired with ⏪:** if your Xtream account has catch-up for that channel, you can watch them **from the start**. Channels with archive show "⏪ N d" (days available).
+
+## 11. Parental control, Continue watching and backup
+
+- **Parental control** (Settings → Parental control): with a PIN, adult categories (XXX, Adults, Erotic, 18+…) are hidden. Show them with **🔒 Adults** on the category bar by entering the PIN, until the app closes.
+- **Continue watching:** movies and episodes resume where you left off. Posters show a progress bar and there's a **▶ Continue watching** filter in Movies and Series.
+- **Backup** (Android, Settings → Data): **Export backup** saves lists (with passwords), favorites, Continue watching and settings to a `.json` file; **Import backup** restores them on another device. Keep it somewhere private.
+
+## 12. Language
 
 The app is available in **Spanish** and **English**. By default it follows the system language (Spanish if the device is in Spanish, otherwise English) and it can be set in **Settings → Appearance → Language**. Translations live in `i18n/en.json`, a single dictionary for both the web app and Android: to fix or add a text, edit it there and run `node i18n/build.mjs`.
 

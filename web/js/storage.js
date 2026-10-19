@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS = {
   osApiKey: '', osUser: '', osPass: '', subLangs: 'es,en', subSize: 'normal', subdlKey: '',
   // Inicio de la app
   startup: 'home',
+  // Control parental: PIN ('' = desactivado)
+  parentalPin: '',
 };
 
 export const getSettings = () => ({ ...DEFAULT_SETTINGS, ...read(K.settings, {}) });
@@ -48,6 +50,14 @@ export function removeSource(id) {
   saveSources(getSources().filter((s) => s.id !== id));
   try { localStorage.removeItem(K.favs(id)); } catch {}
 }
+
+// "Seguir viendo": { itemId: { pos, dur, at, parent } } en milisegundos
+export const getResume = (sourceId) => read(`iptv.pos.${sourceId}`, {});
+export function saveResume(sourceId, map) {
+  const top = Object.entries(map).sort((a, b) => b[1].at - a[1].at).slice(0, 200);
+  write(`iptv.pos.${sourceId}`, Object.fromEntries(top));
+}
+export const clearResume = (sourceId) => { try { localStorage.removeItem(`iptv.pos.${sourceId}`); } catch {} };
 
 export const getFavs = (sourceId) => new Set(read(K.favs(sourceId), []));
 export function toggleFav(sourceId, itemId) {

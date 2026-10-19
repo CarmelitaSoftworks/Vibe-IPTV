@@ -614,3 +614,7 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 .field.ocr-filled { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .form-note { margin: 4px 0 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4;
   background: color-mix(in srgb, var(--accent) 10%, var(--sheet)); color: var(--ink); }
+
+/* ===== Seguir viendo: barra de avance en la carátula ===== */
+.tile .progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,.45); z-index: 2; }
+.tile .progress i { display: block; height: 100%; background: var(--accent); }
