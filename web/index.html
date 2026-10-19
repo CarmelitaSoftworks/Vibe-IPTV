@@ -125,6 +125,8 @@
   <section id="playerView" class="player" hidden>
     <video id="video" playsinline crossorigin="anonymous"></video>
     <div class="status" id="pStatus" hidden></div>
+    <div class="pdigits" id="pDigits" hidden></div>
+    <div class="seek-flash" id="pSeekFlash" hidden></div>
     <div class="perror" id="pError" hidden role="alert">
       <b id="pErrTitle">No se pudo reproducir</b>
       <p id="pErrText"></p>
@@ -159,6 +161,9 @@
             <button class="ctl" id="pQuality" data-nav data-tip="Calidad" aria-label="Calidad"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M7 9v6M7 12h3.5M10.5 9v6M14 9v6h1.5a3 3 0 0 0 0-6z"/></svg></button>
             <button class="ctl" id="pAspect" data-nav data-tip="Formato de pantalla" aria-label="Formato de pantalla"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M6.5 10V8.5h2.5M17.5 14v1.5H15"/></svg></button>
             <button class="ctl" id="pSpeed" data-nav data-tip="Velocidad" aria-label="Velocidad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 14 4-5"/><circle cx="12" cy="14" r="1.4" fill="currentColor"/></svg></button>
+            <button class="ctl" id="pLast" data-nav data-tip="Canal anterior" aria-label="Canal anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2-5"/><path d="M4 4v4.5h4.5"/></svg></button>
+            <button class="ctl" id="pMulti" data-nav data-tip="Multivista" aria-label="Multivista"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="8" height="6.5" rx="1.5"/><rect x="13" y="4.5" width="8" height="6.5" rx="1.5"/><rect x="3" y="13" width="8" height="6.5" rx="1.5"/><rect x="13" y="13" width="8" height="6.5" rx="1.5"/></svg></button>
+            <button class="ctl" id="pSleep" data-nav data-tip="Temporizador para dormir" aria-label="Temporizador para dormir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
             <button class="ctl" id="pInfoBtn" data-nav data-tip="Información" aria-label="Información"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.7" r="1.1" fill="currentColor"/></svg></button>
             <button class="ctl" id="pFav" data-nav data-tip="Favorito" aria-label="Favorito"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></button>
             <button class="ctl" id="pPip" data-nav data-tip="Imagen en imagen" aria-label="Imagen en imagen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><rect x="12" y="11" width="7" height="6" rx="1.2" fill="currentColor"/></svg></button>

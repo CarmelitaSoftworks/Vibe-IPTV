@@ -691,6 +691,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun resetSettings() { updateSettings(Settings()); message = "Ajustes restablecidos" }
 
+    // ---------- SubDL ----------
+    var subdlStatus by mutableStateOf(""); private set
+    fun checkSubdl() {
+        subdlStatus = "Comprobando…"
+        viewModelScope.launch {
+            subdlStatus = runCatching { subtitleSources.subdlAccount(settings.subdlKey) }.getOrElse { it.message ?: "error" }
+        }
+    }
+
     // ---------- Multivista ----------
     var multiview by mutableStateOf<List<Item>?>(null); private set
     fun openMultiview(item: Item) {

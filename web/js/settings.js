@@ -23,6 +23,7 @@ const icon = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</sv
 const ACCENTS = [['celeste', 'Celeste'], ['verde', 'Verde'], ['naranja', 'Naranja'], ['rosa', 'Rosa'], ['violeta', 'Violeta']];
 const OFFSETS = [-3, -2, -1, 0, 1, 2, 3].map((h) => [h, h === 0 ? 'Sin desfase' : `${h > 0 ? '+' : ''}${h} h`]);
 
+let subdlStatus = '';
 let ctx = null;          // funciones de la app (guía, listas, avisos…)
 let current = 'quick';   // sección abierta
 let lastSection = 'quick';
@@ -65,6 +66,9 @@ function sections() {
       { type: 'info', label: 'Fuentes', value: () => 'OpenSubtitles · SubDL · Podnapisi' },
       { type: 'text', key: 'osApiKey', label: 'API key de OpenSubtitles (opcional)', desc: 'Sin clave igual se busca en OpenSubtitles; con clave hay más resultados', secret: true },
       { type: 'text', key: 'subdlKey', label: 'API key de SubDL', desc: 'Gratis en subdl.com: mucho catálogo en español latino', secret: true },
+      { type: 'action', label: 'Probar la clave de SubDL', desc: 'Comprueba la clave y muestra tu plan · consíguela gratis en subdl.com/panel/api',
+        value: () => subdlStatus || (store.getSettings().subdlKey ? 'Probar' : 'Sin clave'),
+        run: () => { subdlStatus = 'Comprobando…'; renderPanel(); ctx.checkSubdl().then((m) => { subdlStatus = m; renderPanel(); }); } },
       { type: 'text', key: 'osUser', label: 'Usuario de OpenSubtitles', desc: 'Opcional: más descargas diarias' },
       { type: 'text', key: 'osPass', label: 'Contraseña de OpenSubtitles', secret: true },
     ] },
@@ -93,6 +97,7 @@ function sections() {
     ] },
     { id: 'about', name: 'Acerca de', rows: [
       { type: 'info', label: 'Vibe IPTV', value: () => 'Versión 1.0' },
+      { type: 'action', label: 'Guardar registro', desc: 'Para reportar un problema: errores recientes, sin usuarios ni contraseñas', arrow: true, run: () => ctx.saveLog() },
       { type: 'info', label: 'Desarrollado por', value: () => 'Carmelita Softworks' },
       { type: 'info', label: 'Licencia', value: () => 'Código abierto · GPLv3' },
       { type: 'info', label: 'Reproducción', value: () => 'hls.js · mpegts.js · ffmpeg' },

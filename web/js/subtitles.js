@@ -76,7 +76,7 @@ export async function searchSubtitles(item, query) {
 
 export async function downloadSubtitle(r) {
   if (r.provider === 'os-direct') return downloadOpenSubtitlesDirect(r.id);
-  const p = new URLSearchParams({ provider: r.provider, id: r.id, osKey: getSettings().osApiKey || '' });
+  const p = new URLSearchParams({ provider: r.provider, id: r.id, osKey: getSettings().osApiKey || '', subdlKey: getSettings().subdlKey || '' });
   const res = await fetch(`${proxyBase()}/proxy/subs/get?${p}`);
   if (!res.ok) throw new Error(decodeURIComponent(res.headers.get('x-proxy-error') || `error ${res.status}`));
   return res.text();

@@ -62,8 +62,10 @@ export function openGuide(ctx, onClose) {
     <header class="guide-head">
       <button class="pill" data-nav id="gBack">‹ ${esc(t('Volver'))}</button>
       <div><h2>${esc(t('Guía de programación'))}</h2><small>${esc(t(`${ctx.channels.length} canales`))}</small></div>
+      <button class="pill" data-nav id="gFind">🔍 ${esc(t('Buscar programa'))}</button>
       <b class="guide-clock">${ctx.fmtTime(now)}</b>
     </header>
+    <div class="g-search" id="gSearch" hidden><input type="search" id="gQuery" placeholder="${esc(t('Nombre del programa'))}"><div id="gHits"></div></div>
     <div class="guide-info" id="gInfo"></div>
     <div class="guide-scroll" id="gScroll">
       <div class="guide-ruler" style="width:${totalW + 220}px"><span class="gc-spacer"></span>
@@ -74,6 +76,41 @@ export function openGuide(ctx, onClose) {
       <div id="gMore" class="guide-more"></div>
     </div>`;
   el.querySelector('#gBack').onclick = close;
+  // Buscar un programa por su nombre en toda la guía (todos los canales en vivo)
+  const nrm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const gq = el.querySelector('#gQuery'), hits = el.querySelector('#gHits');
+  el.querySelector('#gFind').onclick = () => { el.querySelector('#gSearch').hidden = false; gq.focus(); };
+  let qTimer;
+  gq.oninput = () => {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(() => {
+      const n = nrm(gq.value.trim());
+      hits.innerHTML = '';
+      if (n.length < 2) return;
+      const from = Date.now() - sh - 3 * 86400e3;
+      const out = [];
+      for (const ch of ctx.allLive || ctx.channels) {
+        for (const p of ctx.epg.listFor(ch)) if (p.stop > from && nrm(p.title).includes(n)) out.push([ch, p]);
+        if (out.length > 400) break;
+      }
+      out.sort((a, b) => a[1].start - b[1].start);
+      if (!out.length) hits.innerHTML = `<small>${esc(t('Sin resultados en la guía cargada.'))}</small>`;
+      for (const [ch, p] of out.slice(0, 80)) {
+        const s = p.start + sh, e2 = p.stop + sh, nowT = Date.now();
+        const tag = s <= nowT && e2 > nowT ? t('▶ AHORA') : e2 <= nowT ? '⏪' : new Date(s).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+        const b = document.createElement('button');
+        b.className = 'pill'; b.dataset.nav = '';
+        b.textContent = `${tag} ${ctx.fmtTime(s)} · ${p.title} — ${ch.name}`;
+        b.onclick = () => {
+          const list = ctx.channels.includes(ch) ? ctx.channels : [ch];
+          if (s <= nowT && e2 > nowT) { close(); ctx.play(ch, list); return; }
+          if (e2 <= nowT && catchupUrl(ch, { ...p, start: s, stop: e2 }, nowT)) { close(); ctx.playCatchup(ch, { ...p, start: s, stop: e2 }); return; }
+          ctx.toast(e2 <= nowT ? t('Este canal no tiene TV en diferido.') : `${p.title} · ${ch.name} · ${ctx.fmtTime(s)}`);
+        };
+        hits.appendChild(b);
+      }
+    }, 300);
+  };
   const rows = el.querySelector('#gRows'), info = el.querySelector('#gInfo');
   let rendered = 0;
   const renderBatch = () => {

@@ -63,6 +63,12 @@ export function saveResume(sourceId, map) {
 }
 export const clearResume = (sourceId) => { try { localStorage.removeItem(`iptv.pos.${sourceId}`); } catch {} };
 
+// Vistos recientemente (ids, el más nuevo primero) y categorías ocultas / ordenadas por lista
+export const getRecent = (sourceId) => read(`iptv.recent.${sourceId}`, []);
+export const saveRecent = (sourceId, ids) => write(`iptv.recent.${sourceId}`, ids.slice(0, 40));
+export const getCatPrefs = (sourceId) => ({ hidden: [], order: {}, ...read(`iptv.cats.${sourceId}`, {}) });
+export const saveCatPrefs = (sourceId, p) => write(`iptv.cats.${sourceId}`, p);
+
 export const getFavs = (sourceId) => new Set(read(K.favs(sourceId), []));
 export function toggleFav(sourceId, itemId) {
   const s = getFavs(sourceId);

@@ -367,6 +367,12 @@ async function handleProxy(req, res, reqUrl) {
     return res.end(JSON.stringify({ ffmpeg: !!FFMPEG, ocr: OCR_LOCAL }));
   }
   if (reqUrl.pathname === '/proxy/transcode') return handleTranscode(req, res, reqUrl);
+  if (reqUrl.pathname === '/proxy/subs/subdl-account') {
+    try {
+      const msg = await subtitles.subdlAccount(reqUrl.searchParams.get('key') || '');
+      res.writeHead(200, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8' }); return res.end(msg);
+    } catch (e) { res.writeHead(200, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8' }); return res.end(e.message); }
+  }
   if (reqUrl.pathname === '/proxy/subs/search' || reqUrl.pathname === '/proxy/subs/get') {
     const q = Object.fromEntries(reqUrl.searchParams);
     try {
@@ -379,7 +385,7 @@ async function handleProxy(req, res, reqUrl) {
         res.writeHead(200, { ...CORS, 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify(out));
       }
-      const vtt = await subtitles.download(q.provider, q.id, { osKey: q.osKey });
+      const vtt = await subtitles.download(q.provider, q.id, { osKey: q.osKey, subdlKey: q.subdlKey });
       res.writeHead(200, { ...CORS, 'Content-Type': 'text/vtt; charset=utf-8' });
       return res.end(vtt);
     } catch (e) {

@@ -93,6 +93,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.TextField("Idiomas preferidos", "Códigos separados por coma, ej: es,en", get = { it.subLangs }, set = { s, v -> s.copy(subLangs = v.ifBlank { "es,en" }) }),
             Row.Info("Fuentes", "OpenSubtitles · SubDL · Podnapisi"),
             Row.TextField("API key de SubDL", "Gratis en subdl.com: mucho catálogo en español latino", secret = true, get = { it.subdlKey }, set = { s, v -> s.copy(subdlKey = v) }),
+            Row.Action("Probar la clave de SubDL", "Comprueba la clave y muestra tu plan · consíguela gratis en subdl.com/panel/api",
+                value = { vm.subdlStatus.ifBlank { if (vm.settings.subdlKey.isBlank()) "Sin clave" else "Probar" } }) { vm.checkSubdl() },
             Row.TextField("API key de OpenSubtitles (opcional)", "Sin clave igual se busca en OpenSubtitles; con clave hay más resultados", secret = true, get = { it.osApiKey }, set = { s, v -> s.copy(osApiKey = v) }),
             Row.TextField("Usuario de OpenSubtitles", "Opcional: más descargas diarias", get = { it.osUser }, set = { s, v -> s.copy(osUser = v) }),
             Row.TextField("Contraseña de OpenSubtitles", secret = true, get = { it.osPass }, set = { s, v -> s.copy(osPass = v) }),

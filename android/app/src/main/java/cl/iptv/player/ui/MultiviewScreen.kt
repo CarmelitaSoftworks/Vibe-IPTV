@@ -20,7 +20,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,7 +99,8 @@ fun MultiviewScreen(vm: AppViewModel) {
     }
 }
 
-@OptIn(UnstableApi::class, ExperimentalFoundationApi::class)
+@OptIn(UnstableApi::class)
+@kotlin.OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MultiTile(item: Item, sound: Boolean, modifier: Modifier, onFocus: () -> Unit, onClick: () -> Unit, onMenu: () -> Unit) {
     val ctx = LocalContext.current

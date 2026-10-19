@@ -30,7 +30,9 @@ import java.util.zip.ZipInputStream
 class SubtitleSources(private val settings: () -> Settings) {
 
     data class Query(val title: String, val series: Boolean, val season: Int = 0, val episode: Int = 0, val year: String = "")
-    data class Result(val provider: String, val source: String, val id: String, val lang: String, val label: String, val downloads: Int)
+    data class Result(val provider: String, val source: String, val id: String, val lang: String, val label: String, val downloads: Int,
+                      /** "S01E05": elige ese episodio si la descarga es un paquete de temporada. */
+                      val episode: String = "")
     data class Found(val results: List<Result>, val errors: Map<String, String>)
 
     private val ua = "VibeIPTVAndroid v1.0"
@@ -99,25 +101,84 @@ class SubtitleSources(private val settings: () -> Settings) {
         return out
     }
 
+    /**
+     * SubDL, API oficial (https://subdl.com/api-doc): busca por código IMDb cuando se encuentra (más preciso)
+     * y si no por título; pide los archivos sueltos de los paquetes de temporada para bajar sólo el episodio.
+     */
     private fun subdl(q: Query): List<Result> {
-        val url = "https://api.subdl.com/api/v1/subtitles".toHttpUrl().newBuilder()
-            .addQueryParameter("api_key", settings().subdlKey)
-            .addQueryParameter("film_name", q.title)
-            .addQueryParameter("languages", langs().joinToString(",") { it.uppercase() })
-            .addQueryParameter("subs_per_page", "30")
-            .addQueryParameter("type", if (q.series) "tv" else "movie")
-            .apply {
-                if (q.season > 0) addQueryParameter("season_number", q.season.toString())
-                if (q.episode > 0) addQueryParameter("episode_number", q.episode.toString())
-                if (q.year.isNotBlank()) addQueryParameter("year", q.year)
-            }.build().toString()
-        val o = json(url)
-        if (o.has("status") && !o.optBoolean("status")) throw IOException(o.optString("error").ifBlank { "sin resultados" })
-        val subs = o.optJSONArray("subtitles") ?: return emptyList()
-        return (0 until subs.length()).mapNotNull { subs.optJSONObject(it) }.map { s ->
-            Result("subdl", names.getValue("subdl"), s.optString("url"), s.optString("lang").take(2).lowercase(),
-                s.optString("release_name").ifBlank { s.optString("name") }, 0)
+        val imdb = runCatching { imdbFor(q) }.getOrNull()
+        fun query(byImdb: Boolean): JSONObject {
+            val url = "https://api.subdl.com/api/v1/subtitles".toHttpUrl().newBuilder()
+                .addQueryParameter("api_key", settings().subdlKey)
+                .apply { if (byImdb && imdb != null) addQueryParameter("imdb_id", imdb) else addQueryParameter("film_name", q.title) }
+                .addQueryParameter("languages", langs().joinToString(",") { subdlLang(it) })
+                .addQueryParameter("subs_per_page", "30")
+                .addQueryParameter("type", if (q.series) "tv" else "movie")
+                .addQueryParameter("hi", "1").addQueryParameter("releases", "1").addQueryParameter("unpack", "1")
+                .addQueryParameter("client", "custom_integration")
+                .apply {
+                    if (q.season > 0) addQueryParameter("season_number", q.season.toString())
+                    if (q.episode > 0) addQueryParameter("episode_number", q.episode.toString())
+                    if (q.year.isNotBlank() && !(byImdb && imdb != null)) addQueryParameter("year", q.year)
+                }.build().toString()
+            return try { json(url) } catch (e: IOException) {
+                // La API responde 4xx con un JSON de error: mostrar el motivo real
+                throw IOException(if (e.message == "HTTP 401" || e.message == "HTTP 403") "API key inválida (revísala en Ajustes → Subtítulos)"
+                    else if (e.message == "HTTP 429") "límite diario de la API alcanzado" else e.message)
+            }
         }
+        var o = query(byImdb = imdb != null)
+        if (imdb != null && (o.optJSONArray("subtitles")?.length() ?: 0) == 0) o = query(byImdb = false)
+        if (o.has("status") && !o.optBoolean("status")) {
+            val err = o.optString("error")
+            if (err.contains("can't find", true) || err.contains("not found", true)) return emptyList()
+            throw IOException(err.ifBlank { "sin resultados" })
+        }
+        val subs = o.optJSONArray("subtitles") ?: return emptyList()
+        val ep = if (q.season > 0 && q.episode > 0) "S%02dE%02d".format(q.season, q.episode) else ""
+        val out = ArrayList<Result>()
+        for (i in 0 until subs.length()) {
+            val s = subs.optJSONObject(i) ?: continue
+            val lang = subdlLangCode(s.optString("language"), s.optString("lang"))
+            val hi = if (s.optBoolean("hi")) " · SDH" else ""
+            val name = s.optString("release_name").ifBlank { s.optString("name") }
+            // Paquete de temporada con archivos sueltos: sólo el del episodio pedido
+            val files = s.optJSONArray("unpack_files")
+            val match = if (files != null && q.episode > 0) (0 until files.length()).mapNotNull { files.optJSONObject(it) }
+                .firstOrNull { f -> f.optInt("episode") == q.episode && (q.season == 0 || f.optInt("season", q.season) == q.season) } else null
+            if (match != null) {
+                out += Result("subdl", names.getValue("subdl"), match.optString("url"), lang, match.optString("name").ifBlank { name } + hi, 0, ep)
+            } else {
+                val pack = if (s.optBoolean("full_season")) " · temporada completa" else ""
+                out += Result("subdl", names.getValue("subdl"), s.optString("url"), lang, name + hi + pack, 0, ep)
+            }
+        }
+        return out.distinctBy { it.id }
+    }
+
+    /** Código de idioma que espera SubDL (ES, EN, BR_PT…). */
+    private fun subdlLang(l: String) = when (l) { "pt" -> "BR_PT,PT"; "zh" -> "ZH"; else -> l.uppercase() }
+    private fun subdlLangCode(code: String, name: String): String {
+        val c = code.lowercase()
+        if (c.length == 2) return c
+        if (c.startsWith("br") || c.startsWith("pt")) return "pt"
+        return when (name.lowercase().substringBefore(' ')) {
+            "spanish" -> "es"; "english" -> "en"; "portuguese", "brazillian", "brazilian" -> "pt"; "french" -> "fr"
+            "italian" -> "it"; "german" -> "de"; else -> c.take(2).ifBlank { name.take(2).lowercase() }
+        }
+    }
+
+    /** Estado de la clave de SubDL (plan y cuota de hoy) para Ajustes → Subtítulos. */
+    suspend fun subdlAccount(key: String): String = withContext(Dispatchers.IO) {
+        if (key.isBlank()) throw IOException("Escribe primero la API key")
+        val o = try { json("https://api.subdl.com/api/v1/me".toHttpUrl().newBuilder().addQueryParameter("api_key", key).build().toString()) { header("x-api-key", key) } }
+            catch (e: IOException) { throw IOException(if (e.message == "HTTP 401" || e.message == "HTTP 403") "API key inválida" else "SubDL: ${e.message}") }
+        if (o.has("status") && !o.optBoolean("status")) throw IOException(o.optString("error").ifBlank { "API key inválida" })
+        val d = o.optJSONObject("data") ?: o.optJSONObject("user") ?: o
+        val plan = listOf("plan", "plan_name", "tier").firstNotNullOfOrNull { d.optString(it).takeIf { v -> v.isNotBlank() && v != "null" } } ?: "gratis"
+        val used = listOf("requests_today", "used_today", "today_requests").firstNotNullOfOrNull { k -> d.opt(k)?.toString()?.takeIf { it != "null" } }
+        val limit = listOf("daily_limit", "requests_limit", "limit").firstNotNullOfOrNull { k -> d.opt(k)?.toString()?.takeIf { it != "null" } }
+        "Clave válida · plan $plan" + (if (used != null) " · hoy $used${limit?.let { "/$it" } ?: ""} búsquedas" else "")
     }
 
     private fun podnapisi(q: Query): List<Result> {
@@ -158,7 +219,10 @@ class SubtitleSources(private val settings: () -> Settings) {
     suspend fun download(r: Result, dir: File): File = withContext(Dispatchers.IO) {
         var bytes = when (r.provider) {
             "stremio" -> call(r.id) { header("Accept", "*/*") }
-            "subdl" -> call("https://dl.subdl.com${r.id}") { header("Accept", "*/*") }
+            "subdl" -> call("https://dl.subdl.com${if (r.id.startsWith("/")) r.id else "/" + r.id}") {
+                header("Accept", "*/*")
+                settings().subdlKey.takeIf { it.isNotBlank() }?.let { header("x-api-key", it) }
+            }
             "podnapisi" -> call("https://www.podnapisi.net/subtitles/${r.id}/download") { header("Accept", "*/*") }
             "opensubtitles" -> {
                 val body = JSONObject().put("file_id", r.id.toLong()).toString().toRequestBody("application/json".toMediaType())
@@ -170,7 +234,7 @@ class SubtitleSources(private val settings: () -> Settings) {
         }
         var ext = "srt"
         if (bytes.size > 2 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4b.toByte()) {
-            val (name, data) = unzipBest(bytes)
+            val (name, data) = unzipBest(bytes, r.episode)
             bytes = data
             ext = name.substringAfterLast('.', "srt").lowercase()
         } else if (bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()) {
@@ -183,8 +247,14 @@ class SubtitleSources(private val settings: () -> Settings) {
         File(dir, "${r.provider}_${r.id.hashCode().toUInt()}.${if (ext == "ssa") "ass" else ext}").apply { writeText(text) }
     }
 
-    private fun unzipBest(zip: ByteArray): Pair<String, ByteArray> {
-        val rank = { n: String -> when { n.endsWith(".srt", true) -> 0; n.endsWith(".vtt", true) -> 1; n.endsWith(".ass", true) || n.endsWith(".ssa", true) -> 2; else -> 9 } }
+    private fun unzipBest(zip: ByteArray, episode: String = ""): Pair<String, ByteArray> {
+        // En paquetes de temporada se prefiere el archivo del episodio (S01E05, 1x05)
+        val epRe = if (episode.isBlank()) null else Regex("""S0*(\d+)E0*(\d+)""").find(episode)?.let { m ->
+            val (s, e) = m.destructured; Regex("""(?i)(s0*$s[ ._-]*e0*$e(?!\d)|\b$s[x×]0*$e(?!\d))""") }
+        val rank = { n: String ->
+            val base = when { n.endsWith(".srt", true) -> 0; n.endsWith(".vtt", true) -> 1; n.endsWith(".ass", true) || n.endsWith(".ssa", true) -> 2; else -> 9 }
+            if (base < 9 && epRe != null && !epRe.containsMatchIn(n)) base + 3 else base
+        }
         var best: Pair<String, ByteArray>? = null
         ZipInputStream(ByteArrayInputStream(zip)).use { z ->
             while (true) {

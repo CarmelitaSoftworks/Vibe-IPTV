@@ -23,7 +23,7 @@ const SECTION_ICONS = {
   movie: '<svg viewBox="0 0 48 48"><rect x="6" y="16" width="36" height="25" rx="4"/><path d="m6 16 4-9 34 0-3 9M14 7l5 9M24 7l5 9M34 7l5 9"/><path d="m21 24 8 4.5-8 4.5z" fill="currentColor"/></svg>',
   series: '<svg viewBox="0 0 48 48"><rect x="4" y="15" width="30" height="22" rx="4"/><path d="M10 10h28a4 4 0 0 1 4 4v18M16 5h26a4 4 0 0 1 4 4v16"/><path d="m16 22 7 4-7 4z" fill="currentColor"/></svg>',
 };
-const ALL = '__all__', FAV = '__fav__', RESUME = '__resume__';
+const ALL = '__all__', FAV = '__fav__', RESUME = '__resume__', RECENT = '__recent__';
 
 /* ---------- control parental ---------- */
 const ADULT = /(^|[^a-z])(xxx|adult[oa]?s?|adults?|er[oó]tic[oa]s?|porno?|hentai|playboy|\+ ?18|18 ?\+|for adults|para adultos)([^a-z]|$)/i;
@@ -65,8 +65,55 @@ const state = {
   series: null, episodes: [],
   view: [], page: 0, cols: 4, rows: 3,
   favs: new Set(),
-  playing: null, playList: [], playIndex: -1,
+  playing: null, playList: [], playIndex: -1, prevIndex: null,
+  recent: [], catPrefs: { hidden: [], order: {} },
 };
+
+/* ---------- registro de eventos (Ajustes → Guardar registro), sin usuarios ni contraseñas ---------- */
+const eventLog = [];
+const redactLog = (s) => String(s)
+  .replace(/\/(live|movie|series|timeshift)\/[^/\s]+\/[^/\s]+\//g, '/$1/***/***/')
+  .replace(/(username|password|user|pass)=[^&\s]+/gi, '$1=***')
+  .replace(/\/\/[^/@\s]+:[^/@\s]+@/g, '//***:***@');
+function logEvent(msg) {
+  eventLog.push(`${new Date().toTimeString().slice(0, 8)}  ${redactLog(msg)}`);
+  if (eventLog.length > 300) eventLog.shift();
+}
+function logReport() {
+  return [`Vibe IPTV (web) · ${navigator.userAgent}`,
+    `Lista: ${state.source?.type || '-'} · Canales: ${state.items.length} · Conversión: ${cfg().convert}`, '---',
+    ...(eventLog.length ? eventLog : ['(sin eventos todavía)'])].join('\n');
+}
+function saveLog() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([logReport()], { type: 'text/plain' }));
+  a.download = 'vibe-iptv-registro.txt'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast(t('Registro guardado: no contiene usuarios ni contraseñas'));
+}
+
+/* ---------- categorías ocultas y orden ---------- */
+const hiddenCats = () => new Set(state.catPrefs.hidden);
+function orderedCats(cats) {
+  const order = state.catPrefs.order[state.section] || [];
+  const pos = (c) => { const i = order.indexOf(c); return i < 0 ? 1e9 : i; };
+  return [...cats].sort((a, b) => pos(a) - pos(b));
+}
+function saveCats() { store.saveCatPrefs(state.source.id, state.catPrefs); refresh(); }
+function toggleHiddenCat(c) {
+  const h = hiddenCats(); h.has(c) ? h.delete(c) : h.add(c);
+  state.catPrefs.hidden = [...h];
+  if (state.category === c) state.category = ALL;
+  saveCats();
+}
+function moveCat(c, delta) {
+  const all = orderedCats(new Set(state.items.filter((i) => i.kind === state.section).map((i) => i.cat)));
+  const i = all.indexOf(c), j = i + delta;
+  if (i < 0 || j < 0 || j >= all.length) return;
+  all.splice(i, 1); all.splice(j, 0, c);
+  state.catPrefs.order[state.section] = all;
+  saveCats();
+}
 
 /* ---------- utilidades ---------- */
 const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -76,6 +123,7 @@ const initials = (name) => (name || '?').replace(/^[A-Z]{2,3}\s*[|:]\s*/, '').sp
 
 let toastTimer;
 function toast(msg, ms = 3500) {
+  logEvent(`Aviso: ${msg}`);
   const t = $('toast');
   t.textContent = redact(msg); t.hidden = false;
   clearTimeout(toastTimer);
@@ -171,6 +219,8 @@ async function openSource(src) {
   state.epgUrls = ''; state.epgAt = 0; state.epgStatus = '';
   state.favs = store.getFavs(src.id);
   state.resume = store.getResume(src.id);
+  state.recent = store.getRecent(src.id);
+  state.catPrefs = store.getCatPrefs(src.id);
   state.allItems = [];
   if (!src.demo) loadCachedEpg(src); // la última guía guardada se muestra al instante
   $('sourceName').textContent = src.name;
@@ -396,12 +446,14 @@ function computeView() {
     list = list.filter((i) => norm(i.name).includes(q));
   } else if (!state.series) {
     if (state.category === FAV) list = list.filter((i) => state.favs.has(i.id));
+    else if (state.category === RECENT) { const by = new Map(list.map((i) => [i.id, i])); list = state.recent.map((id) => by.get(id)).filter(Boolean); }
     else if (state.category === RESUME) {
       const ids = resumeIds();
       const at = (i) => state.resume[i.id]?.at || Math.max(0, ...Object.values(state.resume).filter((r) => r.parent === i.id).map((r) => r.at));
       list = list.filter((i) => ids.has(i.id)).sort((a, b) => at(b) - at(a));
     }
-    else if (state.category !== ALL) {
+    else if (state.category === ALL) { const h = hiddenCats(); if (h.size) list = list.filter((i) => !h.has(i.cat)); }
+    else {
       list = list.filter((i) => i.cat === state.category);
       if (state.sub) list = list.filter((i) => i.sub === state.sub);
     }
@@ -416,6 +468,7 @@ function categoryLabel() {
   if (state.category === ALL) return `${SECTIONS[state.section]} · Todos`;
   if (state.category === FAV) return 'Favoritos';
   if (state.category === RESUME) return 'Seguir viendo';
+  if (state.category === RECENT) return 'Vistos recientemente';
   return state.sub ? `${state.category} · ${state.sub}` : state.category;
 }
 
@@ -449,12 +502,16 @@ function renderCatBar() {
   const nRes = items.filter((i) => rids.has(i.id)).length;
   if (nRes) row1.append(chip('▶ Seguir viendo', state.category === RESUME, () => selectCategory(RESUME), nRes));
   if (nFav) row1.append(chip('★ Favoritos', state.category === FAV, () => selectCategory(FAV), nFav));
-  for (const [cat, n] of counts) row1.append(chip(cat, state.category === cat, () => selectCategory(cat), n));
+  const ids = new Set(items.map((i) => i.id));
+  const nRecent = state.recent.filter((id) => ids.has(id)).length;
+  if (nRecent) row1.append(chip('🕘 Recientes', state.category === RECENT, () => selectCategory(RECENT), nRecent));
+  const hidden = hiddenCats();
+  for (const cat of orderedCats(counts.keys())) if (!hidden.has(cat)) row1.append(chip(cat, state.category === cat, () => selectCategory(cat), counts.get(cat)));
   if (parentalOn() && !state.adultUnlocked && state.hiddenAdult) row1.append(chip('🔒 Adultos', false, unlockAdult));
   if (parentalOn() && state.adultUnlocked) row1.append(chip('🔓 Ocultar adultos', false, lockAdult));
   // Subcategorías de la categoría elegida (si la lista las trae)
   const subs = new Map();
-  if (![ALL, FAV, RESUME].includes(state.category)) for (const it of items) if (it.cat === state.category && it.sub) subs.set(it.sub, (subs.get(it.sub) || 0) + 1);
+  if (![ALL, FAV, RESUME, RECENT].includes(state.category)) for (const it of items) if (it.cat === state.category && it.sub) subs.set(it.sub, (subs.get(it.sub) || 0) + 1);
   row2.hidden = subs.size === 0;
   if (subs.size) {
     row2.append(chip('Todas', !state.sub, () => selectCategory(state.category, '')));
@@ -660,7 +717,7 @@ function showGuide() {
   const back = document.activeElement;
   const channels = guideChannels();
   openGuide({
-    channels, epg: state.epg, shift: epgShift(), fmtTime, toast,
+    channels, allLive: state.items.filter((i) => i.kind === 'live'), epg: state.epg, shift: epgShift(), fmtTime, toast,
     play: (ch, list) => openPlayer(ch, list, list.indexOf(ch)),
     playCatchup: (ch, prog) => {
       const url = catchupUrl(ch, prog);
@@ -709,7 +766,28 @@ function renderCategories() {
     }
     return;
   }
-  const groups = [...new Set(baseList().map((i) => i.cat))];
+  const groups = orderedCats(new Set(baseList().map((i) => i.cat)));
+  if (state.organizing) {
+    box.insertAdjacentHTML('beforeend', `<p class="hint">${esc(t('Sube, baja u oculta categorías. Las ocultas tampoco aparecen en “Todos”.'))}</p>`);
+    const done = document.createElement('button');
+    done.className = 'pill active'; done.dataset.nav = ''; done.textContent = '✓ Listo';
+    done.onclick = () => { state.organizing = false; renderCategories(); box.querySelector('button')?.focus(); };
+    box.appendChild(done);
+    const hidden = hiddenCats();
+    groups.forEach((g) => {
+      const row = document.createElement('div');
+      row.className = 'cat-org' + (hidden.has(g) ? ' off' : '');
+      row.innerHTML = `<span>${hidden.has(g) ? '🚫 ' : ''}${esc(g)}</span>`;
+      for (const [label, run] of [['▲', () => moveCat(g, -1)], ['▼', () => moveCat(g, 1)], [hidden.has(g) ? 'Mostrar' : 'Ocultar', () => toggleHiddenCat(g)]]) {
+        const b = document.createElement('button');
+        b.className = 'pill'; b.dataset.nav = ''; b.textContent = label;
+        b.onclick = () => { run(); renderCategories(); [...box.querySelectorAll('.cat-org')].find((r) => r.firstChild.textContent.endsWith(g))?.querySelector('button')?.focus(); };
+        row.appendChild(b);
+      }
+      box.appendChild(row);
+    });
+    return;
+  }
   const add = (val, label) => {
     const b = document.createElement('button');
     b.className = 'pill' + (state.category === val && !state.query ? ' active' : '');
@@ -720,7 +798,13 @@ function renderCategories() {
   };
   add(ALL, 'Todos');
   add(FAV, '★ Favoritos');
-  groups.forEach((g) => add(g, g));
+  if (state.recent.length) add(RECENT, '🕘 Recientes');
+  const hidden = hiddenCats();
+  groups.filter((g) => !hidden.has(g)).forEach((g) => add(g, g));
+  const org = document.createElement('button');
+  org.className = 'pill'; org.dataset.nav = ''; org.textContent = '✎ Organizar categorías';
+  org.onclick = () => { state.organizing = true; renderCategories(); box.querySelector('button')?.focus(); };
+  box.appendChild(org);
 }
 
 let searchTimer;
@@ -789,6 +873,7 @@ function playCurrent() {
   $('pSeekWrap').hidden = item.kind === 'live';
   $('playerView').classList.toggle('is-live', item.kind === 'live');
   $('pPrev').hidden = $('pNext').hidden = state.playList.length < 2;
+  $('pLast').hidden = $('pMulti').hidden = state.playList.length < 2 || item.kind !== 'live';
   closePlayerMenu();
   if (!$('pListPanel').hidden) renderChannelList();
   video.playbackRate = 1;
@@ -796,6 +881,11 @@ function playCurrent() {
   updateFavBtn();
   renderPlayerEpg();
   store.saveLast({ itemId: item.id });
+  logEvent(`Reproducir: ${item.name} [${item.kind}] ${item.url}`);
+  if (state.source && !String(item.id).startsWith('cu_')) {
+    state.recent = [item.id, ...state.recent.filter((id) => id !== item.id)].slice(0, 40);
+    store.saveRecent(state.source.id, state.recent);
+  }
   if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: item.name, artist: item.group, artwork: item.logo ? [{ src: item.logo }] : [] });
   player.play(item);
   // Seguir viendo: continuar donde quedó
@@ -855,6 +945,7 @@ async function diagnose(item) {
 
 async function showPlayError(msg) {
   const it = state.playing;
+  logEvent(`Error: ${it?.name} · ${msg} · ${it?.url}`);
   $('pErrTitle').textContent = 'No se pudo reproducir';
   $('pErrText').textContent = redact(msg) + ' · Revisando el canal…';
   $('pError').hidden = false;
@@ -867,9 +958,108 @@ async function showPlayError(msg) {
 
 function zap(delta) {
   if (state.playList.length < 2) return;
+  playIndexAt((state.playIndex + delta + state.playList.length) % state.playList.length);
+}
+function playIndexAt(i) {
+  if (i < 0 || i >= state.playList.length || i === state.playIndex) return;
   savePosition(state.playing);
-  state.playIndex = (state.playIndex + delta + state.playList.length) % state.playList.length;
+  state.prevIndex = state.playIndex;
+  state.playIndex = i;
   playCurrent();
+}
+/* ---------- Multivista: hasta 4 canales a la vez; sólo suena el elegido ---------- */
+function openMultiview() {
+  const cur = state.playing; if (!cur) return;
+  const favs = state.playList.filter((i) => state.favs.has(i.id) && i.id !== cur.id);
+  const near = [1, 2, 3].map((d) => state.playList[(state.playIndex + d) % state.playList.length]);
+  let slots = [cur, ...favs, ...near].filter((x, i, a) => a.findIndex((y) => y.id === x.id) === i).slice(0, 4);
+  closePlayer();
+  const el = document.createElement('section');
+  el.className = 'multi-view'; el.id = 'multiView';
+  const bar = document.createElement('div'); bar.className = 'mv-bar';
+  document.body.append(el, bar);
+  let players = [], sound = 0;
+  const render = () => {
+    players.forEach((p) => p.destroy()); players = [];
+    el.innerHTML = ''; el.classList.toggle('two', slots.length <= 2);
+    slots.forEach((it, i) => {
+      const b = document.createElement('button');
+      b.className = 'mv-tile' + (i === sound ? ' sound' : ''); b.dataset.nav = '';
+      b.innerHTML = `<video playsinline></video><b>${i === sound ? '🔊 ' : ''}${esc(it.name)}</b>`;
+      const v = b.querySelector('video'); v.muted = i !== sound;
+      const p = new Player(v, { onError: () => { b.querySelector('b').textContent = `${it.name} · ${t('no disponible')}`; } });
+      p.play(it); players.push(p);
+      b.onfocus = () => setSound(i);
+      b.onclick = () => (sound === i ? full(it) : setSound(i));
+      b.oncontextmenu = (e) => { e.preventDefault(); pick(i); };
+      el.appendChild(b);
+    });
+    bar.innerHTML = `<span>${esc(t('OK: sonido · OK otra vez: pantalla completa · Menú o clic derecho: cambiar canal'))}</span>`;
+    const btn = (label, run) => { const x = document.createElement('button'); x.className = 'pill'; x.textContent = label; x.onclick = run; bar.appendChild(x); };
+    if (slots.length < 4) btn('＋ Añadir', () => pick(slots.length));
+    if (slots.length > 2) btn('− Quitar', () => { slots.splice(sound, 1); sound = 0; render(); });
+    btn('✕ Salir', () => close());
+    el.querySelectorAll('.mv-tile')[sound]?.focus();
+  };
+  const setSound = (i) => {
+    sound = i;
+    el.querySelectorAll('.mv-tile').forEach((b, j) => {
+      b.classList.toggle('sound', j === i); b.querySelector('video').muted = j !== i;
+      b.querySelector('b').textContent = (j === i ? '🔊 ' : '') + slots[j].name;
+    });
+  };
+  const pick = (i) => {
+    const q = prompt(t('Nombre del canal'), '');
+    if (!q) return;
+    const n = norm(q), found = state.playList.find((x) => norm(x.name).includes(n));
+    if (!found) return toast(t('Sin resultados'));
+    slots[i] = found; render();
+  };
+  const close = () => { players.forEach((p) => p.destroy()); el.remove(); bar.remove(); document.removeEventListener('keydown', keys, true); };
+  const full = (it) => { const list = state.playList; close(); openPlayer(it, list, list.indexOf(it)); };
+  const keys = (e) => {
+    if (isBack(e)) { e.preventDefault(); e.stopImmediatePropagation(); close(); if (cur) focusItem(cur); return; }
+    const dir = keyDir(e);
+    if (dir) { e.preventDefault(); e.stopImmediatePropagation(); moveFocus(dir, el); return; }
+    if (e.key === 'ContextMenu' || e.key === 'm') { e.preventDefault(); e.stopImmediatePropagation(); pick(sound); }
+  };
+  document.addEventListener('keydown', keys, true);
+  render();
+  toast(t('Multivista: elige con OK qué canal suena'));
+}
+function previousChannel() {
+  if (state.prevIndex == null) return toast(t('Todavía no hay un canal anterior'));
+  playIndexAt(state.prevIndex);
+}
+// Teclas numéricas: salta al canal con ese número (o a esa posición si la lista no trae números)
+let digits = '', digitTimer;
+function typeDigit(d) {
+  if (state.playList.length < 2 || digits.length >= 5) return;
+  digits += d;
+  $('pDigits').textContent = digits; $('pDigits').hidden = false;
+  clearTimeout(digitTimer);
+  digitTimer = setTimeout(() => {
+    const n = Number(digits); digits = ''; $('pDigits').hidden = true;
+    let i = state.playList.findIndex((it) => Number(it.num) === n);
+    if (i < 0 && !state.playList.some((it) => it.num)) i = n - 1;
+    if (i < 0 || i >= state.playList.length) toast(t(`No hay canal ${n}`)); else playIndexAt(i);
+  }, 1600);
+}
+// Temporizador para dormir
+let sleepTimer, sleepWarn, sleepAt = 0;
+function setSleep(min) {
+  clearTimeout(sleepTimer); clearTimeout(sleepWarn); sleepAt = 0;
+  $('pSleep').classList.toggle('on', min > 0);
+  if (!min) return toast(t('Temporizador desactivado'));
+  sleepAt = Date.now() + min * 60e3;
+  if (min > 1) sleepWarn = setTimeout(() => toast(t('El reproductor se apagará en 1 minuto')), (min - 1) * 60e3);
+  sleepTimer = setTimeout(() => { sleepAt = 0; $('pSleep').classList.remove('on'); if (!$('playerView').hidden) closePlayer(); }, min * 60e3);
+  toast(t(`El reproductor se apagará en ${min} min`));
+}
+function menuSleep() {
+  const left = sleepAt ? Math.ceil((sleepAt - Date.now()) / 60e3) : 0;
+  openPlayerMenu(left ? t(`Temporizador · quedan ${left} min`) : 'Temporizador para dormir',
+    [0, 15, 30, 60, 90, 120].map((m) => ({ label: m ? `${m} min` : 'Desactivado', active: !m && !sleepAt, value: m })), setSleep);
 }
 
 function closePlayer() {
@@ -975,7 +1165,7 @@ function renderChannelList() {
     b.innerHTML = `<span class="lg">${it.logo ? `<img src="${esc(it.logo)}" alt="" loading="lazy">` : esc(initials(it.name))}</span>
       <span class="t"><b>${esc(it.name)}</b><small>${esc(now ? `Ahora: ${now.title}` : it.group || '')}</small></span>`;
     b.querySelector('img')?.addEventListener('error', (e) => { e.target.replaceWith(document.createTextNode(initials(it.name))); });
-    b.onclick = () => { state.playIndex = i; playCurrent(); renderChannelList(); };
+    b.onclick = () => { playIndexAt(i); renderChannelList(); };
     box.appendChild(b);
   });
 }
@@ -1179,6 +1369,8 @@ document.addEventListener('keydown', (e) => {
       return;
     }
     const live = state.playing?.kind === 'live';
+    if (/^[0-9]$/.test(e.key) && !inText) { e.preventDefault(); typeDigit(e.key); return; }
+    if (e.key === 'p' || e.keyCode === 10190) { e.preventDefault(); previousChannel(); return; }
     if (e.key === 'm' || e.key === 'AudioVolumeMute') { e.preventDefault(); video.muted = !video.muted; showOsd(); return; }
     if (e.key === 'i' || e.key === 'Info' || e.keyCode === 457) { e.preventDefault(); toggleInfo(); return; }
     if (e.key === 'l' || e.key === 'Guide' || e.keyCode === 458) { e.preventDefault(); openChannelList(); return; }
@@ -1305,7 +1497,22 @@ $('playerView').addEventListener('click', (e) => {
   if (playerPanelOpen()) { closePlayerMenu(); if (!$('pListPanel').hidden) $('pListPanel').hidden = true; return; }
   osdVisible() ? hideOsd() : showOsd();
 });
-video.addEventListener('dblclick', toggleFullscreen);
+// Doble toque en celulares (películas y series): izquierda −10 s, derecha +10 s; en el resto, pantalla completa
+video.addEventListener('dblclick', (e) => {
+  if (matchMedia('(pointer: coarse)').matches && state.playing?.kind !== 'live') {
+    const r = video.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
+    if (x < 0.4 || x > 0.6) {
+      const d = x < 0.4 ? -10 : 10; video.currentTime += d;
+      const f = $('pSeekFlash'); f.textContent = d < 0 ? '«  10 s' : '10 s  »'; f.className = 'seek-flash ' + (d < 0 ? 'l' : 'r'); f.hidden = false;
+      clearTimeout(f._t); f._t = setTimeout(() => (f.hidden = true), 700);
+      return;
+    }
+  }
+  toggleFullscreen();
+});
+$('pLast').onclick = () => { previousChannel(); showOsd(); };
+$('pSleep').onclick = menuSleep;
+$('pMulti').onclick = () => openMultiview();
 
 // Rueda y gestos para paginar
 let wheelLock = 0;
@@ -1348,6 +1555,12 @@ const settingsCtx = {
   clearEpgCache: async () => { for (const s of store.getSources()) await store.idbDel(`epg:${s.id}`).catch(() => {}); },
   exportBackup: () => exportBackup().then(() => toast(t('Respaldo guardado. Contiene tus contraseñas: guárdalo en un lugar privado.'), 6000)),
   importBackup: () => doImportBackup(),
+  saveLog: () => saveLog(),
+  checkSubdl: async () => {
+    if (!proxyBase()) return t('Necesita el servidor de Vibe IPTV (docs/SERVIDOR-PROPIO.md)');
+    try { return await (await fetch(`${proxyBase()}/proxy/subs/subdl-account?key=${encodeURIComponent(cfg().subdlKey || '')}`)).text(); }
+    catch (e) { return e.message; }
+  },
   clearResume: () => { store.clearResume(state.source.id); state.resume = {}; refresh(); },
   clearFavorites: () => { if (!state.source) return; for (const id of [...state.favs]) store.toggleFav(state.source.id, id); state.favs = new Set(); refresh(); },
 };
