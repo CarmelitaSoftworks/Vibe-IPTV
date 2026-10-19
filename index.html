@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe IPTV · Descargar</title>
+<meta name="description" content="Reproductor IPTV libre y de código abierto para Android, Android TV y navegador.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap">
+<style>
+:root{--bg:#e8ecef;--tile-a:#f7f8f9;--tile-b:#d9dee2;--edge:#bfc6cb;--ink:#5d666c;--soft:#8c959b;--accent:#22b3df;--deep:#138bb0}
+*{box-sizing:border-box}
+body{margin:0;font-family:Nunito,system-ui,sans-serif;color:var(--ink);background:repeating-linear-gradient(0deg,rgba(255,255,255,.55) 0 1px,transparent 1px 4px),var(--bg);min-height:100vh}
+main{max-width:980px;margin:0 auto;padding:32px 16px 48px}
+header{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.logo{width:64px;height:64px;border-radius:18px;background:var(--tile-a);box-shadow:0 2px 6px rgba(0,0,0,.12);display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:12px}
+.logo i{border-radius:5px;background:var(--accent);opacity:.45}.logo i:first-child{opacity:1}
+h1{margin:0;font-size:clamp(28px,5vw,40px);font-weight:800}
+.tag{color:var(--deep);font-weight:800;margin:0}
+p{line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:24px 0}
+.card{display:block;text-decoration:none;color:inherit;padding:20px;border-radius:20px;border:1px solid var(--edge);background:linear-gradient(var(--tile-a),var(--tile-b));box-shadow:0 3px 8px rgba(0,0,0,.08)}
+.card:hover,.card:focus{outline:4px solid #3fd2ff;outline-offset:0}
+.card b{display:block;font-size:20px;font-weight:800;color:var(--ink)}
+.card small{color:var(--soft);font-weight:700}
+.card code{display:inline-block;margin-top:10px;font-size:15px;color:var(--deep);background:rgba(255,255,255,.7);padding:4px 8px;border-radius:8px;word-break:break-all}
+.box{background:rgba(255,255,255,.75);border:1px solid var(--edge);border-radius:20px;padding:20px 22px;margin:18px 0}
+.box h2{margin:0 0 8px;font-size:21px}
+ol{padding-left:22px;line-height:1.7}
+.big{font-size:clamp(18px,3.4vw,24px);font-weight:800;color:var(--deep);word-break:break-all}
+footer{color:var(--soft);font-size:14px;margin-top:28px}
+a{color:var(--deep)}
+</style></head><body><main>
+<header><div class="logo"><i></i><i></i><i></i><i></i></div>
+<div><h1>Vibe IPTV</h1><p class="tag">Libre · Código abierto · Solo reproductor</p></div></header>
+<p>Reproductor IPTV para Android, Android TV y navegador. <b>No incluye canales</b>: agregas tu propia lista M3U o cuenta Xtream Codes. · <i>Free, open-source IPTV player. No channels included.</i></p>
+
+<div class="grid">
+<a class="card" href="tv/"><b>📺 TV, Fire TV y TV Box</b><small>Android TV / Google TV · 32 bits (funciona en casi todos)</small><br><code>carmelitasoftworks.github.io/Vibe-IPTV/tv</code></a>
+<a class="card" href="movil/"><b>📱 Celular o tablet</b><small>Android 7.0 o superior · 64 bits</small><br><code>carmelitasoftworks.github.io/Vibe-IPTV/movil</code></a>
+<a class="card" href="universal/"><b>🧩 Universal</b><small>Si no sabes cuál usar (pesa más)</small><br><code>carmelitasoftworks.github.io/Vibe-IPTV/universal</code></a>
+</div>
+
+<div class="box"><h2>Instalar en el TV con Downloader</h2>
+<ol>
+<li>En el TV, instala la app <b>Downloader</b> (de AFTVnews) desde la tienda de apps (Google Play o Amazon Appstore).</li>
+<li>Permite instalar apps desde Downloader: <b>Ajustes → Apps → Acceso especial → Instalar apps desconocidas → Downloader → Permitir</b>. En Fire TV: <b>Mi Fire TV → Opciones para desarrolladores → Instalar apps desconocidas → Downloader</b>.</li>
+<li>Abre Downloader y escribe en el recuadro de dirección:<br><span class="big">carmelitasoftworks.github.io/Vibe-IPTV/tv</span></li>
+<li>Pulsa <b>Go</b>: se descarga el APK. Cuando termine, elige <b>Instalar</b> y luego <b>Abrir</b>.</li>
+<li>Al final Downloader ofrece <b>borrar el APK</b>: puedes borrarlo para liberar espacio (la app queda instalada).</li>
+</ol>
+<p>Guía completa paso a paso y solución de problemas: <a href="https://github.com/CarmelitaSoftworks/Vibe-IPTV/blob/main/docs/DOWNLOADER.md">docs/DOWNLOADER.md</a> · English: <a href="https://github.com/CarmelitaSoftworks/Vibe-IPTV/blob/main/docs/DOWNLOADER.en.md">docs/DOWNLOADER.en.md</a></p>
+</div>
+
+<div class="box"><h2>Install on your TV with Downloader</h2>
+<ol>
+<li>Install <b>Downloader</b> (by AFTVnews) from your TV's app store.</li>
+<li>Allow it to install apps: <b>Settings → Apps → Special app access → Install unknown apps → Downloader</b> (Fire TV: <b>My Fire TV → Developer options</b>).</li>
+<li>Open Downloader and type <span class="big">carmelitasoftworks.github.io/Vibe-IPTV/tv</span>, then press <b>Go</b> and <b>Install</b>.</li>
+</ol></div>
+
+<footer>Versión de prueba compilada automáticamente desde el código · <a href="https://github.com/CarmelitaSoftworks/Vibe-IPTV">Código fuente (GPLv3)</a> · <a href="https://github.com/CarmelitaSoftworks/Vibe-IPTV/releases/tag/prueba">Todas las descargas</a> · Carmelita Softworks</footer>
+</main></body></html>
