@@ -100,6 +100,7 @@ function applySettings(key) {
   const s = cfg(), root = document.documentElement, body = document.body;
   root.dataset.appTheme = s.theme;
   setLang(resolveLang(s.lang));
+  root.style.setProperty('--hud', s.hudScale || '1');
   if (s.accent && s.accent !== 'celeste') root.dataset.accent = s.accent; else delete root.dataset.accent;
   body.classList.toggle('no-nums', !s.showNumbers);
   body.classList.toggle('no-anim', !s.animations);
@@ -925,7 +926,7 @@ function renderChannelList() {
     b.className = 'plist-item' + (i === state.playIndex ? ' current' : '');
     b.dataset.nav = '';
     const { now } = it.kind === 'live' ? nowNext(it) : {};
-    b.innerHTML = `<span class="n">${it.num ?? i + 1}</span><span class="lg">${it.logo ? `<img src="${esc(it.logo)}" alt="" loading="lazy">` : esc(initials(it.name))}</span>
+    b.innerHTML = `<span class="lg">${it.logo ? `<img src="${esc(it.logo)}" alt="" loading="lazy">` : esc(initials(it.name))}</span>
       <span class="t"><b>${esc(it.name)}</b><small>${esc(now ? `Ahora: ${now.title}` : it.group || '')}</small></span>`;
     b.querySelector('img')?.addEventListener('error', (e) => { e.target.replaceWith(document.createTextNode(initials(it.name))); });
     b.onclick = () => { state.playIndex = i; playCurrent(); renderChannelList(); };

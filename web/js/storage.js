@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS = {
   startup: 'home',
   // Control parental: PIN ('' = desactivado)
   parentalPin: '',
+  // Tamaño de los controles del reproductor
+  hudScale: '1',
 };
 
 export const getSettings = () => ({ ...DEFAULT_SETTINGS, ...read(K.settings, {}) });

@@ -52,6 +52,7 @@ function sections() {
       { type: 'toggle', key: 'animations', label: 'Animaciones' },
     ] },
     { id: 'play', name: 'Reproducción', rows: [
+      { type: 'choice', key: 'hudScale', label: 'Tamaño de los controles del reproductor', desc: 'Botones, textos y paneles del reproductor (HUD)', options: [['0.8', '80 %'], ['0.9', '90 %'], ['1', '100 % (normal)'], ['1.1', '110 %'], ['1.25', '125 %'], ['1.4', '140 %']] },
       { type: 'choice', key: 'convert', label: 'Convertir formatos no compatibles', desc: 'Para canales con audio AC-3 / MP2 o video MPEG-2 (habitual en TV de cable)', options: [['auto', 'Automático, sólo si hace falta'], ['always', 'Siempre en TV en vivo'], ['never', 'Nunca']] },
       { type: 'choice', key: 'convertQuality', label: 'Calidad de la conversión', desc: 'Sólo cuando hay que convertir el video', options: [['fast', 'Rápida (usa menos el PC)'], ['balanced', 'Mejor calidad']] },
       { type: 'info', label: 'Conversión (ffmpeg)', value: () => ctx.caps?.ffmpeg ? 'Disponible' : 'No instalada: abre la app con iniciar.bat' },

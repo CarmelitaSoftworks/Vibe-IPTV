@@ -10,7 +10,14 @@ name: Compilar APK
 on:
   push:
     branches: [main, master]
-  workflow_dispatch: {}
+  # Publicar una versión: Actions → Compilar APK → Run workflow (marcar "publicar"),
+  # o incluir [publicar] en el mensaje del último commit. Los demás cambios sólo se compilan y prueban.
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Publicar la versión en Releases (y actualizar el enlace de Downloader)"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -62,11 +69,12 @@ jobs:
       - name: Publicar el APK (Artifacts)
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 7
           name: Vibe-IPTV-APK
           path: android/app/build/outputs/apk/release/*.apk
 
       - name: Publicar versiones (Releases)
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && (inputs.publicar || contains(github.event.head_commit.message, '[publicar]'))
         env:
           GH_TOKEN: ${{ github.token }}
           N: ${{ github.run_number }}

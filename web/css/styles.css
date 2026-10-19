@@ -515,7 +515,7 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 
 /* Lista lateral de canales */
 .plist {
-  position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(400px, 92vw); display: flex; flex-direction: column; color: #fff;
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(560px, 92vw); display: flex; flex-direction: column; color: #fff;
   background: rgba(14,17,20,.88); backdrop-filter: blur(16px); border-left: 1px solid var(--pedge);
   padding: max(14px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 12px 12px;
   animation: slideIn .2s ease;
@@ -524,7 +524,7 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 .plist header { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 10px; font-size: 1.05rem; }
 .plist-items { overflow-y: auto; display: grid; gap: 4px; padding-right: 2px; }
 .plist-item {
-  display: grid; grid-template-columns: 34px 54px minmax(0, 1fr); align-items: center; gap: 10px; text-align: left;
+  display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; gap: 12px; text-align: left;
   padding: 8px 10px; border-radius: 12px; border: 2px solid transparent; background: transparent; color: #fff; cursor: pointer;
 }
 .plist-item .n { font-size: .8rem; font-weight: 800; color: rgba(255,255,255,.55); text-align: right; font-variant-numeric: tabular-nums; }
@@ -618,3 +618,6 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 /* ===== Seguir viendo: barra de avance en la carátula ===== */
 .tile .progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,.45); z-index: 2; }
 .tile .progress i { display: block; height: 100%; background: var(--accent); }
+
+/* ===== Tamaño de los controles del reproductor (Ajustes → Reproducción) ===== */
+#playerView .osd > *, #playerView .plist, #playerView .pmenu, #playerView .pinfo, #playerView .perror { zoom: var(--hud, 1); }

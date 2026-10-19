@@ -46,7 +46,7 @@ enum class PAction(val label: String) {
     BACK("Volver"), PREV("Anterior"), REW("Retroceder 10 s"), PLAY("Reproducir / pausa"), FWD("Adelantar 10 s"), NEXT("Siguiente"),
     LIST("Lista de canales"), AUDIO("Audio"), SUBS("Subtítulos"), QUALITY("Calidad"), ASPECT("Formato de pantalla"),
     SPEED("Velocidad"), ENGINE("Motor de reproducción"), INFO("Información técnica"), FAV("Favorito"), PIP("Imagen en imagen"),
-    EXTERNAL("Abrir en la app VLC"),
+    EXTERNAL("Abrir en la app VLC"), RECORD("Grabar"),
 }
 
 /** Íconos dibujados (líneas simples, como los del menú). */
@@ -80,6 +80,7 @@ fun PlayerIcon(a: PAction, tint: Color, modifier: Modifier = Modifier, on: Boole
             PAction.INFO -> { drawCircle(tint, 9f * s, p(12f, 12f), style = Stroke(w)); line(12f, 11f, 12f, 16.5f); drawCircle(tint, 1.3f * s, p(12f, 7.8f)) }
             PAction.FAV -> poly(on, 12f, 3.5f, 14.6f, 9f, 20.5f, 9.6f, 16f, 13.6f, 17.3f, 19.5f, 12f, 16.4f, 6.7f, 19.5f, 8f, 13.6f, 3.5f, 9.6f, 9.4f, 9f)
             PAction.PIP -> { rect(3f, 5f, 18f, 14f); rect(12f, 11.5f, 7f, 5.5f, 1f, true) }
+            PAction.RECORD -> { drawCircle(tint, 9f * s, p(12f, 12f), style = Stroke(w)); drawCircle(if (on) Color(0xFFE53935) else tint, 5f * s, p(12f, 12f)) }
             PAction.EXTERNAL -> { line(13f, 4f, 20f, 4f, 20f, 11f); line(20f, 4f, 11f, 13f); line(17f, 14f, 17f, 19f, 5f, 19f, 5f, 7f, 10f, 7f) }
         }
     }
@@ -121,6 +122,7 @@ fun PlayerControlsBar(
     hasList: Boolean,
     fav: Boolean,
     showQuality: Boolean,
+    recording: Boolean = false,
     playFocus: FocusRequester,
     onAction: (PAction) -> Unit,
     onInteract: () -> Unit,
@@ -178,27 +180,33 @@ fun PlayerControlsBar(
                     if (showQuality) add(PAction.QUALITY)
                     add(PAction.ASPECT)
                     if (!live) add(PAction.SPEED)
+                    if (live) add(PAction.RECORD)
                     add(PAction.ENGINE); add(PAction.INFO); add(PAction.FAV); add(PAction.PIP); add(PAction.EXTERNAL)
                 }
-                extra.forEach { a -> CtlButton(a, on = a == PAction.FAV && fav, onFocused = focused) { onAction(a) } }
+                extra.forEach { a -> CtlButton(a, on = (a == PAction.FAV && fav) || (a == PAction.RECORD && recording), onFocused = focused) { onAction(a) } }
             }
         }
     }
 }
 
 /** Una fila de un panel lateral de opciones. */
-data class PanelRow(val label: String, val selected: Boolean = false, val detail: String = "", val onClick: () -> Unit)
+data class PanelRow(
+    val label: String, val selected: Boolean = false, val detail: String = "",
+    /** Lista de canales: logo y avance del programa actual (0..1, o -1 si no hay guía). */
+    val logo: String = "", val progress: Float = -1f,
+    val onClick: () -> Unit,
+)
 
 /** Panel lateral (audio, subtítulos, calidad, formato, velocidad, motor, lista de canales, información). */
 @Composable
-fun PlayerSidePanel(title: String, rows: List<PanelRow>, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun PlayerSidePanel(title: String, rows: List<PanelRow>, onClose: () -> Unit, modifier: Modifier = Modifier, wide: Boolean = false) {
     val c = LocalIptv.current
     val first = remember { FocusRequester() }
     val start = rows.indexOfFirst { it.selected }.coerceAtLeast(0)
     val state = rememberLazyListState(initialFirstVisibleItemIndex = (start - 2).coerceAtLeast(0))
     LaunchedEffect(title) { delay(60); runCatching { first.requestFocus() } }
     Column(
-        modifier.fillMaxHeight().widthIn(max = 380.dp).fillMaxWidth(0.42f)
+        modifier.fillMaxHeight().then(if (wide) Modifier.widthIn(min = 300.dp, max = 620.dp).fillMaxWidth(0.62f) else Modifier.widthIn(max = 380.dp).fillMaxWidth(0.42f))
             .background(Color(0xF2161A1D)).padding(vertical = 18.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -223,10 +231,20 @@ fun PlayerSidePanel(title: String, rows: List<PanelRow>, onClose: () -> Unit, mo
                         if (r.selected) Box(Modifier.size(10.dp).clip(CircleShape).background(if (f) c.accentDeep else c.accent))
                     }
                     Spacer(Modifier.width(10.dp))
+                    if (wide) {
+                        Box(Modifier.size(width = 52.dp, height = 36.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = if (f) 0f else 0.08f)), contentAlignment = Alignment.Center) {
+                            if (r.logo.isNotBlank()) coil.compose.AsyncImage(r.logo, null, contentScale = androidx.compose.ui.layout.ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(3.dp))
+                            else Text(initials(r.label), color = if (f) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                    }
                     Column(Modifier.weight(1f)) {
                         Text(r.label, color = if (f) Color(0xFF1A1F23) else Color.White, fontWeight = if (r.selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            fontSize = 15.sp, maxLines = if (wide) 2 else 1, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
                         if (r.detail.isNotBlank()) Text(r.detail, color = if (f) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (r.progress >= 0f) Box(Modifier.padding(top = 4.dp).fillMaxWidth(0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.2f))) {
+                            Box(Modifier.fillMaxWidth(r.progress).fillMaxHeight().background(c.accent))
+                        }
                     }
                 }
             }

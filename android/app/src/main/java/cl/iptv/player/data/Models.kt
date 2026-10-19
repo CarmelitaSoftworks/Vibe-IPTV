@@ -77,6 +77,8 @@ data class Settings(
     val parentalPin: String = "",
     /** Fichas: mostrar la ficha antes de reproducir una película, y clave opcional de TMDB para listas M3U. */
     val showDetails: Boolean = true,
+    /** Tamaño de los controles del reproductor (0.7 = 70 %, 1.5 = 150 %). */
+    val hudScale: Float = 1f,
     val tmdbKey: String = "",
     // Rápido
     val showNumbers: Boolean = true,

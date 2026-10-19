@@ -429,6 +429,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (category == CAT_FAV) recompute(false)
     }
 
+    // ---------- Grabación ----------
+    class RecState(val item: Item, val name: String, val started: Long) { var bytes by mutableStateOf(0L) }
+    var recording by mutableStateOf<RecState?>(null); private set
+    private var recJob: Job? = null
+    fun startRecording(item: Item) {
+        if (recording != null) { message = "Ya hay una grabación en curso"; return }
+        val app = getApplication<Application>()
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.US).format(java.util.Date())
+        val name = "${item.name.replace(Regex("[^\\p{L}\\p{N} ._-]"), "_").take(40).trim()}_$stamp.ts"
+        val st = RecState(item, name, System.currentTimeMillis())
+        recording = st
+        message = "Grabando ${item.name}… Si tu cuenta admite una sola conexión, la imagen puede cortarse."
+        recJob = viewModelScope.launch(Dispatchers.IO) {
+            var finish: ((Long) -> Unit)? = null
+            var error: String? = null
+            try {
+                val (out, fin) = Recorder.open(app, name); finish = fin
+                out.use { o -> Recorder.record(item, o) { n -> st.bytes = n } }
+            } catch (e: kotlinx.coroutines.CancellationException) { /* detenida por el usuario */ }
+            catch (e: Exception) { error = e.message }
+            finally {
+                runCatching { finish?.invoke(st.bytes) }
+                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main) {
+                    if (recording === st) recording = null
+                    message = when {
+                        st.bytes > 0 -> "Grabación guardada en Descargas/VibeIPTV: $name"
+                        error != null -> "No se pudo grabar: $error"
+                        else -> "Grabación cancelada"
+                    }
+                }
+            }
+        }
+    }
+    fun stopRecording() { recJob?.cancel(); recJob = null }
+
     // ---------- Fichas ----------
     var details by mutableStateOf<Item?>(null)
     var detailsMeta by mutableStateOf<Meta?>(null); private set

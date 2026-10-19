@@ -430,6 +430,7 @@ fun PlayerScreen(vm: AppViewModel) {
             }
             PAction.PIP -> { if (!activity.enterPip()) vm.message = "Este equipo no permite imagen en imagen" }
             PAction.EXTERNAL -> openInVlc()
+            PAction.RECORD -> if (vm.recording?.item?.id == item.id) vm.stopRecording() else vm.startRecording(item)
             else -> panel = a
         }
     }
@@ -437,13 +438,18 @@ fun PlayerScreen(vm: AppViewModel) {
     // Reloj para el banner
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
-    val showBanner = !activity.inPip && (controls || now < bannerUntil || error != null)
+    val showBanner = !activity.inPip && (controls || now < bannerUntil || error != null || vm.recording != null)
     val resize = when (vm.settings.aspect) {
         "fill", "zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
     }
 
+    // Tamaño de los controles (Ajustes → Reproducción): escala todo lo que se dibuja sobre el video
+    val baseDensity = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(baseDensity.density * vm.settings.hudScale, baseDensity.fontScale),
+    ) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         val onAltEnded = {
             val cur = vm.playing
@@ -529,6 +535,10 @@ fun PlayerScreen(vm: AppViewModel) {
                     }
                 }
                 Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    vm.recording?.let { r ->
+                        Text("● REC ${fmtDur(now - r.started)} · ${"%.0f".format(r.bytes / 1_048_576.0)} MB",
+                            color = Color(0xFFFF6B6B), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                    }
                     Text(fmtTime(now), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                     Text("Motor: ${engineName[engine]}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
                 }
@@ -553,10 +563,11 @@ fun PlayerScreen(vm: AppViewModel) {
             }
         }
 
-        AnimatedVisibility(controls && !activity.inPip, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+        AnimatedVisibility(controls && panel == null && !activity.inPip, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
             PlayerControlsBar(
                 ctl = ctl, live = live, hasList = vm.playList.size > 1, fav = item.id in vm.favorites,
                 showQuality = !useAlt && exo.qualities().isNotEmpty(),
+                recording = vm.recording?.item?.id == item.id,
                 playFocus = playFocus, onAction = ::onAction, onInteract = { lastTouch = System.currentTimeMillis() },
             )
         }
@@ -567,7 +578,13 @@ fun PlayerScreen(vm: AppViewModel) {
             val rows: List<PanelRow> = when (p) {
                 PAction.LIST -> vm.playList.mapIndexed { i, it ->
                     val cur = if (it.kind == Kind.LIVE) vm.epg.nowNext(it, now - vm.epgShift).first else null
-                    PanelRow((it.num?.let { n -> "$n · " } ?: "") + it.name, i == vm.playIndex, cur?.title.orEmpty()) { vm.playAt(i); panel = null }
+                    val sh = vm.epgShift
+                    PanelRow(
+                        it.name, i == vm.playIndex,                       // sólo el nombre: más fácil de leer
+                        cur?.let { p -> "${p.title}  ${fmtTime(p.start + sh)}–${fmtTime(p.stop + sh)}" }.orEmpty(),
+                        logo = it.logo,
+                        progress = cur?.let { p -> ((now - sh - p.start).toFloat() / (p.stop - p.start)).coerceIn(0f, 1f) } ?: -1f,
+                    ) { vm.playAt(i); panel = null }
                 }
                 PAction.AUDIO -> k?.audioTracks().orEmpty().map { t -> PanelRow(t.label, t.selected) { k?.selectAudio(t.id); panel = null } }
                 PAction.SUBS -> buildList {
@@ -600,9 +617,11 @@ fun PlayerScreen(vm: AppViewModel) {
                     listOfNotNull(Uri.parse(playUrl).host?.let { "Servidor del canal" to it })).map { (l, v) -> PanelRow(l, detail = v) {} }
                 else -> emptyList()
             }
-            PlayerSidePanel(p.label, rows, onClose = { panel = null }, modifier = Modifier.align(Alignment.CenterEnd))
+            PlayerSidePanel(p.label, rows, onClose = { panel = null }, modifier = Modifier.align(Alignment.CenterEnd), wide = p == PAction.LIST)
         }
     }
+
+    }   // fin de la escala del HUD
 
     if (showSubs) SubtitlesDialog(
         vm = vm, item = item, current = subtitle,

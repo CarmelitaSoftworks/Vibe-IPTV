@@ -46,6 +46,8 @@ private sealed class Row(val label: String, val desc: String = "") {
     class Action(label: String, desc: String = "", val value: () -> String = { "" }, val arrow: Boolean = false, val run: () -> Unit) : Row(label, desc)
     class Danger(label: String, desc: String = "", val run: () -> Unit) : Row(label, desc)
     class Info(label: String, val value: String) : Row(label)
+    class Slider(label: String, desc: String = "", val min: Float, val max: Float, val step: Float,
+                 val format: (Float) -> String, val get: (Settings) -> Float, val set: (Settings, Float) -> Settings) : Row(label, desc)
 }
 
 private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
@@ -76,6 +78,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Toggle("Animaciones", get = { it.animations }, set = { s, v -> s.copy(animations = v) }),
         )),
         Section("play", "Reproducción", SecIcon.PLAY, listOf(
+            Row.Slider("Tamaño de los controles del reproductor", "Botones, textos y paneles del reproductor (HUD)",
+                min = 0.7f, max = 1.5f, step = 0.05f, format = { "${Math.round(it * 100)} %" }, get = { it.hudScale }, set = { s, v -> s.copy(hudScale = v) }),
             Row.Choice("Motor de reproducción", "VLC reproduce el audio AC-3 / MP2 y el video MPEG-2 de la TV de cable",
                 listOf("auto" to "Automático: ExoPlayer, y VLC o MPV si hace falta", "exo" to "ExoPlayer", "vlc" to "VLC siempre", "mpv" to "MPV siempre"),
                 { it.engine }, { s, v -> s.copy(engine = v) }),
@@ -243,6 +247,41 @@ fun SettingsScreen(vm: AppViewModel) {
                 ActionButton("Guardar") { save(p.set(vm.settings, text.trim())); picking = null }
             }
         }
+        is Row.Slider -> Sheet(p.label, onDismiss = { picking = null }) {
+            if (p.desc.isNotEmpty()) Text(p.desc, color = c.inkSoft, fontSize = 13.sp, modifier = Modifier.padding(bottom = 10.dp))
+            val v = p.get(vm.settings)
+            fun setV(x: Float) { val r = (Math.round(x / p.step) * p.step).coerceIn(p.min, p.max); save(p.set(vm.settings, r)) }
+            val minus = remember { FocusRequester() }
+            LaunchedEffect(Unit) { delay(60); runCatching { minus.requestFocus() } }
+            Text(p.format(v), color = c.accentDeep, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ActionButton("−", Modifier.focusRequester(minus), ghost = true) { setV(v - p.step) }
+                androidx.compose.material3.Slider(
+                    value = v, onValueChange = { setV(it) }, valueRange = p.min..p.max,
+                    steps = ((p.max - p.min) / p.step).toInt() - 1, modifier = Modifier.weight(1f),
+                    colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent),
+                )
+                ActionButton("+", ghost = true) { setV(v + p.step) }
+            }
+            // Vista previa con el tamaño elegido
+            val d = androidx.compose.ui.platform.LocalDensity.current
+            Box(Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF101417)).padding(12.dp), contentAlignment = Alignment.Center) {
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density * v, d.fontScale)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf(PAction.PREV, PAction.PLAY, PAction.NEXT, PAction.AUDIO, PAction.SUBS).forEach { a ->
+                            Box(Modifier.size(if (a == PAction.PLAY) 60.dp else 48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(Color.White.copy(alpha = if (a == PAction.PLAY) 0.18f else 0f)), contentAlignment = Alignment.Center) {
+                                PlayerIcon(a, Color.White, Modifier.size(if (a == PAction.PLAY) 30.dp else 24.dp))
+                            }
+                        }
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+                ActionButton("Normal", ghost = true) { setV(1f) }
+                ActionButton("Listo") { picking = null }
+            }
+        }
         else -> Unit
     }
 }
@@ -289,6 +328,7 @@ private fun SettingRow(r: Row, s: Settings, onToggle: (Row.Toggle) -> Unit, onOp
         is Row.TextField -> if (r.secret) (if (r.get(s).isBlank()) "Sin configurar" else "••••••") else r.get(s).ifBlank { "Sin configurar" }
         is Row.Action -> r.value()
         is Row.Info -> r.value
+        is Row.Slider -> r.format(r.get(s))
         else -> ""
     }
     val clickable = r !is Row.Info
@@ -302,7 +342,7 @@ private fun SettingRow(r: Row, s: Settings, onToggle: (Row.Toggle) -> Unit, onOp
                     is Row.Toggle -> onToggle(r)
                     is Row.Action -> r.run()
                     is Row.Danger -> if (confirm) { confirm = false; r.run() } else confirm = true
-                    is Row.Choice, is Row.TextField -> onOpen(r)
+                    is Row.Choice, is Row.TextField, is Row.Slider -> onOpen(r)
                     is Row.Info -> Unit
                 }
             } else Modifier)
@@ -319,7 +359,7 @@ private fun SettingRow(r: Row, s: Settings, onToggle: (Row.Toggle) -> Unit, onOp
         }
         if (r is Row.Toggle) Switch(r.get(s))
         else if (value.isNotEmpty()) Text(value, color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 280.dp))
-        if (r is Row.Choice || r is Row.TextField || (r is Row.Action && r.arrow)) Text("›", color = c.inkSoft, fontSize = 22.sp)
+        if (r is Row.Choice || r is Row.TextField || r is Row.Slider || (r is Row.Action && r.arrow)) Text("›", color = c.inkSoft, fontSize = 22.sp)
     }
 }
 
