@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -378,7 +377,7 @@ fun PlayerScreen(vm: AppViewModel) {
                     onReady = { vlc = it },
                     onPlaying = { error = null },
                     // VLC tampoco pudo: en automático, último intento con MPV
-                    onError = { msg -> if (vm.settings.engine == "auto") switchEngine("mpv", "Probando con el motor MPV…") else { error = msg } },
+                    onError = { msg -> if (vm.settings.engine == "auto" && android.os.Build.VERSION.SDK_INT >= 26) switchEngine("mpv", "Probando con el motor MPV…") else { error = msg } },
                     onEnded = onAltEnded,
                 )
             }

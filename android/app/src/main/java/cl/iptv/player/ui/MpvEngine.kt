@@ -61,9 +61,14 @@ fun MpvVideo(
     val cbError by rememberUpdatedState(onError)
     val cbEnded by rememberUpdatedState(onEnded)
 
+    // libmpv necesita Android 8.0 o más nuevo
+    if (android.os.Build.VERSION.SDK_INT < 26) {
+        LaunchedEffect(Unit) { cbError("MPV no está disponible en este equipo") }
+        return
+    }
     // Crear e iniciar libmpv una vez por pantalla
     val mpv = remember {
-        MPVLib.create(ctx.applicationContext)?.apply {
+        runCatching { MPVLib.create(ctx.applicationContext) }.getOrNull()?.apply {
             setOptionString("config", "no")
             setOptionString("vo", "gpu")
             setOptionString("gpu-context", "android")
