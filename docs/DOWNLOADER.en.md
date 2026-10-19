@@ -34,7 +34,7 @@ Download page: **https://carmelitasoftworks.github.io/Vibe-IPTV/**
    ```
    carmelitasoftworks.github.io/Vibe-IPTV/tv
    ```
-5. Press **Go**. The download takes a moment (the file is about 75 MB).
+5. Press **Go**. The download takes a moment (the file is about 85 MB).
 6. When it finishes, press **Install** and then **Open**.
 7. Downloader asks whether to **delete the APK**: press **Delete** twice to free up space. Vibe IPTV stays installed and shows up on the TV's home screen (or under **Apps**).
 
