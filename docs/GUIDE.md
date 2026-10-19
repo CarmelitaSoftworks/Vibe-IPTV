@@ -52,7 +52,7 @@ Tests: `npm test` (M3U/XMLTV/SRT parsers, proxy, password and translations).
 
 Installing on a phone: copy the APK, open it and allow "Install unknown apps" for your file manager or browser.
 
-**Easiest on a TV:** the *Downloader* app with the link `carmelitasoftworks.github.io/Vibe-IPTV/tv` (step by step in [DOWNLOADER.en.md](DOWNLOADER.en.md)).
+**Easiest on a TV:** the *Downloader* app with the code **9370754** (or the link `carmelitasoftworks.github.io/Vibe-IPTV/tv`) (step by step in [DOWNLOADER.en.md](DOWNLOADER.en.md)).
 
 Installing on an Android TV without Android Studio: enable *Developer options → Network debugging* on the TV and run `adb connect TV_IP` and `adb install app-release.apk`. You can also copy the APK with an app such as "Send Files to TV" or "Downloader".
 

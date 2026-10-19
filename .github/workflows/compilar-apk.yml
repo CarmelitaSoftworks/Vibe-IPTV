@@ -59,7 +59,7 @@ jobs:
           gh release create prueba dist/*.apk \
             --prerelease --target "$GITHUB_SHA" \
             --title "Vibe IPTV — versión de prueba / test build" \
-            --notes "Compilación automática de \`${GITHUB_SHA::7}\`. Celular: \`vibe-iptv-arm64.apk\` · TV, Fire TV y TV Box: \`vibe-iptv-armv7.apk\` · Si no sabes: \`vibe-iptv-universal.apk\`. En TV con Downloader escribe: carmelitasoftworks.github.io/Vibe-IPTV/tv · Phone: arm64 · TV/Fire TV/TV box: armv7 · Not sure: universal. Downloader: carmelitasoftworks.github.io/Vibe-IPTV/tv"
+            --notes "Compilación automática de \`${GITHUB_SHA::7}\`. Celular: \`vibe-iptv-arm64.apk\` · TV, Fire TV y TV Box: \`vibe-iptv-armv7.apk\` · Si no sabes: \`vibe-iptv-universal.apk\`. En TV con Downloader escribe el código 9370754 · Phone: arm64 · TV/Fire TV/TV box: armv7 · Not sure: universal. Downloader code: 9370754"
 
       - name: Pruebas / Unit tests
         run: |

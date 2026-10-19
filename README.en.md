@@ -90,11 +90,13 @@ All the code is out in the open: you can review it, build it yourself, modify it
 ### Android / Android TV
 
 **📺 On your TV with Downloader** (Android TV, Google TV, Fire TV, TV box): install the *Downloader* app,
-allow it to install unknown apps and type:
+allow it to install unknown apps and type the code:
 
 <div align="center">
 
-**`carmelitasoftworks.github.io/Vibe-IPTV/tv`**
+## **9370754**
+
+or the address `carmelitasoftworks.github.io/Vibe-IPTV/tv`
 
 </div>
 

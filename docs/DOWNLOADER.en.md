@@ -6,11 +6,22 @@
 installs APKs from an address you type with the remote. It's the easiest way to install Vibe IPTV on
 a TV without a computer or cables.
 
+## Downloader code
+
+<div align="center">
+
+### **9370754**
+
+</div>
+
+Type **9370754** in Downloader and press **Go**: it downloads the TV version. It's the same as typing
+`carmelitasoftworks.github.io/Vibe-IPTV/tv`, just shorter.
+
 ## Short links
 
 | Device | Type in Downloader |
 |---|---|
-| **TV, Fire TV, TV box** (recommended for TVs) | `carmelitasoftworks.github.io/Vibe-IPTV/tv` |
+| **TV, Fire TV, TV box** (recommended for TVs) | `9370754` or `carmelitasoftworks.github.io/Vibe-IPTV/tv` |
 | Phone or tablet | `carmelitasoftworks.github.io/Vibe-IPTV/movil` |
 | Not sure (bigger file) | `carmelitasoftworks.github.io/Vibe-IPTV/universal` |
 
@@ -30,11 +41,12 @@ Download page: **https://carmelitasoftworks.github.io/Vibe-IPTV/**
    - Google TV: **Settings → System → About → Android TV OS build**: press OK **7 times** until it says you're a developer. Then **Settings → Apps → Security & restrictions → Unknown sources → Downloader → on**.
    - Android TV (other models): **Settings → Apps → Special app access → Install unknown apps → Downloader → Allow**. On some devices it's under **Settings → Security & restrictions → Unknown sources**.
 3. **Open Downloader.** The first time it asks for file access: choose **Allow**.
-4. On the **Home** tab, select the address box and type:
+4. On the **Home** tab, select the address box and type the code:
    ```
-   carmelitasoftworks.github.io/Vibe-IPTV/tv
+   9370754
    ```
-5. Press **Go**. The download takes a moment (the file is about 85 MB).
+   (or the address `carmelitasoftworks.github.io/Vibe-IPTV/tv`).
+5. Press **Go**. An AFTVnews page briefly shows the destination, then the download starts takes a moment (the file is about 85 MB).
 6. When it finishes, press **Install** and then **Open**.
 7. Downloader asks whether to **delete the APK**: press **Delete** twice to free up space. Vibe IPTV stays installed and shows up on the TV's home screen (or under **Apps**).
 
@@ -43,7 +55,7 @@ Download page: **https://carmelitasoftworks.github.io/Vibe-IPTV/**
 1. On the home screen, go to the **magnifier (Search)**, type *Downloader* and install it.
 2. Turn on developer options: **Settings → My Fire TV → About** → select the device name (*Fire TV Stick*) and press OK **7 times**.
 3. Go back to **My Fire TV → Developer options → Install unknown apps → Downloader → On**.
-4. Open Downloader, type `carmelitasoftworks.github.io/Vibe-IPTV/tv` and press **Go**.
+4. Open Downloader, type `9370754` (or say the number with the Alexa voice remote) and press **Go**.
 5. **Install → Open**, and delete the APK when asked.
 
 > On Fire TV the app is under **Apps** (the three-squares icon). Long-press OK on it → **Move** to put it first.
@@ -73,6 +85,7 @@ Requires **Android 7.0** or newer. The MPV engine needs Android 8.0; older devic
 | **"For your security, your TV is not allowed to install unknown apps"** | Step 2 is missing: allow Downloader to install unknown apps. |
 | **Downloader opens a page instead of downloading** | Wait a few seconds: the page redirects by itself. Otherwise use the direct link in the box above. |
 | **"Insufficient storage"** | Delete old APKs from Downloader's **Files** tab, or uninstall apps you don't use. |
+| **The code doesn't work** | Type only the number `9370754`, without `aftv.news/`. If it still fails, use the address `carmelitasoftworks.github.io/Vibe-IPTV/tv`. |
 | **The short link doesn't load (404 error)** | Check capitals and dashes: `Vibe-IPTV`. You can also use the direct link. |
 | **It doesn't show on the TV's home screen** | Look under **Apps** or **Settings → Apps → See all apps**. |
 
