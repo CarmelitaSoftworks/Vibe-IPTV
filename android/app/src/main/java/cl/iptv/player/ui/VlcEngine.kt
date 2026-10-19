@@ -100,8 +100,9 @@ fun VlcVideo(
                         attached = true
                     }
                     override fun onViewDetachedFromWindow(v: View) {
+                        // Sólo soltar la superficie: detener VLC aquí bloqueaba la app con canales que no responden
                         attached = false
-                        runCatching { mp.stop(); mp.detachViews() }
+                        runCatching { if (mp.vlcVout.areViewsAttached()) mp.detachViews() }
                     }
                 })
             }
@@ -133,10 +134,13 @@ fun VlcVideo(
         }
         onDispose {
             mp.setEventListener(null)
-            runCatching { mp.stop() }
             runCatching { if (mp.vlcVout.areViewsAttached()) mp.detachViews() }
-            mp.release()
-            libVlc.release()
+            // stop() espera a que VLC suelte la conexión (segundos si el canal está colgado): fuera del hilo principal
+            EngineReleaser.release {
+                runCatching { mp.stop() }
+                runCatching { mp.release() }
+                runCatching { libVlc.release() }
+            }
         }
     }
 }

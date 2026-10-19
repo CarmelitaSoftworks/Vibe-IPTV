@@ -117,6 +117,9 @@ fun MpvVideo(
         return
     }
     val handle = remember { MpvHandle(mpv) }
+    // false en cuanto la pantalla se cierra: desde ahí nadie más toca libmpv en el hilo principal
+    val alive = remember { java.util.concurrent.atomic.AtomicBoolean(true) }
+    val surfaceAttached = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
 
     // Eventos de libmpv (llegan en otro hilo: se pasan al hilo principal)
     DisposableEffect(mpv) {
@@ -142,9 +145,19 @@ fun MpvVideo(
         }
         mpv.addObserver(obs)
         onDispose {
+            alive.set(false)
             mpv.removeObserver(obs)
-            runCatching { mpv.command(arrayOf("stop")) }
-            runCatching { mpv.destroy() }
+            main.removeCallbacksAndMessages(null)
+            if (surfaceAttached.getAndSet(false)) runCatching {
+                mpv.setPropertyString("vo", "null")
+                mpv.setOptionString("force-window", "no")
+                mpv.detachSurface()
+            }
+            // destroy() espera a que libmpv corte la conexión (hasta network-timeout): fuera del hilo principal
+            EngineReleaser.release {
+                runCatching { mpv.command(arrayOf("stop")) }
+                runCatching { mpv.destroy() }
+            }
         }
     }
 
@@ -154,14 +167,18 @@ fun MpvVideo(
             SurfaceView(context).apply {
                 holder.addCallback(object : SurfaceHolder.Callback {
                     override fun surfaceCreated(h: SurfaceHolder) {
+                        if (!alive.get()) return
+                        surfaceAttached.set(true)
                         mpv.attachSurface(h.surface)
                         mpv.setOptionString("force-window", "yes")
                         mpv.setPropertyString("vo", "gpu")
                     }
                     override fun surfaceChanged(h: SurfaceHolder, format: Int, w: Int, hgt: Int) {
+                        if (!alive.get()) return
                         mpv.setPropertyString("android-surface-size", "${w}x$hgt")
                     }
                     override fun surfaceDestroyed(h: SurfaceHolder) {
+                        if (!alive.get() || !surfaceAttached.getAndSet(false)) return
                         mpv.setPropertyString("vo", "null")
                         mpv.setOptionString("force-window", "no")
                         mpv.detachSurface()
@@ -171,8 +188,9 @@ fun MpvVideo(
         },
     )
 
-    LaunchedEffect(aspect) { runCatching { applyAspect(mpv, aspect) } }
+    LaunchedEffect(aspect) { if (alive.get()) runCatching { applyAspect(mpv, aspect) } }
     LaunchedEffect(url) {
+        if (!alive.get()) return@LaunchedEffect
         mpv.command(arrayOf("loadfile", url))
         onReady(handle)
     }

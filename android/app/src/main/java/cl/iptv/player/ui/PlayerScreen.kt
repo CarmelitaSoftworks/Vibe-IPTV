@@ -140,6 +140,8 @@ fun PlayerScreen(vm: AppViewModel) {
     var alt by remember { mutableStateOf<AltEngine?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
     var liveRetries by remember { mutableStateOf(0) }
+    // true cuando el motor actual ya mostró imagen o sonido (lo usa el vigilante de arranque)
+    var started by remember { mutableStateOf(false) }
     fun switchEngine(to: String, reason: String) {
         val it0 = currentItem
         if (engineFor?.first == it0.id && engineFor?.second == to) return
@@ -189,7 +191,7 @@ fun PlayerScreen(vm: AppViewModel) {
         error = null
         if (useAlt) { player.stop(); player.clearMediaItems(); bannerUntil = System.currentTimeMillis() + 4500; return@LaunchedEffect }
         val pos = if (subtitle != null && player.currentMediaItem?.mediaId == item.id) player.currentPosition else C.TIME_UNSET
-        val http = OkHttpDataSource.Factory(Http.client)
+        val http = OkHttpDataSource.Factory(Http.streamClient)
             .setUserAgent(item.userAgent.ifBlank { Http.DEFAULT_UA })
             .apply { if (item.referrer.isNotBlank()) setDefaultRequestProperties(mapOf("Referer" to item.referrer)) }
         val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, http))
@@ -199,6 +201,33 @@ fun PlayerScreen(vm: AppViewModel) {
         player.play()
         bannerUntil = System.currentTimeMillis() + 4500
     }
+    // Vigilante de arranque: algunos canales aceptan la conexión pero nunca envían video y el motor
+    // se queda esperando con la pantalla negra. Si no arranca a tiempo, se prueba el otro formato,
+    // luego otro motor y, si nada funciona, se muestra el error con opciones.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(item.id, playUrl, engine, reloadKey) {
+        started = false
+        delay(if (item.kind == Kind.LIVE) 20_000L else 30_000L)
+        if (started || error != null) return@LaunchedEffect
+        if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@LaunchedEffect
+        val it0 = currentItem
+        val auto = vm.settings.engine == "auto"
+        when {
+            engine == "exo" && altFormat(it0.url) != null && altFor != it0.id -> {
+                vm.message = "El canal no responde: probando otro formato…"
+                altFor = it0.id
+            }
+            engine == "exo" && auto -> switchEngine("vlc", "El canal no responde: probando con el motor VLC…")
+            engine == "vlc" && auto && android.os.Build.VERSION.SDK_INT >= 26 ->
+                switchEngine("mpv", "El canal no responde: probando con el motor MPV…")
+            else -> {
+                if (engine == "exo") player.stop()     // soltar la conexión colgada
+                else alt?.pause()
+                error = "El canal no responde (tiempo de espera agotado). Puede estar caído o saturado."
+            }
+        }
+    }
+
     // Subtítulo externo en VLC / MPV
     LaunchedEffect(subtitle, alt) { val f = subtitle; if (useAlt && f != null) runCatching { alt?.addExternalSubtitle(f) } }
 
@@ -229,8 +258,9 @@ fun PlayerScreen(vm: AppViewModel) {
                 val badVideo = video.isNotEmpty() && video.none { it.isSupported }
                 if (badAudio || badVideo) switchEngine("vlc", if (badVideo) "Video no compatible con este equipo: usando VLC" else "Audio no compatible con este equipo: usando VLC")
             }
-            override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) { error = null; liveRetries = 0 } }
+            override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) { started = true; error = null; liveRetries = 0 } }
             override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) started = true
                 // Siguiente episodio automático (Ajustes → Rápido)
                 val cur = vm.playing
                 if (state == Player.STATE_ENDED && vm.settings.autoNext && cur != null && cur.episode > 0 &&
@@ -393,7 +423,7 @@ fun PlayerScreen(vm: AppViewModel) {
                     url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
-                    onPlaying = { error = null },
+                    onPlaying = { started = true; error = null },
                     // VLC tampoco pudo: en automático, último intento con MPV
                     onError = { msg -> if (vm.settings.engine == "auto" && android.os.Build.VERSION.SDK_INT >= 26) switchEngine("mpv", "Probando con el motor MPV…") else { error = msg } },
                     onEnded = onAltEnded,
@@ -406,7 +436,7 @@ fun PlayerScreen(vm: AppViewModel) {
                     url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
-                    onPlaying = { error = null },
+                    onPlaying = { started = true; error = null },
                     onError = { error = it },
                     onEnded = onAltEnded,
                 )
