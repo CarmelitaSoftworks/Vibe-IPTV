@@ -11,3 +11,4 @@ captures/
 # Sistema
 .DS_Store
 Thumbs.db
+*.jks

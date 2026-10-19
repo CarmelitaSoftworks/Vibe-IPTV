@@ -23,6 +23,9 @@ jobs:
         working-directory: android
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 40          # para armar la lista de cambios de la versión
+          fetch-tags: true
 
       - uses: actions/setup-java@v4
         with:
@@ -31,40 +34,67 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Compilar (debug, instalable directamente)
+      - name: Compilar (release, firmado)
+        env:
+          VIBE_BUILD: ${{ github.run_number }}
+          KS_B64: ${{ secrets.VIBE_KEYSTORE_B64 }}
+          VIBE_KEY_PASS: ${{ secrets.VIBE_KEY_PASS }}
         run: |
           chmod +x gradlew
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          # Firma fija desde los secretos del repositorio (ver docs/FIRMA.md). Sin ellos: clave de prueba.
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/vibe.jks"
+            export VIBE_KEYSTORE="$RUNNER_TEMP/vibe.jks"
+            echo "SIGNED=fija" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Sin los secretos VIBE_KEYSTORE_B64 / VIBE_KEY_PASS: el APK se firma con una clave de prueba y no se podrá actualizar encima."
+            echo "SIGNED=prueba" >> "$GITHUB_ENV"
+          fi
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+          rm -f "$RUNNER_TEMP/vibe.jks"
 
       - name: Publicar el APK (Artifacts)
         uses: actions/upload-artifact@v4
         with:
           name: Vibe-IPTV-APK
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: android/app/build/outputs/apk/release/*.apk
 
-      - name: Publicar versión de prueba (Releases)
+      - name: Publicar versiones (Releases)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}
+          N: ${{ github.run_number }}
         run: |
           # Nombres cortos y fijos: fáciles de escribir en Downloader / short fixed names for Downloader
           mkdir -p dist
-          d=app/build/outputs/apk/debug
-          cp $d/app-armeabi-v7a-debug.apk dist/vibe-iptv-armv7.apk
-          cp $d/app-arm64-v8a-debug.apk dist/vibe-iptv-arm64.apk
-          cp $d/app-x86_64-debug.apk dist/vibe-iptv-x86_64.apk
-          cp $d/app-universal-debug.apk dist/vibe-iptv-universal.apk
+          d=app/build/outputs/apk/release
+          cp $d/app-armeabi-v7a-release.apk dist/vibe-iptv-armv7.apk
+          cp $d/app-arm64-v8a-release.apk dist/vibe-iptv-arm64.apk
+          cp $d/app-x86_64-release.apk dist/vibe-iptv-x86_64.apk
+          cp $d/app-universal-release.apk dist/vibe-iptv-universal.apk
+          firma=$([ "$SIGNED" = "fija" ] && echo "Firma fija: se actualiza encima sin perder listas ni ajustes." || echo "⚠️ Firma de prueba: desinstala la versión anterior antes de instalar.")
+          {
+            echo "**Vibe IPTV 0.1.$N** · $firma"
+            echo
+            echo "📺 TV / Fire TV / TV Box: \`vibe-iptv-armv7.apk\` · Downloader: **9370754**"
+            echo "📱 Celular / Phone: \`vibe-iptv-arm64.apk\` · Si no sabes / Not sure: \`vibe-iptv-universal.apk\`"
+            echo
+            echo "### Cambios / Changes"
+            prev=$(git describe --tags --abbrev=0 --match 'v0.*' 2>/dev/null || true)
+            git log --no-merges --pretty='- %s' ${prev:+$prev..}HEAD | grep -v -i 'registro\|build-logs' | head -25
+          } > notes.md
+          # Versión numerada (historial) …
+          gh release create "v0.1.$N" dist/*.apk --prerelease --target "$GITHUB_SHA" --title "Vibe IPTV 0.1.$N" --notes-file notes.md
+          # … y "prueba", siempre la última: a ella apuntan Downloader y los enlaces cortos
           gh release delete prueba --yes --cleanup-tag || true
-          gh release create prueba dist/*.apk \
-            --prerelease --target "$GITHUB_SHA" \
-            --title "Vibe IPTV — versión de prueba / test build" \
-            --notes "Compilación automática de \`${GITHUB_SHA::7}\`. Celular: \`vibe-iptv-arm64.apk\` · TV, Fire TV y TV Box: \`vibe-iptv-armv7.apk\` · Si no sabes: \`vibe-iptv-universal.apk\`. En TV con Downloader escribe el código 9370754 · Phone: arm64 · TV/Fire TV/TV box: armv7 · Not sure: universal. Downloader code: 9370754"
+          gh release create prueba dist/*.apk --prerelease --target "$GITHUB_SHA" \
+            --title "Vibe IPTV — última versión / latest (0.1.$N)" --notes-file notes.md
 
       - name: Pruebas / Unit tests
         run: |
           set -o pipefail
-          ./gradlew testDebugUnitTest --no-daemon 2>&1 | tee test.log
+          ./gradlew testReleaseUnitTest --no-daemon 2>&1 | tee test.log
 
       - name: Mostrar errores / Show errors
         if: failure()

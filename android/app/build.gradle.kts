@@ -12,17 +12,30 @@ android {
         applicationId = "cl.iptv.player"
         minSdk = 24          // Android 7.0 / Android TV 7+
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Número de versión automático en GitHub Actions (número de compilación); 1 en local
+        val build = (System.getenv("VIBE_BUILD") ?: "1").toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "0.1.$build"
+    }
+
+    // Firma fija: la misma clave en cada versión permite actualizar encima sin perder listas ni ajustes.
+    // La clave NO está en el repositorio: GitHub Actions la toma de los secretos VIBE_KEYSTORE_B64 y VIBE_KEY_PASS.
+    val keystore = System.getenv("VIBE_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (keystore != null) create("vibe") {
+            storeFile = keystore
+            storePassword = System.getenv("VIBE_KEY_PASS")
+            keyAlias = System.getenv("VIBE_KEY_ALIAS") ?: "vibe"
+            keyPassword = System.getenv("VIBE_KEY_PASS")
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Para probar el APK release sin keystore propio. Cámbialo por tu firma antes de publicar.
-            signingConfig = signingConfigs.getByName("debug")
+            // Sin R8: VLC, MPV, FFmpeg y ML Kit cargan clases por reflexión; el peso está en las librerías nativas
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = if (keystore != null) signingConfigs.getByName("vibe") else signingConfigs.getByName("debug")
         }
     }
     compileOptions {
