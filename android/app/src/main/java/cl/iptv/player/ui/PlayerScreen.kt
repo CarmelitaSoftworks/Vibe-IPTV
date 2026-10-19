@@ -190,7 +190,10 @@ fun PlayerScreen(vm: AppViewModel) {
     LaunchedEffect(item.id, subtitle, playUrl, engine, reloadKey) {
         error = null
         if (useAlt) { player.stop(); player.clearMediaItems(); bannerUntil = System.currentTimeMillis() + 4500; return@LaunchedEffect }
-        val pos = if (subtitle != null && player.currentMediaItem?.mediaId == item.id) player.currentPosition else C.TIME_UNSET
+        val saved = if (item.kind != Kind.LIVE) vm.resumeFor(item) else null
+        val pos = if (subtitle != null && player.currentMediaItem?.mediaId == item.id) player.currentPosition
+            else if (saved != null && player.currentMediaItem?.mediaId != item.id) { vm.message = "Continuando desde ${fmtDur(saved.pos)}"; saved.pos }
+            else C.TIME_UNSET
         val http = OkHttpDataSource.Factory(Http.streamClient)
             .setUserAgent(item.userAgent.ifBlank { Http.DEFAULT_UA })
             .apply { if (item.referrer.isNotBlank()) setDefaultRequestProperties(mapOf("Referer" to item.referrer)) }
@@ -225,6 +228,27 @@ fun PlayerScreen(vm: AppViewModel) {
                 else alt?.pause()
                 error = "El canal no responde (tiempo de espera agotado). Puede estar caído o saturado."
             }
+        }
+    }
+
+    // Seguir viendo: VLC / MPV continúan donde quedó (una vez por elemento)
+    var resumedFor by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(alt, item.id) {
+        val a = alt ?: return@LaunchedEffect
+        val saved = if (item.kind != Kind.LIVE) vm.resumeFor(item) else null
+        if (saved != null && resumedFor != item.id) {
+            resumedFor = item.id
+            for (i in 0 until 20) { if (a.duration > 0) break; delay(500) }
+            a.seekTo(saved.pos); vm.message = "Continuando desde ${fmtDur(saved.pos)}"
+        }
+    }
+    // Guardar dónde va cada 10 s
+    LaunchedEffect(item.id, engine) {
+        if (live) return@LaunchedEffect
+        while (true) {
+            delay(10_000)
+            val k = if (useAlt) alt else exo
+            if (k != null && k.isPlaying) vm.savePosition(item, k.position, k.duration)
         }
     }
 
@@ -272,6 +296,14 @@ fun PlayerScreen(vm: AppViewModel) {
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener); player.release() }
+    }
+
+    // Al salir del elemento (otro canal o volver al menú): guardar dónde quedó
+    DisposableEffect(item.id, engine) {
+        onDispose {
+            // Sólo ExoPlayer: VLC y MPV ya se cerraron a esta altura (su posición se guarda cada 10 s)
+            if (!live && !useAlt) runCatching { vm.savePosition(item, exo.position, exo.duration) }
+        }
     }
 
     // Pantalla completa inmersiva + horizontal en teléfonos; PiP al salir con el botón Inicio

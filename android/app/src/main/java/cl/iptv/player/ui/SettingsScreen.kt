@@ -48,7 +48,7 @@ private sealed class Row(val label: String, val desc: String = "") {
     class Info(label: String, val value: String) : Row(label)
 }
 
-private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, DATA, ABOUT }
+private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
 private class Section(val id: String, val name: String, val icon: SecIcon, val rows: List<Row>)
 
 private fun sections(vm: AppViewModel): List<Section> {
@@ -96,7 +96,16 @@ private fun sections(vm: AppViewModel): List<Section> {
         Section("startup", "Inicio de la app", SecIcon.STARTUP, listOf(
             Row.Choice("Al abrir la app", options = listOf("home" to "Inicio de la última lista", "welcome" to "Pantalla de mis listas", "lastChannel" to "Último canal visto"), get = { it.startup }, set = { s, v -> s.copy(startup = v) }),
         )),
+        Section("parental", "Control parental", SecIcon.LOCK, listOf(
+            Row.TextField("PIN de control parental", "4 dígitos. Con PIN, las categorías para adultos (XXX, Adultos, +18…) quedan ocultas. Vacío = desactivado.",
+                secret = true, get = { it.parentalPin }, set = { s, v -> s.copy(parentalPin = v.filter(Char::isDigit).take(8)) }),
+            Row.Action("Contenido para adultos", "Se desbloquea con el PIN desde la barra de categorías, hasta cerrar la app",
+                value = { if (!vm.parentalOn) "Visible (sin PIN)" else if (vm.adultUnlocked) "Desbloqueado" else "Oculto (${vm.hiddenAdult})" }) {
+                if (vm.adultUnlocked) vm.lockAdult()
+            },
+        )),
         Section("data", "Datos", SecIcon.DATA, listOf(
+            Row.Danger("Borrar \"Seguir viendo\"", "Olvida dónde quedaste en películas y series de esta lista") { vm.clearResume() },
             Row.Danger("Borrar guías guardadas", "Se vuelven a descargar al abrir cada lista") { vm.clearEpgCache() },
             Row.Danger("Borrar favoritos de esta lista") { vm.clearFavorites() },
             Row.Danger("Restablecer ajustes", "Vuelve a los valores de fábrica (no borra tus listas)") { vm.resetSettings() },
@@ -326,6 +335,7 @@ private fun SectionIcon(icon: SecIcon, color: Color, modifier: Modifier) {
             SecIcon.PLAY -> { rect(3f, 5f, 18f, 14f); drawPath(Path().apply { moveTo(10 * s, 9 * s); lineTo(15 * s, 12 * s); lineTo(10 * s, 15 * s); close() }, color) }
             SecIcon.SUBS -> { rect(3f, 5f, 18f, 14f); line(7f, 15f, 11f, 15f); line(13f, 15f, 17f, 15f); line(7f, 11f, 17f, 11f) }
             SecIcon.STARTUP -> { line(12f, 3f, 12f, 12f); drawArc(color, -50f, 280f, false, Offset(4 * s, 5 * s), Size(16 * s, 16 * s), style = st) }
+            SecIcon.LOCK -> { drawRoundRect(color, Offset(5 * s, 11 * s), Size(14 * s, 10 * s), androidx.compose.ui.geometry.CornerRadius(2 * s), style = st); drawArc(color, 180f, 180f, false, Offset(8 * s, 4 * s), Size(8 * s, 10 * s), style = st); line(8f, 9f, 8f, 11f); line(16f, 9f, 16f, 11f) }
             SecIcon.DATA -> { drawOval(color, Offset(4 * s, 3 * s), Size(16 * s, 6 * s), style = st); line(4f, 6f, 4f, 18f); line(20f, 6f, 20f, 18f); drawArc(color, 0f, 180f, false, Offset(4 * s, 15 * s), Size(16 * s, 6 * s), style = st) }
             SecIcon.ABOUT -> { drawCircle(color, 9 * s, Offset(12 * s, 12 * s), style = st); line(12f, 11f, 12f, 17f); drawCircle(color, 1.2f * s, Offset(12 * s, 7.5f * s)) }
         }

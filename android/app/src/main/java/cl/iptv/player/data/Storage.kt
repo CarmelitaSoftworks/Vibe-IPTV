@@ -68,6 +68,7 @@ class Storage(private val ctx: Context) {
             epgEvery = prefs.getInt("epgEvery", d.epgEvery), epgOffset = prefs.getInt("epgOffset", d.epgOffset),
             subSize = str("subSize", d.subSize), startup = str("startup", d.startup),
             engine = str("engine", d.engine), aspect = str("aspect", d.aspect), subdlKey = str("subdlKey", ""),
+            parentalPin = str("parentalPin", ""),
         )
     }
 
@@ -79,7 +80,7 @@ class Storage(private val ctx: Context) {
         .putString("lang", s.lang).putString("theme", s.theme).putString("accent", s.accent).putString("tileSize", s.tileSize)
         .putInt("epgEvery", s.epgEvery).putInt("epgOffset", s.epgOffset)
         .putString("subSize", s.subSize).putString("startup", s.startup)
-        .putString("engine", s.engine).putString("aspect", s.aspect).putString("subdlKey", s.subdlKey)
+        .putString("engine", s.engine).putString("aspect", s.aspect).putString("subdlKey", s.subdlKey).putString("parentalPin", s.parentalPin)
         .apply()
 
     var lastItemId: String?
@@ -87,4 +88,21 @@ class Storage(private val ctx: Context) {
         set(v) = prefs.edit().putString("last_item", v).apply()
 
     fun clearFavorites(sourceId: String) = prefs.edit().remove("favs_$sourceId").apply()
+
+    // ---------- Seguir viendo ----------
+    fun resume(sourceId: String): Map<String, Resume> {
+        val o = runCatching { org.json.JSONObject(prefs.getString("pos_$sourceId", "{}")!!) }.getOrNull() ?: return emptyMap()
+        return o.keys().asSequence().mapNotNull { k ->
+            o.optJSONArray(k)?.let { a -> k to Resume(a.optLong(0), a.optLong(1), a.optLong(2), a.optString(3, "")) }
+        }.toMap()
+    }
+    fun saveResume(sourceId: String, map: Map<String, Resume>) {
+        val o = org.json.JSONObject()
+        // Sólo los 200 más recientes
+        map.entries.sortedByDescending { it.value.at }.take(200).forEach { (k, r) ->
+            o.put(k, org.json.JSONArray().put(r.pos).put(r.dur).put(r.at).put(r.parent))
+        }
+        prefs.edit().putString("pos_$sourceId", o.toString()).apply()
+    }
+    fun clearResume(sourceId: String) = prefs.edit().remove("pos_$sourceId").apply()
 }

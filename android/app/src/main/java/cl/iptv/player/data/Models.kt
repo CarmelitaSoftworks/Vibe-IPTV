@@ -68,6 +68,8 @@ data class Settings(
     val osPass: String = "",
     val subLangs: String = "es,en",
     val subdlKey: String = "",
+    /** Control parental: PIN de 4 dígitos ("" = desactivado). Con PIN, el contenido para adultos queda oculto. */
+    val parentalPin: String = "",
     // Rápido
     val showNumbers: Boolean = true,
     val showEpgInfo: Boolean = true,
@@ -89,3 +91,14 @@ data class Settings(
     val engine: String = "auto",          // auto (ExoPlayer → VLC → MPV) | exo | vlc | mpv
     val aspect: String = "fit",           // fit | fill | stretch | zoom
 )
+
+
+/** Punto donde quedó una película o episodio ("Seguir viendo"). parent = id de la serie, si es un episodio. */
+data class Resume(val pos: Long, val dur: Long, val at: Long, val parent: String = "") {
+    val fraction: Float get() = if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f
+}
+
+private val ADULT = Regex("""(?i)(^|[^a-z])(xxx|adult[oa]?s?|adults?|er[oó]tic[oa]s?|porno?|hentai|playboy|\+ ?18|18 ?\+|for adults|para adultos)([^a-z]|$)""")
+
+/** Contenido para adultos según el grupo / categoría de la lista. */
+fun Item.isAdult(): Boolean = ADULT.containsMatchIn(group) || ADULT.containsMatchIn(cat) || ADULT.containsMatchIn(sub)

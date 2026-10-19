@@ -282,3 +282,26 @@ fun SearchDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         Text("Busca en todas las categorías de la sección actual.", color = LocalIptv.current.inkSoft, fontSize = 13.sp)
     }
 }
+
+
+/** Pide el PIN de control parental. onPin devuelve true si era correcto. */
+@Composable
+fun PinDialog(onDismiss: () -> Unit, onPin: (String) -> Boolean) {
+    val c = LocalIptv.current
+    var pin by remember { mutableStateOf("") }
+    var wrong by remember { mutableStateOf(false) }
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { delay(80); runCatching { fr.requestFocus() } }
+    fun check() { if (!onPin(pin)) { wrong = true; pin = "" } }
+    Sheet("Control parental", onDismiss) {
+        Text("Escribe el PIN para ver el contenido para adultos hasta cerrar la app.", color = c.inkSoft, fontSize = 13.sp)
+        Spacer(Modifier.height(10.dp))
+        Field(pin, { pin = it.filter(Char::isDigit).take(8); wrong = false }, "PIN", modifier = Modifier.focusRequester(fr),
+            password = true, keyboard = KeyboardType.NumberPassword, onDone = { check() })
+        if (wrong) Text("PIN incorrecto", color = androidx.compose.ui.graphics.Color(0xFFD9534F), fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+            ActionButton("Cancelar", ghost = true, onClick = onDismiss)
+            ActionButton("Desbloquear") { check() }
+        }
+    }
+}

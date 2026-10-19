@@ -127,12 +127,19 @@ private fun CategoryBar(vm: AppViewModel) {
     val cats = remember(vm.items, vm.section) { vm.categories() }
     val subs = remember(vm.items, vm.section, vm.category) { vm.subcategories() }
     val nFav = vm.favoritesInSection()
+    val nResume = remember(vm.items, vm.section, vm.resume) { vm.resumeInSection() }
     val total = remember(vm.items, vm.section) { vm.items.count { it.kind == vm.section } }
+    var askPin by remember { mutableStateOf(false) }
+    if (askPin) PinDialog(onDismiss = { askPin = false }) { pin -> if (vm.unlockAdult(pin)) { askPin = false; true } else false }
     Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(3.dp)) {
             item { Pill("Todos  $total", active = vm.category == CAT_ALL) { vm.selectCategory(CAT_ALL) } }
+            if (nResume > 0) item { Pill("▶ Seguir viendo  $nResume", active = vm.category == CAT_RESUME) { vm.selectCategory(CAT_RESUME) } }
             if (nFav > 0) item { Pill("★ Favoritos  $nFav", active = vm.category == CAT_FAV) { vm.selectCategory(CAT_FAV) } }
             items(cats, key = { it.first }) { (c, n) -> Pill("$c  $n", active = vm.category == c) { vm.selectCategory(c) } }
+            // Control parental: categorías para adultos ocultas con PIN
+            if (vm.parentalOn && !vm.adultUnlocked && vm.hiddenAdult > 0) item { Pill("🔒 Adultos") { askPin = true } }
+            if (vm.parentalOn && vm.adultUnlocked) item { Pill("🔓 Ocultar adultos") { vm.lockAdult() } }
         }
         if (subs.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(3.dp)) {
             item { Pill("Todas", active = vm.subcategory.isEmpty()) { vm.selectCategory(vm.category) } }
@@ -281,6 +288,7 @@ private fun TileGrid(vm: AppViewModel, compact: Boolean, onFocusItem: (Item?) ->
                                     showNumber = vm.settings.showNumbers,
                                     animate = vm.settings.animations,
                                     poster = item.kind != Kind.LIVE,
+                                    progress = vm.resume[item.id]?.fraction ?: 0f,
                                     modifier = mod
                                         .focusRequester(requesters[pos])
                                         .onPreviewKeyEvent { ev ->
@@ -407,7 +415,7 @@ private fun HomeTile(
 @Composable
 private fun Tile(
     item: Item, fav: Boolean, poster: Boolean, modifier: Modifier,
-    showNumber: Boolean = true, animate: Boolean = true,
+    showNumber: Boolean = true, animate: Boolean = true, progress: Float = 0f,
     onFocused: () -> Unit, onClick: () -> Unit, onLongClick: () -> Unit,
 ) {
     val c = LocalIptv.current
@@ -439,6 +447,10 @@ private fun Tile(
                         model = item.logo, contentDescription = null, contentScale = ContentScale.Crop,
                         onError = { imgFailed = true }, modifier = Modifier.fillMaxSize(),
                     ) else Text(initials(item.name), color = c.inkSoft, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp)
+                    // Seguir viendo: cuánto se vio
+                    if (progress > 0f) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(5.dp).background(Color(0x99000000))) {
+                        Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(c.accent))
+                    }
                 }
                 Box(Modifier.fillMaxWidth().height(34.dp).background(c.tileA).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
                     Text(

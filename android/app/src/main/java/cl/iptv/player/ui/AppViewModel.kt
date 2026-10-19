@@ -21,6 +21,7 @@ enum class Screen { MENU, PLAYER }
 
 const val CAT_ALL = "__all__"
 const val CAT_FAV = "__fav__"
+const val CAT_RESUME = "__resume__"
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val store = Storage(app)
@@ -48,6 +49,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var series by mutableStateOf<Item?>(null); private set
     private var episodes: List<Item> = emptyList()
     var favorites by mutableStateOf<Set<String>>(emptySet()); private set
+    /** "Seguir viendo": dónde quedó cada película o episodio de esta lista. */
+    var resume by mutableStateOf<Map<String, Resume>>(emptyMap()); private set
+
+    // ---------- Control parental ----------
+    /** Toda la lista; [items] es lo visible (sin contenido para adultos si hay PIN y está bloqueado). */
+    private var allItems: List<Item> = emptyList()
+    var adultUnlocked by mutableStateOf(false); private set
+    var hiddenAdult by mutableStateOf(0); private set
+    val parentalOn: Boolean get() = settings.parentalPin.isNotBlank()
+    private fun applyParental() {
+        items = if (parentalOn && !adultUnlocked) allItems.filterNot { it.isAdult() } else allItems
+        hiddenAdult = allItems.size - items.size
+        if (category != CAT_ALL && category != CAT_FAV && category != CAT_RESUME && items.none { it.cat == category }) { category = CAT_ALL; subcategory = "" }
+        recompute(false)
+    }
+    /** Devuelve false si el PIN no coincide. */
+    fun unlockAdult(pin: String): Boolean {
+        if (pin != settings.parentalPin) return false
+        adultUnlocked = true; applyParental(); message = "Contenido para adultos visible hasta cerrar la app"; return true
+    }
+    fun lockAdult() { adultUnlocked = false; applyParental(); message = "Contenido para adultos oculto" }
 
     /** Lista visible (filtrada) que dibuja la cuadrícula. */
     var view by mutableStateOf<List<Item>>(emptyList()); private set
@@ -113,15 +135,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (category == CAT_ALL || category == CAT_FAV) emptyList()
         else items.filter { it.kind == section && it.cat == category && it.sub.isNotEmpty() }.groupingBy { it.sub }.eachCount().toList()
     fun favoritesInSection() = items.count { it.kind == section && it.id in favorites }
+    fun resumeInSection(): Int {
+        val parents = resume.values.map { it.parent }.toSet()
+        return items.count { it.kind == section && (it.id in resume || it.id in parents) }
+    }
+
+    /** Guarda dónde quedó una película o episodio; lo borra si se terminó de ver o casi no se vio. */
+    fun savePosition(item: Item, pos: Long, dur: Long) {
+        val src = source ?: return
+        if (item.kind == Kind.LIVE || dur <= 0) return
+        val done = pos > dur - 90_000 || pos > dur * 0.95
+        val next = if (done || pos < 30_000) resume - item.id
+            else resume + (item.id to Resume(pos, dur, System.currentTimeMillis(), series?.id.orEmpty()))
+        if (next != resume) { resume = next; store.saveResume(src.id, next); if (category == CAT_RESUME) recompute(false) }
+    }
+    fun resumeFor(item: Item): Resume? = resume[item.id]
+    fun clearResume() {
+        val src = source ?: run { message = "Abre una lista primero"; return }
+        store.clearResume(src.id); resume = emptyMap(); recompute(false); message = "\"Seguir viendo\" borrado"
+    }
 
     // ---------- fuentes ----------
     fun open(src: Source) {
         loadJob?.cancel()
-        source = src; items = emptyList(); epg = Epg.EMPTY; series = null; episodes = emptyList(); home = true
+        source = src; allItems = emptyList(); items = emptyList(); epg = Epg.EMPTY; series = null; episodes = emptyList(); home = true
         epgJob?.cancel(); epgAt = 0; epgUrls = ""; epgStatus = ""
         loadCachedEpg(src)   // la última guía guardada se muestra al instante
         showWelcome = false
         favorites = store.favorites(src.id)
+        resume = store.resume(src.id)
         store.lastSourceId = src.id
         recompute(true)
         loadJob = viewModelScope.launch {
@@ -137,14 +179,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         store.upsert(updated); sources = store.sources(); source = updated
                         message = "Dirección corregida a $fixed"
                     }
-                    items = x.loadAll().map { it.withCategory() }
+                    allItems = x.loadAll().map { it.withCategory() }; applyParental()
                     if (epgUrl.isBlank()) epgUrl = x.epgUrl()
                 } else {
                     xtream = null
                     val result = if (src.localFile) withContext(Dispatchers.IO) {
                         store.localM3u(src.id).bufferedReader().use(M3uParser::parse)
                     } else Http.stream(src.url) { it.bufferedReader().use(M3uParser::parse) }
-                    items = result.items.map { it.withCategory() }
+                    allItems = result.items.map { it.withCategory() }; applyParental()
                     if (epgUrl.isBlank()) epgUrl = result.epgUrl
                 }
                 val kinds = sectionsAvailable
@@ -241,15 +283,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         epgFiles(src.id).forEach { it.delete() }
         sources = store.sources()
         if (source?.id == src.id) {
-            source = null; items = emptyList(); recompute(true)
+            source = null; allItems = emptyList(); items = emptyList(); recompute(true)
             showWelcome = true
         }
     }
 
     fun updateSettings(s: Settings) {
         val formatChanged = s.liveFormat != settings.liveFormat
+        val pinChanged = s.parentalPin != settings.parentalPin
         settings = s
         store.saveSettings(s)
+        if (pinChanged) { adultUnlocked = false; applyParental() }
         if (formatChanged) source?.takeIf { it.type == SourceType.XTREAM }?.let { open(it) }
     }
 
@@ -272,6 +316,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             list = when (category) {
                 CAT_ALL -> list
                 CAT_FAV -> list.filter { it.id in favorites }
+                CAT_RESUME -> {
+                    val parents = resume.values.map { it.parent }.toSet()
+                    list.filter { it.id in resume || it.id in parents }
+                        .sortedByDescending { i -> resume[i.id]?.at ?: resume.values.filter { it.parent == i.id }.maxOfOrNull { it.at } ?: 0L }
+                }
                 else -> list.filter { it.cat == category && (subcategory.isEmpty() || it.sub == subcategory) }
             }
         }
@@ -293,6 +342,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         series != null -> series!!.name
         category == CAT_ALL -> "${section.label} · Todos"
         category == CAT_FAV -> "Favoritos"
+        category == CAT_RESUME -> "Seguir viendo"
         else -> if (subcategory.isNotEmpty()) "$category · $subcategory" else category
     }
 
