@@ -42,7 +42,7 @@ const MAX_REDIRECTS = 6;
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
-  '.ico': 'image/x-icon',
+  '.ico': 'image/x-icon', '.wasm': 'application/wasm', '.gz': 'application/octet-stream',
 };
 
 const CORS = {
@@ -364,7 +364,7 @@ async function handleTranscode(req, res, reqUrl) {
 async function handleProxy(req, res, reqUrl) {
   if (reqUrl.pathname === '/proxy/caps') {
     res.writeHead(200, { ...CORS, 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ffmpeg: !!FFMPEG }));
+    return res.end(JSON.stringify({ ffmpeg: !!FFMPEG, ocr: OCR_LOCAL }));
   }
   if (reqUrl.pathname === '/proxy/transcode') return handleTranscode(req, res, reqUrl);
   if (reqUrl.pathname === '/proxy/subs/search' || reqUrl.pathname === '/proxy/subs/get') {
@@ -434,7 +434,28 @@ async function handleProxy(req, res, reqUrl) {
   req.on('close', () => up.destroy());
 }
 
+// ---- Lector de texto para "Desde una captura" (opcional: npm install lo deja disponible sin Internet) ----
+function ocrFile(p) {
+  const nm = path.join(ROOT, 'node_modules');
+  const name = path.basename(p);
+  if (p === '/ocr/tesseract.min.js' || p === '/ocr/worker.min.js') return path.join(nm, 'tesseract.js', 'dist', name);
+  if (p.startsWith('/ocr/core/') && /^tesseract-core[\w.-]*\.(?:js|wasm)$/.test(name)) return path.join(nm, 'tesseract.js-core', name);
+  if (p === '/ocr/lang/eng.traineddata.gz') return path.join(nm, '@tesseract.js-data', 'eng', '4.0.0_best_int', name);
+  return null;
+}
+const OCR_LOCAL = !!ocrFile('/ocr/tesseract.min.js') && fs.existsSync(ocrFile('/ocr/tesseract.min.js'))
+  && fs.existsSync(path.join(ROOT, 'node_modules', 'tesseract.js-core')) && fs.existsSync(ocrFile('/ocr/lang/eng.traineddata.gz'));
+
 function serveStatic(req, res, reqUrl) {
+  if (reqUrl.pathname.startsWith('/ocr/')) {
+    const f = ocrFile(reqUrl.pathname);
+    if (!f) { res.writeHead(404); return res.end(); }
+    return fs.stat(f, (err, st) => {
+      if (err || !st.isFile()) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Content-Length': st.size, 'Cache-Control': 'max-age=604800' });
+      fs.createReadStream(f).pipe(res);
+    });
+  }
   let p = decodeURIComponent(reqUrl.pathname);
   if (p.endsWith('/')) p += 'index.html';
   const file = path.normalize(path.join(ROOT, p));

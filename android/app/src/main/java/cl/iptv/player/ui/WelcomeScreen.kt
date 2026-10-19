@@ -46,6 +46,7 @@ private enum class AddOption(val title: String, val desc: String) {
     URL("Lista M3U por enlace", "Pega la URL .m3u o .m3u8 que te dio tu proveedor"),
     FILE("Archivo M3U", "Carga una lista guardada en este dispositivo"),
     XTREAM("Xtream Codes", "Servidor, usuario y contraseña de tu cuenta"),
+    SHOT("Desde una captura", "Sube una foto o captura de pantalla con los datos y se rellenan solos"),
 }
 
 private sealed interface WelcomeDialog {
@@ -141,6 +142,7 @@ fun WelcomeScreen(vm: AppViewModel) {
             vm, onDismiss = { dialog = WelcomeDialog.None },
             addType = if (d.option == AddOption.XTREAM) SourceType.XTREAM else SourceType.M3U,
             autoPickFile = d.option == AddOption.FILE,
+            autoPickShot = d.option == AddOption.SHOT,
         )
     }
 }
@@ -241,6 +243,12 @@ private fun OptionIcon(option: AddOption, color: Color, modifier: Modifier) {
                 line(12f, 5f, 29f, 5f, 38f, 14f, 38f, 43f, 12f, 43f, 12f, 5f)
                 line(29f, 5f, 29f, 14f, 38f, 14f)
                 line(24f, 21f, 24f, 35f); line(18f, 29f, 24f, 35f, 30f, 29f)
+            }
+            AddOption.SHOT -> {
+                // marco de captura con líneas de texto
+                line(6f, 15f, 6f, 10f, 9f, 7f, 14f, 7f); line(34f, 7f, 39f, 7f, 42f, 10f, 42f, 15f)
+                line(42f, 33f, 42f, 38f, 39f, 41f, 34f, 41f); line(14f, 41f, 9f, 41f, 6f, 38f, 6f, 33f)
+                line(14f, 18f, 34f, 18f); line(14f, 24f, 28f, 24f); line(14f, 30f, 31f, 30f)
             }
             AddOption.XTREAM -> {
                 drawRoundRect(color, Offset(7 * s, 7 * s), Size(34 * s, 12 * s), CornerRadius(3 * s), style = st)

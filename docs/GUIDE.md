@@ -81,7 +81,7 @@ When a list opens you get **Home** with three big tiles (Live TV, Movies, Series
 
 ## 5. Lists screen and Settings
 
-- **Lists screen**: three big options to add a list (M3U list by link, M3U file, Xtream Codes) and your saved lists to open them with one click. Open it with the list button (top left).
+- **Lists screen**: four big options to add a list (M3U list by link, M3U file, Xtream Codes and from a screenshot) and your saved lists to open them with one click. Open it with the list button (top left).
 - **Settings** (gear button), in the style of OwnTV: sections on the left with their number of options and, on the right, each setting with its value; search at the top. With the remote: ▲▼ between sections, ► enters, ◄ goes back.
   - Quick: channel numbers, guide below the tiles, autoplay next episode, animations.
   - Lists & guide · Appearance (**language** Spanish/English; the menu is **white by default**; optional dark theme and accent color; tile size) · Playback · Subtitles · Network (web only) · App startup (last list, lists screen or last channel) · Data · About.
@@ -113,7 +113,18 @@ The search queries several sources **at once** and shows where each result comes
 
 Inside Live TV, Movies and Series there's a bar with the list's categories and, if groups have sub-levels (`CHILE | DEPORTES`, `Series » Drama » Turcas`, `LATINO - Noticias`), a second bar with the subcategories. A prefix that only repeats the section ("Movies | Action") is dropped.
 
-## 9. Language
+## 9. Loading a list from a screenshot
+
+Did your provider send the details over WhatsApp, email or as an image? Use **From a screenshot** on the lists screen (or **📷 Fill in from a screenshot…** inside the form) and pick the image. The app reads the text and fills in whatever it finds:
+
+- **Xtream Codes**: server (also when the port comes separately), username and password, with labels in Spanish, English or Portuguese (`Usuario`, `User`, `Login`, `Contraseña`, `Password`, `Clave`, `Servidor`, `Host`, `DNS`, `URL`, `Port`…), on the same line or the next one.
+- **Full links**: a `get.php?username=…&password=…` link brings everything at once; `.m3u`/`.m3u8` links and the `xmltv.php` guide are recognized too.
+- Filled fields are highlighted and the password is shown so you can check it: reading can mix up similar characters (`l`, `I` and `1`, `O` and `0`). **Nothing is saved until you press Save and open.**
+- On the web you can also **paste** the screenshot with Ctrl+V on the lists screen.
+- **Privacy**: text is read on your device. On Android with ML Kit (the model ships inside the app and works offline). On the web with Tesseract.js: if you open the app with `iniciar.bat` or your server, the reader is installed there; otherwise it's downloaded from jsDelivr the first time. The image is never sent to any server.
+- Tip: crop the image so only the details show, and avoid blurry photos or glare.
+
+## 10. Language
 
 The app is available in **Spanish** and **English**. By default it follows the system language (Spanish if the device is in Spanish, otherwise English) and it can be set in **Settings → Appearance → Language**. Translations live in `i18n/en.json`, a single dictionary for both the web app and Android: to fix or add a text, edit it there and run `node i18n/build.mjs`.
 
@@ -134,13 +145,14 @@ web/
   js/subtitles.js  multi-source subtitles, SRT→VTT
   js/nav.js        spatial arrow navigation
   js/i18n.js       English translation
+  js/ocr.js, js/ocr-parse.js   screenshot reading and detail recognition
   server/          server + proxy + subtitles + ffmpeg conversion
   Dockerfile, docker-compose.yml, deploy/   self-hosting
 i18n/en.json       Spanish → English dictionary (web and Android)
 android/
   app/src/main/java/cl/iptv/player/
     MainActivity.kt          remote keys, PiP, TV detection
-    data/                    models, M3U, Xtream, EPG, subtitles, storage
+    data/                    models, M3U, Xtream, EPG, subtitles, storage, screenshots (ScreenshotParser/Reader)
     ui/SplashScreen.kt       splash screen
     ui/MenuScreen.kt         tile grid + bottom bar
     ui/PlayerScreen.kt       player, guide, options, subtitles

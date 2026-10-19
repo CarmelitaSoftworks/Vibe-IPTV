@@ -81,7 +81,7 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
 
 ## 5. Pantalla de listas y Ajustes
 
-- **Pantalla de listas**: tres opciones grandes para añadir (lista M3U por enlace, archivo M3U, Xtream Codes) y tus listas guardadas para abrirlas con un clic. Se abre con el botón de la lista (arriba a la izquierda).
+- **Pantalla de listas**: cuatro opciones grandes para añadir (lista M3U por enlace, archivo M3U, Xtream Codes y desde una captura) y tus listas guardadas para abrirlas con un clic. Se abre con el botón de la lista (arriba a la izquierda).
 - **Ajustes** (botón con engranaje), al estilo de OwnTV: secciones a la izquierda con su número de opciones y, a la derecha, cada ajuste con su valor; buscador arriba. Con el control: ▲▼ entre secciones, ► entra, ◄ vuelve.
   - Rápido: números de canal, guía bajo los mosaicos, siguiente episodio automático, animaciones.
   - Listas y guía · Apariencia (**idioma** español/inglés; el menú es **blanco por defecto**; tema oscuro y color de acento opcionales; tamaño de mosaicos) · Reproducción · Subtítulos · Red (sólo web) · Inicio de la app (última lista, pantalla de listas o último canal) · Datos · Acerca de.
@@ -113,7 +113,18 @@ La búsqueda consulta **a la vez** varias fuentes y muestra de cuál viene cada 
 
 Dentro de TV en vivo, Películas y Series aparece una barra con las categorías de la lista y, si los grupos traen subniveles (`CHILE | DEPORTES`, `Series » Drama » Turcas`, `LATINO - Noticias`), una segunda barra con las subcategorías. Un prefijo que sólo repite la sección ("Películas | Acción") se omite.
 
-## 9. Idioma
+## 9. Cargar una lista desde una captura de pantalla
+
+¿Tu proveedor te mandó los datos por WhatsApp, correo o en una imagen? Usa **Desde una captura** en la pantalla de listas (o **📷 Rellenar desde una captura…** dentro del formulario) y elige la imagen. La app lee el texto y rellena lo que encuentre:
+
+- **Xtream Codes**: servidor (también si el puerto viene aparte), usuario y contraseña, con etiquetas en español, inglés o portugués (`Usuario`, `User`, `Login`, `Contraseña`, `Password`, `Clave`, `Servidor`, `Host`, `DNS`, `URL`, `Puerto`…), en la misma línea o en la siguiente.
+- **Enlaces completos**: un enlace `get.php?username=…&password=…` trae todo de una vez; también reconoce enlaces `.m3u`/`.m3u8` y la guía `xmltv.php`.
+- Los campos rellenados quedan marcados en color y la contraseña se muestra para que la revises: la lectura puede confundir letras parecidas (`l`, `I` y `1`, `O` y `0`). **Nada se guarda hasta que pulses Guardar y abrir.**
+- En la web también puedes **pegar** la captura con Ctrl+V en la pantalla de listas.
+- **Privacidad**: el texto se lee en tu equipo. En Android con ML Kit (el modelo viene dentro de la app y funciona sin Internet). En la web con Tesseract.js: si abres la app con `iniciar.bat` o tu servidor, el lector se instala ahí; si no, se descarga de jsDelivr la primera vez. La imagen nunca se envía a ningún servidor.
+- Consejo: recorta la imagen para que sólo se vean los datos, y evita fotos movidas o con reflejos.
+
+## 10. Idioma
 
 La app está en **español** y en **inglés**. Por defecto sigue el idioma del sistema (español si el equipo está en español; si no, inglés) y se puede fijar en **Ajustes → Apariencia → Idioma**. Las traducciones están en `i18n/en.json`, un solo diccionario para la web y Android: para corregir o agregar un texto, edítalo ahí y ejecuta `node i18n/build.mjs`.
 
@@ -134,13 +145,14 @@ web/
   js/subtitles.js  subtítulos de varias fuentes, SRT→VTT
   js/nav.js        navegación espacial con flechas
   js/i18n.js       traducción al inglés
+  js/ocr.js, js/ocr-parse.js   lectura de capturas y reconocimiento de los datos
   server/          servidor + proxy + subtítulos + conversión ffmpeg
   Dockerfile, docker-compose.yml, deploy/   instalación en servidor propio
 i18n/en.json       diccionario español → inglés (web y Android)
 android/
   app/src/main/java/cl/iptv/player/
     MainActivity.kt          teclas del mando, PiP, detección de TV
-    data/                    modelos, M3U, Xtream, EPG, subtítulos, almacenamiento
+    data/                    modelos, M3U, Xtream, EPG, subtítulos, almacenamiento, capturas (ScreenshotParser/Reader)
     ui/SplashScreen.kt       pantalla de inicio
     ui/MenuScreen.kt         cuadrícula de mosaicos + barra inferior
     ui/PlayerScreen.kt       reproductor, guía, opciones, subtítulos

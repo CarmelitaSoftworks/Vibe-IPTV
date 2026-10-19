@@ -32,6 +32,9 @@ import androidx.compose.ui.window.DialogProperties
 import cl.iptv.player.data.Settings
 import cl.iptv.player.data.Source
 import cl.iptv.player.data.SourceType
+import cl.iptv.player.data.ScreenshotReader
+import cl.iptv.player.data.ShotDetails
+import kotlinx.coroutines.launch
 import cl.iptv.player.ui.theme.LocalIptv
 import kotlinx.coroutines.delay
 
@@ -62,6 +65,8 @@ fun Sheet(title: String, onDismiss: () -> Unit, wide: Boolean = false, content: 
 fun Field(
     value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier,
     password: Boolean = false, keyboard: KeyboardType = KeyboardType.Text, onDone: (() -> Unit)? = null,
+    /** Borde de color: el valor se rellenó desde una captura. */
+    highlight: Boolean = false,
 ) {
     val c = LocalIptv.current
     OutlinedTextField(
@@ -69,7 +74,7 @@ fun Field(
         visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboard, imeAction = if (onDone != null) ImeAction.Done else ImeAction.Next),
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
-        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = c.focus, unfocusedBorderColor = c.tileEdge, focusedLabelColor = c.accentDeep),
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = c.focus, unfocusedBorderColor = if (highlight) c.accent else c.tileEdge, focusedLabelColor = c.accentDeep),
         modifier = modifier.fillMaxWidth().padding(bottom = 8.dp),
     )
 }
@@ -82,8 +87,12 @@ fun SourcesDialog(
     /** Modo "añadir" desde la pantalla de inicio: sólo el formulario, con el tipo ya elegido. */
     addType: SourceType? = null,
     autoPickFile: Boolean = false,
+    /** Abre el selector de imágenes para rellenar el formulario desde una captura. */
+    autoPickShot: Boolean = false,
 ) {
     val c = LocalIptv.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     val adding = addType != null
     var editing by remember { mutableStateOf<Source?>(null) }
     var type by remember { mutableStateOf(addType ?: SourceType.M3U) }
@@ -95,12 +104,53 @@ fun SourcesDialog(
     var epg by remember { mutableStateOf("") }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Rellenar desde una captura
+    var reading by remember { mutableStateOf(false) }
+    var filled by remember { mutableStateOf(emptySet<String>()) }
+    var note by remember { mutableStateOf<String?>(null) }
+    var showPass by remember { mutableStateOf(false) }
 
     fun fill(s: Source?) {
         editing = s; type = s?.type ?: SourceType.M3U; name = s?.name.orEmpty(); url = s?.url.orEmpty()
         server = s?.server.orEmpty(); user = s?.username.orEmpty(); pass = s?.password.orEmpty(); epg = s?.epgUrl.orEmpty()
-        fileUri = null; error = null
+        fileUri = null; error = null; filled = emptySet(); note = null; showPass = false
     }
+
+    fun applyShot(r: ShotDetails) {
+        if (r.found == 0) { error = "No se encontraron datos de una lista en la imagen. Prueba con una captura más nítida o recortada."; return }
+        val t = r.type ?: if (r.server.isNotBlank() || r.username.isNotBlank() || r.password.isNotBlank()) SourceType.XTREAM else SourceType.M3U
+        type = t
+        val f = mutableSetOf<String>()
+        if (r.name.isNotBlank()) { name = r.name; f += "name" }
+        if (t == SourceType.XTREAM) {
+            if (r.server.isNotBlank()) { server = r.server; f += "server" }
+            if (r.username.isNotBlank()) { user = r.username; f += "user" }
+            if (r.password.isNotBlank()) { pass = r.password; f += "pass" }
+            showPass = true                       // a la vista, para poder revisarla
+        } else if (r.url.isNotBlank()) { url = r.url; fileUri = null; f += "url" }
+        if (r.epgUrl.isNotBlank()) { epg = r.epgUrl; f += "epg" }
+        filled = f
+        val need = if (t == SourceType.XTREAM) listOf("server" to "Servidor", "user" to "Usuario", "pass" to "Contraseña")
+            else listOf("url" to "URL de la lista .m3u / .m3u8")
+        val missing = need.filter { it.first !in f }
+        note = tr("Datos leídos de la captura: revísalos antes de guardar. La lectura puede confundir letras parecidas (l, I y 1 · O y 0).") +
+            if (missing.isEmpty()) "" else " " + tr("Falta completar:") + " " + missing.joinToString(", ") { tr(it.second) } + "."
+        error = null
+    }
+
+    val shotPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            reading = true; error = null
+            runCatching { ScreenshotReader.read(ctx, uri) }
+                .onSuccess { applyShot(it) }
+                .onFailure { error = "No se pudo leer la imagen" }
+            reading = false
+        }
+    }
+    fun pickShot() {
+        try { shotPicker.launch("image/*") } catch (e: ActivityNotFoundException) { error = "Este dispositivo no tiene selector de archivos" }
+    }
+    LaunchedEffect(autoPickShot) { if (autoPickShot) pickShot() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -112,7 +162,7 @@ fun SourcesDialog(
         if (autoPickFile) try { picker.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { error = "Este dispositivo no tiene selector de archivos. Usa un enlace." }
     }
 
-    val title = when (addType) { null -> "Mis listas"; SourceType.XTREAM -> "Cuenta Xtream Codes"; SourceType.M3U -> "Lista M3U" }
+    val title = when { !adding -> "Mis listas"; type == SourceType.XTREAM -> "Cuenta Xtream Codes"; else -> "Lista M3U" }
     Sheet(title, onDismiss, wide = true) {
         if (!adding && vm.sources.isEmpty()) Text("Aún no tienes listas guardadas.", color = c.inkSoft)
         if (!adding) vm.sources.forEach { s ->
@@ -147,9 +197,13 @@ fun SourcesDialog(
             }
             Spacer(Modifier.height(10.dp))
         }
-        Field(name, { name = it }, "Nombre (ej: Mi proveedor)")
+        Field(name, { name = it }, "Nombre (ej: Mi proveedor)", highlight = "name" in filled)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+            ActionButton("📷 Rellenar desde una captura…", ghost = true) { pickShot() }
+            if (reading) Text("Leyendo la captura…", color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
         if (type == SourceType.M3U) {
-            Field(url, { url = it; if (it.isNotBlank()) fileUri = null }, "URL de la lista .m3u / .m3u8", keyboard = KeyboardType.Uri)
+            Field(url, { url = it; if (it.isNotBlank()) fileUri = null }, "URL de la lista .m3u / .m3u8", keyboard = KeyboardType.Uri, highlight = "url" in filled)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ActionButton("Cargar archivo…", ghost = true) {
                     try { picker.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { error = "Este dispositivo no tiene selector de archivos. Usa una URL." }
@@ -158,11 +212,15 @@ fun SourcesDialog(
             }
             Spacer(Modifier.height(8.dp))
         } else {
-            Field(server, { server = it }, "Servidor (ej: http://dominio.com:8080)", keyboard = KeyboardType.Uri)
-            Field(user, { user = it }, "Usuario")
-            Field(pass, { pass = it }, "Contraseña", password = true)
+            Field(server, { server = it }, "Servidor (ej: http://dominio.com:8080)", keyboard = KeyboardType.Uri, highlight = "server" in filled)
+            Field(user, { user = it }, "Usuario", highlight = "user" in filled)
+            Field(pass, { pass = it }, "Contraseña", password = !showPass, highlight = "pass" in filled)
         }
-        Field(epg, { epg = it }, "Guía EPG XMLTV (opcional, varias separadas por coma)", keyboard = KeyboardType.Uri)
+        Field(epg, { epg = it }, "Guía EPG XMLTV (opcional, varias separadas por coma)", keyboard = KeyboardType.Uri, highlight = "epg" in filled)
+        note?.let {
+            Text(it, color = c.ink, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                .clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.10f)).padding(10.dp))
+        }
         error?.let { Text(it, color = androidx.compose.ui.graphics.Color(0xFFD9534F), fontWeight = FontWeight.Bold) }
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
             ActionButton("Limpiar", ghost = true) { fill(null) }

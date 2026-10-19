@@ -74,5 +74,8 @@ dependencies {
     // Motor MPV (libmpv): tercera opción si ExoPlayer y VLC no pueden con un canal
     implementation("dev.jdtech.mpv:libmpv:1.0.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Lectura de texto de capturas ("Desde una captura"): modelo incluido, sin Internet ni Google Play
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    testImplementation("junit:junit:4.13.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }

@@ -9,6 +9,7 @@ import { moveFocus, keyDir, isBack, isOk } from './nav.js';
 import * as store from './storage.js';
 import * as subs from './subtitles.js';
 import { demoM3U, demoEpg, DEMO_SOURCE } from './demo.js';
+import { readScreenshot } from './ocr.js';
 
 // En la versión artefacto (vista previa dentro de Claude) se define __ARTIFACT__ al empaquetar
 const IS_ARTIFACT = typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__;
@@ -224,7 +225,46 @@ function fillForm(s) {
   for (const k of ['id', 'name', 'url', 'server', 'username', 'password', 'epgUrl']) f.elements[k].value = s?.[k] || '';
   setFormType(s?.type || 'm3u');
   $('formError').hidden = true;
+  $('formNote').hidden = true;
+  f.querySelectorAll('.ocr-filled').forEach((el) => el.classList.remove('ocr-filled'));
+  f.elements.password.type = 'password';
   f.elements.name.focus();
+}
+
+/* ---------- rellenar desde una captura de pantalla ---------- */
+async function handleShot(file) {
+  if (!file) return;
+  toast(t('Leyendo la captura…'), 120000);
+  try {
+    const r = await readScreenshot(file, (p) => toast(`${t('Leyendo la captura…')} ${Math.round(p * 100)} %`, 120000));
+    $('toast').hidden = true;
+    if (!r.found.length) return toast(t('No se encontraron datos de una lista en la imagen. Prueba con una captura más nítida o recortada.'), 6500);
+    const type = r.type || (r.username || r.password || r.server ? 'xtream' : 'm3u');
+    openSheet('sourcesSheet', { mode: 'add', type });
+    applyShot(r, type);
+  } catch (e) {
+    toast(t(e.message), 6500);
+  }
+}
+
+function applyShot(r, type) {
+  const f = $('sourceForm');
+  const set = (k, v) => { if (v) { f.elements[k].value = v; f.elements[k].classList.add('ocr-filled'); } };
+  set('name', r.name);
+  if (type === 'xtream') {
+    set('server', r.server); set('username', r.username); set('password', r.password);
+    f.elements.password.type = 'text';                       // a la vista, para poder revisarla
+  } else set('url', r.url);
+  set('epgUrl', r.epgUrl);
+  const need = type === 'xtream'
+    ? [['server', 'Servidor'], ['username', 'Usuario'], ['password', 'Contraseña']]
+    : [['url', 'URL de la lista .m3u / .m3u8']];
+  const missing = need.filter(([k]) => !f.elements[k].value);
+  const note = $('formNote');
+  note.textContent = t('Datos leídos de la captura: revísalos antes de guardar. La lectura puede confundir letras parecidas (l, I y 1 · O y 0).')
+    + (missing.length ? ' ' + t('Falta completar:') + ' ' + missing.map(([, n]) => t(n)).join(', ') + '.' : '');
+  note.hidden = false;
+  (missing.length ? f.elements[missing[0][0]] : f.querySelector('button[type=submit]')).focus();
 }
 
 async function submitSource(e) {
@@ -282,6 +322,7 @@ function renderWelcome() {
 }
 
 function startAdd(kind) {
+  if (kind === 'screenshot') { $('shotInput').value = ''; return $('shotInput').click(); }
   openSheet('sourcesSheet', { mode: 'add', type: kind === 'xtream' ? 'xtream' : 'm3u' });
   if (kind === 'm3u-file') $('sourceForm').elements.file.click(); // abre el selector de archivos
 }
@@ -1082,6 +1123,14 @@ document.addEventListener('keydown', (e) => {
 /* ---------- eventos ---------- */
 $('btnSources').onclick = () => showWelcome(true);
 document.querySelectorAll('[data-add]').forEach((b) => (b.onclick = () => startAdd(b.dataset.add)));
+$('shotInput').onchange = (e) => handleShot(e.target.files[0]);
+$('btnShot').onclick = () => { $('shotInput').value = ''; $('shotInput').click(); };
+// Pegar una captura (Ctrl+V) en la pantalla de listas o en el formulario
+document.addEventListener('paste', (e) => {
+  const onLists = !$('welcome').hidden || !$('sourcesSheet').hidden;
+  const img = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
+  if (onLists && img) { e.preventDefault(); handleShot(img.getAsFile()); }
+});
 $('welcomeManage').onclick = () => openSheet('sourcesSheet', { mode: 'manage' });
 $('welcomeBack').onclick = () => showWelcome(false);
 $('sourceForm').elements.file.addEventListener('change', (e) => {

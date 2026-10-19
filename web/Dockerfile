@@ -3,7 +3,8 @@ FROM node:22-alpine
 RUN apk add --no-cache ffmpeg tini
 WORKDIR /app
 COPY . .
-RUN rm -rf node_modules test
+RUN rm -rf node_modules test \
+ && npm install --omit=dev --ignore-scripts --no-audit --no-fund
 ENV HOST=0.0.0.0 \
     PORT=8080 \
     FFMPEG_PATH=/usr/bin/ffmpeg \

@@ -58,6 +58,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ### 🗂️ Listas y guía (EPG)
 - **Listas M3U / M3U8** desde URL o archivo, y **cuentas Xtream Codes** (con detección automática de puertos y formatos).
+- **Desde una captura de pantalla**: sube la foto o captura del mensaje de tu proveedor y el servidor, usuario, contraseña, enlace M3U y guía se rellenan solos. La lectura se hace en tu equipo (ML Kit en Android, Tesseract.js en la web): la imagen no se envía a ningún servidor.
 - **Varias listas guardadas** y cambio rápido entre ellas.
 - **Guía de programación XMLTV** (también comprimida en .gz) que se **actualiza sola** al agregar una lista y al abrir la app. Admite varias guías combinadas y ajuste de horario.
 - Compatible con guías generadas con el proyecto libre [iptv-org/epg](https://github.com/iptv-org/epg).
@@ -150,6 +151,7 @@ npm test
 | Android | Kotlin 2.1, Jetpack Compose, Gradle 8.13 / AGP 8.11, SDK 36 |
 | Reproducción Android | Media3 ExoPlayer, LibVLC, libmpv |
 | Red e imágenes | OkHttp, Coil |
+| Lectura de capturas | ML Kit Text Recognition (Android), Tesseract.js (web) |
 | Web | JavaScript (módulos ES) sin frameworks, PWA |
 | Reproducción web | hls.js, mpegts.js, ffmpeg (opcional, vía `ffmpeg-static`) |
 | Servidor local | Node.js sin dependencias obligatorias (proxy, conversión y subtítulos) |
@@ -189,6 +191,7 @@ También existe gracias a otros proyectos de código abierto:
 - [LibVLC](https://code.videolan.org/videolan/vlc) de VideoLAN — LGPL 2.1+
 - [mpv](https://mpv.io) / [libmpv para Android](https://github.com/jarnedemeulemeester/libmpv-android)
 - [hls.js](https://github.com/video-dev/hls.js) — Apache 2.0 · [mpegts.js](https://github.com/xqq/mpegts.js) — Apache 2.0
+- [Tesseract.js](https://github.com/naptha/tesseract.js) — Apache 2.0 · [ML Kit](https://developers.google.com/ml-kit) de Google
 - [FFmpeg](https://ffmpeg.org) · [OkHttp](https://github.com/square/okhttp) · [Coil](https://github.com/coil-kt/coil)
 - [iptv-org/epg](https://github.com/iptv-org/epg) para generar guías XMLTV
 - Subtítulos de [OpenSubtitles](https://www.opensubtitles.org), [SubDL](https://subdl.com) y [Podnapisi](https://www.podnapisi.net)
