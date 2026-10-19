@@ -429,6 +429,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (category == CAT_FAV) recompute(false)
     }
 
+    // ---------- Fichas ----------
+    var details by mutableStateOf<Item?>(null)
+    var detailsMeta by mutableStateOf<Meta?>(null); private set
+    var detailsLoading by mutableStateOf(false); private set
+    fun openDetails(item: Item) {
+        details = item; detailsMeta = null; detailsLoading = true
+        viewModelScope.launch {
+            detailsMeta = runCatching { Metadata.forItem(item, xtream, settings.tmdbKey, if (I18n.lang == "en") "en-US" else "es-MX") }.getOrNull()
+            detailsLoading = false
+        }
+    }
+    /** Elegir un mosaico: las películas muestran su ficha primero (Ajustes → Fichas). */
+    fun choose(item: Item) {
+        if (item.kind == Kind.MOVIE && settings.showDetails && !item.id.startsWith("cu_")) openDetails(item) else activate(item)
+    }
+    fun forgetResume(item: Item) {
+        val src = source ?: return
+        if (item.id in resume) { resume = resume - item.id; store.saveResume(src.id, resume) }
+    }
+
     fun activate(item: Item, fromList: List<Item>? = null) {
         if (item.kind == Kind.SERIES) {
             if (item.episodes.isNotEmpty()) { episodes = item.episodes; series = item; query = ""; recompute(true); return }

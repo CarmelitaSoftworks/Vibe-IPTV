@@ -38,6 +38,15 @@ object Http {
         }
     }
 
+    /** Texto con cabeceras extra (por ejemplo, Authorization). */
+    suspend fun textWithHeaders(url: String, headers: Map<String, String>, ua: String = "VibeIPTV-Android"): String = withContext(Dispatchers.IO) {
+        val rq = okhttp3.Request.Builder().url(url).header("User-Agent", ua).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
+        client.newCall(rq).execute().use { r ->
+            if (!r.isSuccessful) throw IOException("HTTP ${r.code}")
+            r.body?.string() ?: ""
+        }
+    }
+
     /** Descarga a un archivo (primero a un temporal, para no dejar la caché a medias). */
     suspend fun download(url: String, dest: java.io.File, ua: String = DEFAULT_UA) = withContext(Dispatchers.IO) {
         val tmp = java.io.File(dest.parentFile, dest.name + ".part")

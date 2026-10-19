@@ -75,6 +75,9 @@ data class Settings(
     val subdlKey: String = "",
     /** Control parental: PIN de 4 dígitos ("" = desactivado). Con PIN, el contenido para adultos queda oculto. */
     val parentalPin: String = "",
+    /** Fichas: mostrar la ficha antes de reproducir una película, y clave opcional de TMDB para listas M3U. */
+    val showDetails: Boolean = true,
+    val tmdbKey: String = "",
     // Rápido
     val showNumbers: Boolean = true,
     val showEpgInfo: Boolean = true,

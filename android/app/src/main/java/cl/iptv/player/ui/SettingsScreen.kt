@@ -96,6 +96,11 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
         Section("startup", "Inicio de la app", SecIcon.STARTUP, listOf(
             Row.Choice("Al abrir la app", options = listOf("home" to "Inicio de la última lista", "welcome" to "Pantalla de mis listas", "lastChannel" to "Último canal visto"), get = { it.startup }, set = { s, v -> s.copy(startup = v) }),
         )),
+        Section("meta", "Fichas", SecIcon.ABOUT, listOf(
+            Row.Toggle("Mostrar la ficha de las películas", "Al elegir una película se ve su sinopsis antes de reproducir", get = { it.showDetails }, set = { s, v -> s.copy(showDetails = v) }),
+            Row.TextField("Clave de TMDB (opcional)", "Gratis en themoviedb.org → Ajustes → API. Las cuentas Xtream ya traen fichas; la clave sirve para listas M3U.",
+                secret = true, get = { it.tmdbKey }, set = { s, v -> s.copy(tmdbKey = v) }),
+        )),
         Section("parental", "Control parental", SecIcon.LOCK, listOf(
             Row.TextField("PIN de control parental", "4 dígitos. Con PIN, las categorías para adultos (XXX, Adultos, +18…) quedan ocultas. Vacío = desactivado.",
                 secret = true, get = { it.parentalPin }, set = { s, v -> s.copy(parentalPin = v.filter(Char::isDigit).take(8)) }),

@@ -140,6 +140,17 @@ class XtreamClient(server: String, private val user: String, private val pass: S
         out
     }
 
+    /** Ficha de una película o serie que entrega el propio servidor (sinopsis, reparto, género…). */
+    suspend fun info(item: Item): JSONObject? = runCatching {
+        when {
+            item.kind == Kind.SERIES && item.seriesId != null ->
+                JSONObject(api("get_series_info", mapOf("series_id" to item.seriesId.toString()))).optJSONObject("info")
+            item.kind == Kind.MOVIE && item.id.startsWith("v") ->
+                JSONObject(api("get_vod_info", mapOf("vod_id" to item.id.drop(1)))).optJSONObject("info")
+            else -> null
+        }
+    }.getOrNull()
+
     suspend fun episodes(seriesId: Int): List<Item> {
         val o = JSONObject(api("get_series_info", mapOf("series_id" to seriesId.toString())))
         val cover = o.optJSONObject("info")?.optString("cover").orEmpty()
