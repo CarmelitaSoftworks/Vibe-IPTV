@@ -137,7 +137,7 @@ private fun CategoryBar(vm: AppViewModel) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(3.dp)) {
             if (vm.section == Kind.LIVE) item { Pill("📅 Guía") { vm.showGuide = true } }
             item { Pill("Todos  $total", active = vm.category == CAT_ALL) { vm.selectCategory(CAT_ALL) } }
-            if (nResume > 0) item { Pill("▶ Seguir viendo  $nResume", active = vm.category == CAT_RESUME) { vm.selectCategory(CAT_RESUME) } }
+            if (nResume > 0 || vm.section != Kind.LIVE) item { Pill("▶ Seguir viendo  $nResume", active = vm.category == CAT_RESUME) { vm.selectCategory(CAT_RESUME) } }
             if (nFav > 0) item { Pill("★ Favoritos  $nFav", active = vm.category == CAT_FAV) { vm.selectCategory(CAT_FAV) } }
             if (nRecent > 0) item { Pill("🕘 Recientes  $nRecent", active = vm.category == CAT_RECENT) { vm.selectCategory(CAT_RECENT) } }
             items(cats, key = { it.first }) { (c, n) -> Pill("$c  $n", active = vm.category == c) { vm.selectCategory(c) } }
@@ -249,7 +249,8 @@ private fun TileGrid(vm: AppViewModel, compact: Boolean, onFocusItem: (Item?) ->
 
         if (view.isEmpty() && vm.loading == null) {
             Text(
-                if (vm.query.isBlank() && vm.title() == "Favoritos") "No tienes favoritos aquí todavía.\nMantén pulsado un canal (o botón MENÚ del control) para marcarlo."
+                if (vm.query.isBlank() && vm.category == CAT_RESUME) "Aquí aparecerá lo que dejes a medias.\nSe guarda al ver más de 30 segundos de una película o episodio."
+                else if (vm.query.isBlank() && vm.title() == "Favoritos") "No tienes favoritos aquí todavía.\nMantén pulsado un canal (o botón MENÚ del control) para marcarlo."
                 else "No hay contenido para mostrar.",
                 color = c.ink, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.align(Alignment.Center),
             )
@@ -337,6 +338,10 @@ private fun HomeGrid(vm: AppViewModel, compact: Boolean, onFocusItem: (Item?) ->
     BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = if (compact) 8.dp else 12.dp), contentAlignment = Alignment.Center) {
         val narrow = maxWidth < 560.dp
         val gap = if (narrow) 12.dp else 18.dp
+        val cont = remember(vm.items, vm.resume) { vm.continueWatching() }
+        SideEffect { vm.pageInfo = "" }          // el inicio no tiene páginas (antes quedaba "1 / 384")
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
         if (narrow) {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
                 Kind.entries.forEach { k ->
@@ -348,6 +353,30 @@ private fun HomeGrid(vm: AppViewModel, compact: Boolean, onFocusItem: (Item?) ->
                 Kind.entries.forEach { k ->
                     HomeTile(k, vm.countOf(k), vm.groupsOf(k), Modifier.weight(1f).fillMaxHeight().focusRequester(requesters.getValue(k)), onFocused = { onFocusItem(null) }) { vm.selectSection(k) }
                 }
+            }
+        }
+        }
+        if (cont.isNotEmpty()) ContinueRow(vm, cont, if (compact) 118.dp else 168.dp, onFocusItem)
+        }
+    }
+}
+
+/** Fila "Seguir viendo" del inicio: carátulas con su barra de avance. */
+@Composable
+private fun ContinueRow(vm: AppViewModel, cont: List<Triple<Item, cl.iptv.player.data.Resume, String?>>, height: Dp, onFocusItem: (Item?) -> Unit) {
+    val c = LocalIptv.current
+    Column(Modifier.widthIn(max = 1180.dp).fillMaxWidth()) {
+        Text("▶ Seguir viendo", color = c.accentDeep, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)) {
+            items(cont, key = { it.first.id }) { (item, r, ep) ->
+                Tile(
+                    item = item, fav = item.id in vm.favorites, poster = true, showNumber = false, animate = vm.settings.animations,
+                    progress = r.fraction.coerceAtLeast(0.02f),
+                    modifier = Modifier.height(height).width((height - 34.dp) / 1.5f),
+                    onFocused = { onFocusItem(item) },
+                    onClick = { vm.openContinue(item, ep) },
+                    onLongClick = { vm.toggleFavorite(item) },
+                )
             }
         }
     }

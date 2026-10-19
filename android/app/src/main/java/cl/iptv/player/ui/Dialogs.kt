@@ -287,6 +287,7 @@ fun CategoriesDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Todos", active = vm.category == CAT_ALL && vm.query.isBlank(), modifier = Modifier.focusRequester(first)) { vm.selectCategory(CAT_ALL); onDismiss() }
             Pill("★ Favoritos", active = vm.category == CAT_FAV) { vm.selectCategory(CAT_FAV); onDismiss() }
+            if (vm.section != cl.iptv.player.data.Kind.LIVE) Pill("▶ Seguir viendo", active = vm.category == CAT_RESUME) { vm.selectCategory(CAT_RESUME); onDismiss() }
             if (vm.recent.isNotEmpty()) Pill("🕘 Recientes", active = vm.category == CAT_RECENT) { vm.selectCategory(CAT_RECENT); onDismiss() }
             cats.forEach { (g, n) -> Pill("$g  $n", active = vm.category == g) { vm.selectCategory(g); onDismiss() } }
             Pill("✎ Organizar categorías") { organize = true }

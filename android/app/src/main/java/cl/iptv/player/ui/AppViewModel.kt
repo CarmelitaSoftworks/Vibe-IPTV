@@ -251,6 +251,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun resumeFor(item: Item): Resume? = resume[item.id]
 
+    /** Inicio → "Seguir viendo": películas y series a medias, la más reciente primero (episodios → su serie). */
+    fun continueWatching(): List<Triple<Item, Resume, String?>> {
+        val byId = items.associateBy { it.id }
+        return resume.entries.sortedByDescending { it.value.at }.mapNotNull { (id, r) ->
+            byId[id]?.let { Triple(it, r, null) } ?: byId[r.parent]?.let { Triple(it, r, id) }   // (serie, avance, episodio)
+        }.distinctBy { it.first.id }.take(20)
+    }
+    /** Abre un elemento de "Seguir viendo": la película sigue donde quedó; la serie abre sus episodios con el foco en el que quedó. */
+    fun openContinue(item: Item, episodeId: String?) {
+        if (episodeId != null) { section = item.kind; home = false; returnFocusId = episodeId }
+        choose(item)
+    }
+
     // ---------- Respaldo ----------
     fun exportBackup(uri: android.net.Uri) {
         viewModelScope.launch {
@@ -599,7 +612,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             return
         }
-        val list = fromList ?: view.filter { it.kind == item.kind }
+        // Desde el inicio ("Seguir viendo") no hay vista: reproducir al menos ese elemento
+        val list = (fromList ?: view.filter { it.kind == item.kind }).let { l -> if (item in l) l else listOf(item) }
         store.lastItemId = item.id
         playList = list
         playIndex = list.indexOf(item).coerceAtLeast(0)
