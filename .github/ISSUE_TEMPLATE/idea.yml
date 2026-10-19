@@ -1,0 +1,16 @@
+name: 💡 Proponer una idea / Feature request
+description: Algo que le falta a Vibe IPTV · Something Vibe IPTV is missing
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: ¿Qué te gustaría? / What would you like?
+    validations: { required: true }
+  - type: textarea
+    id: para
+    attributes:
+      label: ¿Para qué te serviría? / Why would it help?
+  - type: markdown
+    attributes:
+      value: "Vibe IPTV es un reproductor neutral: no se agregan listas, canales ni enlaces a contenido. · Vibe IPTV is a neutral player: no playlists, channels or content links are added."

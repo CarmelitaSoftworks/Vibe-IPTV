@@ -51,7 +51,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 ### 🧭 Navigation
 - Big, clear **tile menu**, comfortable with the remote's D-pad on Android TV.
 - **Live TV**, **Movies** and **Series** sections, with **categories and subcategories** taken from your list.
-- Series grouped by season and episode.
+- Series grouped by season and episode, and **Continue watching**: movies and series resume where you left off.
 - **Search** and **favorites**.
 - Animated splash screen in the menu's style, and a welcome screen to add your first list in seconds.
 - On Android it opens **in landscape** by default, like a TV.
@@ -74,7 +74,8 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **In Spanish and English**: follows the device language or can be set in Settings → Appearance → Language.
 
 ### 🔒 Privacy
-- **No accounts, no ads and no telemetry.** Your lists, favorites and settings are stored only on your device.
+- **No accounts, no ads and no telemetry.** Your lists, favorites and settings are stored only on your device ([privacy policy](PRIVACIDAD.md)).
+- **Parental control:** with a PIN, adult categories are hidden.
 - Xtream passwords are hidden from error messages and logs.
 
 ---
@@ -188,6 +189,8 @@ with your improvements. Please keep the project's focus: **a neutral player with
 (playlists, channel links or credentials are not accepted).
 
 When reporting a channel problem, **don't post your username, password or full playlist URL**.
+
+Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · Security: [SECURITY.md](SECURITY.md) · Privacy: [PRIVACIDAD.md](PRIVACIDAD.md) · APK signing: [docs/FIRMA.md](docs/FIRMA.md)
 
 **Translations:** the English texts live in [`i18n/en.json`](i18n/en.json). Fix or add a phrase there and
 run `node i18n/build.mjs` to update both the web app and Android.

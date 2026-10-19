@@ -1,0 +1,42 @@
+name: 🐞 Reportar un error / Bug report
+description: Algo no funciona como debería · Something doesn't work as expected
+labels: ["error"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **No publiques tu usuario, contraseña ni la URL completa de tu lista.** Este reporte es público.
+        **Do not post your username, password or full playlist URL.** This report is public.
+  - type: dropdown
+    id: plataforma
+    attributes:
+      label: Plataforma / Platform
+      options: [Android TV / Google TV, Fire TV, TV Box, Celular o tablet / Phone or tablet, Navegador (web) / Browser, Servidor propio / Self-hosted]
+    validations: { required: true }
+  - type: input
+    id: equipo
+    attributes:
+      label: Equipo y versión de Android / Device and Android version
+      placeholder: "Ej: Chromecast con Google TV, Android 12"
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Vibe IPTV / Vibe IPTV version
+      description: Ajustes → Acerca de · Settings → About
+      placeholder: "0.1.25"
+  - type: dropdown
+    id: motor
+    attributes:
+      label: Motor de reproducción / Playback engine
+      options: [No sé / Don't know, ExoPlayer, VLC, MPV, Navegador / Browser]
+  - type: textarea
+    id: que
+    attributes:
+      label: ¿Qué pasó? / What happened?
+      description: Qué hiciste, qué esperabas y qué pasó. Mensajes de error tal cual aparecen.
+    validations: { required: true }
+  - type: textarea
+    id: formato
+    attributes:
+      label: Datos técnicos del canal / Channel technical info (opcional)
+      description: En el reproductor, botón ⓘ Información técnica (motor, video, audio). Sin la URL.

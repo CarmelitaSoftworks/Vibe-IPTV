@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Guía de uso / User guide
+    url: https://github.com/CarmelitaSoftworks/Vibe-IPTV/blob/main/docs/GUIA.md
+    about: Instalación, listas, guía, subtítulos y más · Installation, lists, guide, subtitles and more
+  - name: 📺 Instalar en el TV con Downloader (código 9370754)
+    url: https://github.com/CarmelitaSoftworks/Vibe-IPTV/blob/main/docs/DOWNLOADER.md
+    about: Paso a paso y problemas comunes · Step by step and common problems

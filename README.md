@@ -51,7 +51,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 ### 🧭 Navegación
 - **Menú en mosaico** grande y claro, cómodo de usar con el control remoto (D-pad) en Android TV.
 - Secciones **TV en vivo**, **Películas** y **Series**, con **categorías y subcategorías** tomadas de tu lista.
-- Series agrupadas por temporada y episodio.
+- Series agrupadas por temporada y episodio, y **Seguir viendo**: películas y series continúan donde quedaste.
 - **Búsqueda** y **favoritos**.
 - Pantalla de inicio animada con el estilo del menú y pantalla de bienvenida para agregar tu primera lista en segundos.
 - En Android se abre **en horizontal** por defecto, como un TV.
@@ -74,7 +74,8 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **En español y en inglés**: sigue el idioma del equipo o se elige en Ajustes → Apariencia → Idioma.
 
 ### 🔒 Privacidad
-- **Sin cuentas, sin anuncios y sin telemetría.** Tus listas, favoritos y ajustes se guardan solo en tu equipo.
+- **Sin cuentas, sin anuncios y sin telemetría.** Tus listas, favoritos y ajustes se guardan solo en tu equipo ([política de privacidad](PRIVACIDAD.md)).
+- **Control parental:** con un PIN, las categorías para adultos quedan ocultas.
 - Las contraseñas de Xtream se ocultan en mensajes de error y registros.
 
 ---
@@ -188,6 +189,8 @@ un **pull request** con tus mejoras. Te pedimos mantener el enfoque del proyecto
 neutral, sin contenido incluido** (no se aceptan listas, enlaces a canales ni credenciales).
 
 Al reportar un problema con un canal, **no publiques tu usuario, contraseña ni la URL completa de tu lista**.
+
+Guía para contribuir: [CONTRIBUTING.md](CONTRIBUTING.md) · Seguridad: [SECURITY.md](SECURITY.md) · Privacidad: [PRIVACIDAD.md](PRIVACIDAD.md) · Firma de los APK: [docs/FIRMA.md](docs/FIRMA.md)
 
 **Traducciones:** los textos en inglés están en [`i18n/en.json`](i18n/en.json). Corrige o agrega una frase ahí y
 ejecuta `node i18n/build.mjs` para actualizar la web y Android.
