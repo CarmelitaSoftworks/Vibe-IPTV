@@ -1,12 +1,19 @@
 # Compila la app Android en la nube de GitHub (sin instalar Android Studio).
-# Sube esta carpeta a un repositorio de GitHub; en la pestaña "Actions" aparece
-# "Compilar APK" y, al terminar, el APK se descarga desde "Artifacts".
+# Builds the Android app in GitHub's cloud (no Android Studio needed).
+# Al terminar / When done:
+#   - el APK queda en "Artifacts" y en la versión "prueba" de Releases
+#     the APK is in "Artifacts" and in the "prueba" (test build) release
+#   - si falla, el registro completo se guarda en la rama build-logs
+#     if it fails, the full log is saved to the build-logs branch
 name: Compilar APK
 
 on:
   push:
     branches: [main, master]
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   apk:
@@ -27,10 +34,38 @@ jobs:
       - name: Compilar (debug, instalable directamente)
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
 
-      - name: Publicar el APK
+      - name: Mostrar errores / Show errors
+        if: failure()
+        run: |
+          grep -E '^e: ' build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+          grep -A12 'What went wrong' build.log | head -40 || true
+
+      - name: Guardar registro en la rama build-logs
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs" && cp build.log "$RUNNER_TEMP/logs/"
+          cd "$RUNNER_TEMP/logs"
+          { grep -E '^e: ' build.log; grep -A15 'What went wrong' build.log; } > errores.txt || true
+          git init -q && git checkout -q -b build-logs
+          git add . && git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "Registro ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" build-logs
+
+      - name: Publicar el APK (Artifacts)
         uses: actions/upload-artifact@v4
         with:
           name: Vibe-IPTV-APK
           path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Publicar versión de prueba (Releases)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete prueba --yes --cleanup-tag || true
+          gh release create prueba app/build/outputs/apk/debug/*.apk \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "Vibe IPTV — versión de prueba / test build" \
+            --notes "Compilación automática de \`${GITHUB_SHA::7}\`. Usa \`arm64-v8a\` en la mayoría de equipos, \`armeabi-v7a\` en Fire TV y TV Box antiguos, o \`universal\` si no sabes. · Automatic build. Use \`arm64-v8a\` on most devices, \`armeabi-v7a\` on Fire TV and older TV boxes, or \`universal\` if unsure."
