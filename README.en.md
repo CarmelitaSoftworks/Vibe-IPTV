@@ -88,19 +88,30 @@ All the code is out in the open: you can review it, build it yourself, modify it
 ## 📥 Installation
 
 ### Android / Android TV
-1. Go to **[Releases](../../releases)** and open the latest **test build** (also available in **[Actions](../../actions)** → latest build → *Artifacts* → **Vibe-IPTV-APK**).
-2. Pick the APK for your device:
 
-   | File | For |
-   |---|---|
-   | `arm64-v8a` | Most current phones and TV boxes |
-   | `armeabi-v7a` | 32-bit devices (many Fire TV Sticks and older TV boxes) |
-   | `x86_64` | Emulators and some Chromebooks |
-   | `universal` | If you're not sure (bigger file) |
+**📺 On your TV with Downloader** (Android TV, Google TV, Fire TV, TV box): install the *Downloader* app,
+allow it to install unknown apps and type:
 
-3. Install it by allowing **“Install unknown apps”**. On Android TV you can use an app such as *Downloader* or *Send Files to TV*.
+<div align="center">
 
-Requires **Android 7.0 (API 24)** or newer (the MPV engine needs Android 8.0+).
+**`carmelitasoftworks.github.io/Vibe-IPTV/tv`**
+
+</div>
+
+Step by step for each kind of TV, plus troubleshooting: **[docs/DOWNLOADER.en.md](docs/DOWNLOADER.en.md)**.
+
+**📱 On your phone:** open **[carmelitasoftworks.github.io/Vibe-IPTV](https://carmelitasoftworks.github.io/Vibe-IPTV/)** and tap *Celular o tablet* (phone or tablet),
+or download the APK from **[Releases → test build](../../releases/tag/prueba)**:
+
+| File | For | Short link |
+|---|---|---|
+| `vibe-iptv-armv7.apk` | Almost every TV, Fire TV and TV box | `…/Vibe-IPTV/tv` |
+| `vibe-iptv-arm64.apk` | Phones, tablets and 64-bit TV boxes | `…/Vibe-IPTV/movil` |
+| `vibe-iptv-x86_64.apk` | Emulators and some Chromebooks | — |
+| `vibe-iptv-universal.apk` | If you're not sure (bigger file) | `…/Vibe-IPTV/universal` |
+
+Allow **“Install unknown apps”** when installing. Requires **Android 7.0 (API 24)** or newer (the MPV engine needs Android 8.0+).
+To update, install the new version on top: your lists and settings are kept.
 
 ### Browser (PC, Mac, phone)
 1. Download the repository (**Code → Download ZIP**) and unzip it.

@@ -48,11 +48,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Nombres cortos y fijos: fáciles de escribir en Downloader / short fixed names for Downloader
+          mkdir -p dist
+          d=app/build/outputs/apk/debug
+          cp $d/app-armeabi-v7a-debug.apk dist/vibe-iptv-armv7.apk
+          cp $d/app-arm64-v8a-debug.apk dist/vibe-iptv-arm64.apk
+          cp $d/app-x86_64-debug.apk dist/vibe-iptv-x86_64.apk
+          cp $d/app-universal-debug.apk dist/vibe-iptv-universal.apk
           gh release delete prueba --yes --cleanup-tag || true
-          gh release create prueba app/build/outputs/apk/debug/*.apk \
+          gh release create prueba dist/*.apk \
             --prerelease --target "$GITHUB_SHA" \
             --title "Vibe IPTV — versión de prueba / test build" \
-            --notes "Compilación automática de \`${GITHUB_SHA::7}\`. Usa \`arm64-v8a\` en la mayoría de equipos, \`armeabi-v7a\` en Fire TV y TV Box antiguos, o \`universal\` si no sabes. · Automatic build. Use \`arm64-v8a\` on most devices, \`armeabi-v7a\` on Fire TV and older TV boxes, or \`universal\` if unsure."
+            --notes "Compilación automática de \`${GITHUB_SHA::7}\`. Celular: \`vibe-iptv-arm64.apk\` · TV, Fire TV y TV Box: \`vibe-iptv-armv7.apk\` · Si no sabes: \`vibe-iptv-universal.apk\`. En TV con Downloader escribe: carmelitasoftworks.github.io/Vibe-IPTV/tv · Phone: arm64 · TV/Fire TV/TV box: armv7 · Not sure: universal. Downloader: carmelitasoftworks.github.io/Vibe-IPTV/tv"
 
       - name: Pruebas / Unit tests
         run: |

@@ -52,6 +52,8 @@ Pruebas: `npm test` (parsers M3U/XMLTV/SRT, proxy, contraseña y traducciones).
 
 Instalar en el teléfono: copia el APK, ábrelo y permite "Instalar apps desconocidas" para el administrador de archivos o el navegador.
 
+**Lo más fácil en el TV:** la app *Downloader* con el enlace `carmelitasoftworks.github.io/Vibe-IPTV/tv` (paso a paso en [DOWNLOADER.md](DOWNLOADER.md)).
+
 Instalar en un Android TV sin Android Studio: activa *Opciones de desarrollador → Depuración por red* en el TV y ejecuta `adb connect IP_DEL_TV` y `adb install app-release.apk`. También sirve copiar el APK con una app como "Send Files to TV" o "Downloader".
 
 **Android TV:** aparece en el lanzador de TV (banner incluido), no requiere pantalla táctil y todo se maneja con el control: D-pad en la cuadrícula (al llegar al borde cambia de página), mantener pulsado OK o la tecla MENÚ marca favorito, CH+/CH− y ▲/▼ cambian de canal en el reproductor, MENÚ abre las opciones (favorito, subtítulos, Abrir en VLC), INFO muestra la guía.

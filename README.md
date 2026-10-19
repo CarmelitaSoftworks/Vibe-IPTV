@@ -88,19 +88,30 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 ## 📥 Instalación
 
 ### Android / Android TV
-1. Ve a **[Releases](../../releases)** y abre la **versión de prueba** más reciente (también está en **[Actions](../../actions)** → última compilación → *Artifacts* → **Vibe-IPTV-APK**).
-2. Elige el APK según tu equipo:
 
-   | Archivo | Para |
-   |---|---|
-   | `arm64-v8a` | La mayoría de celulares y TV Box actuales |
-   | `armeabi-v7a` | Equipos de 32 bits (muchos Fire TV Stick y TV Box antiguos) |
-   | `x86_64` | Emuladores y algunos Chromebook |
-   | `universal` | Si no sabes cuál elegir (pesa más) |
+**📺 En el TV con Downloader** (Android TV, Google TV, Fire TV, TV Box): instala la app *Downloader*,
+permítele instalar apps desconocidas y escribe:
 
-3. Instálalo permitiendo **“Instalar apps desconocidas”**. En Android TV puedes usar una app como *Downloader* o *Send Files to TV*.
+<div align="center">
 
-Requiere **Android 7.0 (API 24)** o superior (el motor MPV, desde Android 8.0).
+**`carmelitasoftworks.github.io/Vibe-IPTV/tv`**
+
+</div>
+
+Paso a paso para cada tipo de TV y solución de problemas: **[docs/DOWNLOADER.md](docs/DOWNLOADER.md)**.
+
+**📱 En el celular:** abre **[carmelitasoftworks.github.io/Vibe-IPTV](https://carmelitasoftworks.github.io/Vibe-IPTV/)** y toca *Celular o tablet*,
+o descarga el APK desde **[Releases → versión de prueba](../../releases/tag/prueba)**:
+
+| Archivo | Para | Enlace corto |
+|---|---|---|
+| `vibe-iptv-armv7.apk` | Casi todos los TV, Fire TV y TV Box | `…/Vibe-IPTV/tv` |
+| `vibe-iptv-arm64.apk` | Celulares, tablets y TV Box de 64 bits | `…/Vibe-IPTV/movil` |
+| `vibe-iptv-x86_64.apk` | Emuladores y algunos Chromebook | — |
+| `vibe-iptv-universal.apk` | Si no sabes cuál elegir (pesa más) | `…/Vibe-IPTV/universal` |
+
+Al instalar, permite **“Instalar apps desconocidas”**. Requiere **Android 7.0 (API 24)** o superior (el motor MPV, desde Android 8.0).
+Para actualizar, instala la nueva versión encima: se conservan tus listas y ajustes.
 
 ### Navegador (PC, Mac, celular)
 1. Descarga el repositorio (**Code → Download ZIP**) y descomprímelo.
