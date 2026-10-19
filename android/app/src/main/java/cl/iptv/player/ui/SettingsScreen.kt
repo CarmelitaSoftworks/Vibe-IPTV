@@ -51,7 +51,7 @@ private sealed class Row(val label: String, val desc: String = "") {
 private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
 private class Section(val id: String, val name: String, val icon: SecIcon, val rows: List<Row>)
 
-private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean): List<Section> {
+private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}): List<Section> {
     val offsets = (-3..3).map { h -> h.toString() to if (h == 0) "Sin desfase" else "${if (h > 0) "+" else ""}$h h" }
     return listOf(
         Section("quick", "Rápido", SecIcon.QUICK, listOf(
@@ -105,6 +105,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             },
         )),
         Section("data", "Datos", SecIcon.DATA, listOf(
+            Row.Action("Exportar respaldo", "Listas (con contraseñas), favoritos, Seguir viendo y ajustes en un archivo", arrow = true) { onExport() },
+            Row.Action("Importar respaldo", "Reemplaza lo guardado en este equipo por el del archivo", arrow = true) { onImport() },
             Row.Danger("Borrar \"Seguir viendo\"", "Olvida dónde quedaste en películas y series de esta lista") { vm.clearResume() },
             Row.Danger("Borrar guías guardadas", "Se vuelven a descargar al abrir cada lista") { vm.clearEpgCache() },
             Row.Danger("Borrar favoritos de esta lista") { vm.clearFavorites() },
@@ -138,7 +140,19 @@ private var lastSection = "quick"
 fun SettingsScreen(vm: AppViewModel) {
     val c = LocalIptv.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val all = sections(vm, ctx, (ctx as? cl.iptv.player.MainActivity)?.isTv == true)
+    val exporter = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")) { uri -> if (uri != null) vm.exportBackup(uri) }
+    val importer = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importBackup(uri) }
+    val all = sections(vm, ctx, (ctx as? cl.iptv.player.MainActivity)?.isTv == true,
+        onExport = {
+            try { exporter.launch("vibe-iptv-respaldo-${java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())}.json") }
+            catch (e: android.content.ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }
+        },
+        onImport = {
+            try { importer.launch(arrayOf("application/json", "text/plain", "*/*")) }
+            catch (e: android.content.ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }
+        })
     var current by remember { mutableStateOf(lastSection) }
     var query by remember { mutableStateOf("") }
     var picking by remember { mutableStateOf<Row?>(null) }

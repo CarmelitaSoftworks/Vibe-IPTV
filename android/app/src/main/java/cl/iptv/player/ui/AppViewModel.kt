@@ -187,6 +187,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (next != resume) { resume = next; store.saveResume(src.id, next); if (category == CAT_RESUME) recompute(false) }
     }
     fun resumeFor(item: Item): Resume? = resume[item.id]
+
+    // ---------- Respaldo ----------
+    fun exportBackup(uri: android.net.Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use { it.write(store.exportBackup().toByteArray()) }
+                }
+            }.onSuccess { message = "Respaldo guardado. Contiene tus contraseñas: guárdalo en un lugar privado." }
+                .onFailure { message = "No se pudo guardar: ${it.message}" }
+        }
+    }
+    fun importBackup(uri: android.net.Uri) {
+        viewModelScope.launch {
+            runCatching {
+                val text = withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+                }
+                store.importBackup(text)
+            }.onSuccess { n ->
+                sources = store.sources(); settings = store.settings()
+                message = "Respaldo restaurado: $n listas"
+                (sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull())?.let { open(it) } ?: run { showWelcome = true }
+            }.onFailure { message = "No se pudo restaurar: ${it.message}" }
+        }
+    }
     fun clearResume() {
         val src = source ?: run { message = "Abre una lista primero"; return }
         store.clearResume(src.id); resume = emptyMap(); recompute(false); message = "\"Seguir viendo\" borrado"

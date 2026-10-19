@@ -105,4 +105,48 @@ class Storage(private val ctx: Context) {
         prefs.edit().putString("pos_$sourceId", o.toString()).apply()
     }
     fun clearResume(sourceId: String) = prefs.edit().remove("pos_$sourceId").apply()
+
+    // ---------- Respaldo ----------
+    /** Todo lo guardado (listas con contraseñas, favoritos, "Seguir viendo", ajustes y listas en archivo) en un JSON. */
+    fun exportBackup(): String {
+        val p = JSONObject()
+        prefs.all.forEach { (k, v) ->
+            when (v) {
+                is String -> p.put(k, JSONObject().put("s", v))
+                is Set<*> -> p.put(k, JSONObject().put("set", JSONArray(v.map { it.toString() })))
+                is Int -> p.put(k, JSONObject().put("i", v))
+                is Long -> p.put(k, JSONObject().put("l", v))
+                is Boolean -> p.put(k, JSONObject().put("b", v))
+                is Float -> p.put(k, JSONObject().put("f", v.toDouble()))
+            }
+        }
+        val files = JSONObject()
+        ctx.filesDir.listFiles { f -> f.name.startsWith("m3u_") && f.length() < 20_000_000 }?.forEach { files.put(it.name, it.readText()) }
+        return JSONObject().put("app", "vibe-iptv").put("version", 1).put("at", System.currentTimeMillis())
+            .put("prefs", p).put("files", files).toString()
+    }
+
+    /** Restaura un respaldo (reemplaza lo guardado). Devuelve cuántas listas trae. */
+    fun importBackup(json: String): Int {
+        val o = JSONObject(json)
+        require(o.optString("app") == "vibe-iptv") { "El archivo no es un respaldo de Vibe IPTV" }
+        val p = o.getJSONObject("prefs")
+        val e = prefs.edit().clear()
+        p.keys().forEach { k ->
+            val v = p.getJSONObject(k)
+            when {
+                v.has("s") -> e.putString(k, v.getString("s"))
+                v.has("set") -> v.getJSONArray("set").let { a -> e.putStringSet(k, (0 until a.length()).map { a.getString(it) }.toSet()) }
+                v.has("i") -> e.putInt(k, v.getInt("i"))
+                v.has("l") -> e.putLong(k, v.getLong("l"))
+                v.has("b") -> e.putBoolean(k, v.getBoolean("b"))
+                v.has("f") -> e.putFloat(k, v.getDouble("f").toFloat())
+            }
+        }
+        e.commit()
+        o.optJSONObject("files")?.let { f -> f.keys().forEach { name ->
+            if (name.matches(Regex("m3u_[\\w-]+\\.m3u"))) File(ctx.filesDir, name).writeText(f.getString(name))
+        } }
+        return sources().size
+    }
 }
