@@ -45,6 +45,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Tres motores en Android** que se relevan solos: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv). Si uno no puede con un canal, prueba el siguiente; también puedes elegir uno fijo en Ajustes.
 - **Formatos de la TV de cable**: video MPEG-2 entrelazado y audio AC-3 / E-AC-3 / MP2, con desentrelazado automático.
 - **En el navegador**: hls.js y mpegts.js, y si el navegador no soporta el formato, conversión al vuelo con **ffmpeg** a través del servidor local.
+- **Búfer ajustable** (Rápido / Equilibrado / Estable) en los tres motores, y **búfer aprendido**: si un canal se corta seguido, la app le sube el búfer sola y lo recuerda.
 - **Canales en vivo estables**: sin saltos hacia adelante ni parpadeos, con reconexión automática si la señal se corta.
 - Menú del reproductor con pistas de audio, calidad, relación de aspecto, velocidad, información técnica del canal, favoritos, imagen en imagen (PiP) y lista de canales sin salir del video.
 

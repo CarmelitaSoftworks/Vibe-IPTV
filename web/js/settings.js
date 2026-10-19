@@ -57,6 +57,7 @@ function sections() {
       { type: 'choice', key: 'convert', label: 'Convertir formatos no compatibles', desc: 'Para canales con audio AC-3 / MP2 o video MPEG-2 (habitual en TV de cable)', options: [['auto', 'Automático, sólo si hace falta'], ['always', 'Siempre en TV en vivo'], ['never', 'Nunca']] },
       { type: 'choice', key: 'convertQuality', label: 'Calidad de la conversión', desc: 'Sólo cuando hay que convertir el video', options: [['fast', 'Rápida (usa menos el PC)'], ['balanced', 'Mejor calidad']] },
       { type: 'info', label: 'Conversión (ffmpeg)', value: () => ctx.caps?.ffmpeg ? 'Disponible' : 'No instalada: abre la app con iniciar.bat' },
+      { type: 'choice', key: 'buffer', label: 'Búfer', desc: 'Cuánto video se carga por adelantado', options: [['fast', 'Rápido: cambia de canal antes'], ['balanced', 'Equilibrado (recomendado)'], ['stable', 'Estable: para proveedores que se cortan']] },
       { type: 'choice', key: 'liveFormat', label: 'Formato de canales en vivo (Xtream)', options: [['m3u8', 'HLS (.m3u8) — recomendado'], ['ts', 'MPEG-TS (.ts)']] },
       { type: 'toggle', key: 'autoNext', label: 'Siguiente episodio automático' },
     ] },

@@ -166,6 +166,7 @@ The app is available in **Spanish** and **English**. By default it follows the s
 - **Multiview:** the ⊞ player button (live TV): up to 4 channels at once. OK picks which one plays sound, OK again opens it full screen, *Menu* (or long press) changes that tile's channel.
 - **Android TV / Google TV home screen:** the app publishes a “Vibe IPTV” row with your favorites and recent channels; picking one opens it directly. (Fire TV doesn't support this.)
 - **Send log:** Settings → About → *Send log* or *Save log to a file*. It includes recent errors and engine switches; addresses are stored without username or password.
+- **Buffer:** Settings → Playback → *Buffer*. *Fast* changes channels quicker, *Balanced* is recommended and *Stable* keeps more video ahead for providers that drop out. If a live channel stalls 3 times, the app raises its buffer (up to two levels) and remembers it; clear it with Settings → Data → *Forget learned buffer*.
 - **SubDL:** paste your free key in Settings → Subtitles and use *Test SubDL key*. Searches use the title's IMDb ID and, for series, download only the episode even when the subtitle comes in a season pack.
 
 ## Preview version (artifact)

@@ -33,6 +33,8 @@ export const DEFAULT_SETTINGS = {
   parentalPin: '',
   // Tamaño de los controles del reproductor
   hudScale: '1',
+  // Búfer: fast | balanced | stable
+  buffer: 'balanced',
   // Fichas: mostrar antes de reproducir películas; clave opcional de TMDB
   showDetails: true, tmdbKey: '',
 };

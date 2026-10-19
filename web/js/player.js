@@ -48,6 +48,9 @@ function transcodeUrl(url, item, full = false) {
   return `${proxyBase()}/proxy/transcode?${p}`;
 }
 
+// Búfer (Ajustes → Reproducción): segundos por adelantado (HLS), megas máximos y colchón inicial MPEG-TS (KB)
+const BUFFER = { fast: { hls: 12, mb: 40, stash: 192 }, balanced: { hls: 30, mb: 60, stash: 384 }, stable: { hls: 60, mb: 120, stash: 1024 } };
+
 export class Player {
   constructor(video, { onError, onStatus, onInfo } = {}) {
     this.video = video;
@@ -155,11 +158,12 @@ export class Player {
 
       if (type === 'hls') {
         if (window.Hls && Hls.isSupported()) {
+          const B = BUFFER[getSettings().buffer] || BUFFER.balanced;
           const hls = new Hls({
             enableWorker: true, lowLatencyMode: false, renderTextTracksNatively: true, backBufferLength: 30,
             // Estabilidad en vivo: sin saltos al borde del directo ni aceleraciones para "alcanzarlo"
             liveSyncDurationCount: 4, liveMaxLatencyDurationCount: Infinity, maxLiveSyncPlaybackRate: 1,
-            maxBufferLength: 30, maxMaxBufferLength: 60,
+            maxBufferLength: B.hls, maxMaxBufferLength: B.hls * 2, maxBufferSize: B.mb * 1e6,
             manifestLoadingMaxRetry: 3, levelLoadingMaxRetry: 6, fragLoadingMaxRetry: 6,
           });
           this.engine = hls; this.kind = kindOverride || 'HLS';
@@ -180,7 +184,7 @@ export class Player {
         if (window.mpegts && mpegts.getFeatureList().mseLivePlayback) {
           const p = mpegts.createPlayer({ type: 'mpegts', isLive: live, url }, {
             // Búfer antes de empezar y SIN "persecución de latencia": era lo que hacía saltar la imagen hacia adelante
-            enableStashBuffer: true, stashInitialSize: 384 * 1024,
+            enableStashBuffer: true, stashInitialSize: (BUFFER[getSettings().buffer] || BUFFER.balanced).stash * 1024,
             liveBufferLatencyChasing: false, autoCleanupSourceBuffer: true,
             autoCleanupMaxBackwardDuration: 60, autoCleanupMinBackwardDuration: 30,
             lazyLoad: false, fixAudioTimestampGap: true,

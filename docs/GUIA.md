@@ -166,6 +166,7 @@ La app está en **español** y en **inglés**. Por defecto sigue el idioma del s
 - **Multivista:** botón ⊞ del reproductor (TV en vivo): hasta 4 canales a la vez. Con OK eliges cuál suena, OK otra vez lo abre en pantalla completa, *Menú* (o mantener presionado) cambia el canal de ese recuadro.
 - **Inicio de Android TV / Google TV:** la app publica una fila «Vibe IPTV» con tus favoritos y canales recientes; al elegir uno se abre directo. (Fire TV no tiene esta función.)
 - **Enviar registro:** Ajustes → Acerca de → *Enviar registro* o *Guardar registro en un archivo*. Incluye errores y cambios de motor recientes; las direcciones se guardan sin usuario ni contraseña.
+- **Búfer:** Ajustes → Reproducción → *Búfer*. *Rápido* cambia de canal antes, *Equilibrado* es el recomendado y *Estable* guarda más video por adelantado para proveedores que se cortan. Si un canal en vivo se queda cargando 3 veces, la app le sube el búfer (hasta dos niveles) y lo recuerda; se borra con Ajustes → Datos → *Olvidar búfer aprendido*.
 - **SubDL:** pega tu clave gratuita en Ajustes → Subtítulos y usa *Probar la clave de SubDL*. La búsqueda usa el código IMDb del título y, en series, baja sólo el episodio aunque el subtítulo venga en un paquete de temporada.
 
 ## Versión de vista previa (artefacto)
