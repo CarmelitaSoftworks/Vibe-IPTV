@@ -64,7 +64,7 @@ class Storage(private val ctx: Context) {
             osPass = str("osPass", ""), subLangs = str("subLangs", d.subLangs),
             showNumbers = prefs.getBoolean("showNumbers", d.showNumbers), showEpgInfo = prefs.getBoolean("showEpgInfo", d.showEpgInfo),
             autoNext = prefs.getBoolean("autoNext", d.autoNext), animations = prefs.getBoolean("animations", d.animations),
-            theme = str("theme", d.theme), accent = str("accent", d.accent), tileSize = str("tileSize", d.tileSize),
+            lang = str("lang", d.lang), theme = str("theme", d.theme), accent = str("accent", d.accent), tileSize = str("tileSize", d.tileSize),
             epgEvery = prefs.getInt("epgEvery", d.epgEvery), epgOffset = prefs.getInt("epgOffset", d.epgOffset),
             subSize = str("subSize", d.subSize), startup = str("startup", d.startup),
             engine = str("engine", d.engine), aspect = str("aspect", d.aspect), subdlKey = str("subdlKey", ""),
@@ -76,7 +76,7 @@ class Storage(private val ctx: Context) {
         .putString("osUser", s.osUser).putString("osPass", s.osPass).putString("subLangs", s.subLangs)
         .putBoolean("showNumbers", s.showNumbers).putBoolean("showEpgInfo", s.showEpgInfo)
         .putBoolean("autoNext", s.autoNext).putBoolean("animations", s.animations)
-        .putString("theme", s.theme).putString("accent", s.accent).putString("tileSize", s.tileSize)
+        .putString("lang", s.lang).putString("theme", s.theme).putString("accent", s.accent).putString("tileSize", s.tileSize)
         .putInt("epgEvery", s.epgEvery).putInt("epgOffset", s.epgOffset)
         .putString("subSize", s.subSize).putString("startup", s.startup)
         .putString("engine", s.engine).putString("aspect", s.aspect).putString("subdlKey", s.subdlKey)

@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -516,7 +515,7 @@ private fun Dock(title: String, pageText: String, onCategories: () -> Unit, onSe
 
 private fun clockText(): String {
     val d = Date()
-    val day = SimpleDateFormat("EEE", ES).format(d).replace(".", "").replaceFirstChar { it.uppercase() }
+    val day = SimpleDateFormat("EEE", I18n.locale).format(d).replace(".", "").replaceFirstChar { it.uppercase() }
     return "$day ${SimpleDateFormat("dd/MM", ES).format(d)} · ${hhmm.format(d)}"
 }
 

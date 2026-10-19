@@ -1,3 +1,4 @@
+import { t, setLang, resolveLang, locale } from './i18n.js';
 import { parseM3U, splitGroup } from './m3u.js';
 import { XtreamClient, normalizeServer } from './xtream.js';
 import { Epg, loadEpg } from './epg.js';
@@ -34,7 +35,7 @@ const state = {
 /* ---------- utilidades ---------- */
 const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmtTime = (ms) => new Date(ms).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const fmtTime = (ms) => new Date(ms).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const initials = (name) => (name || '?').replace(/^[A-Z]{2,3}\s*[|:]\s*/, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
 let toastTimer;
@@ -48,8 +49,8 @@ function loader(on, text = 'Cargando…') { $('loader').hidden = !on; $('loaderT
 
 function tickClock() {
   const d = new Date();
-  const day = d.toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '');
-  const date = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+  const day = d.toLocaleDateString(locale(), { weekday: 'short' }).replace('.', '');
+  const date = d.toLocaleDateString(locale(), { day: '2-digit', month: '2-digit' });
   $('dockClock').textContent = `${day[0].toUpperCase()}${day.slice(1)} ${date} · ${fmtTime(d)}`;
   $('pClock').textContent = fmtTime(d);
 }
@@ -63,6 +64,7 @@ const pTime = (ms) => fmtTime(ms + epgShift());
 function applySettings(key) {
   const s = cfg(), root = document.documentElement, body = document.body;
   root.dataset.appTheme = s.theme;
+  setLang(resolveLang(s.lang));
   if (s.accent && s.accent !== 'celeste') root.dataset.accent = s.accent; else delete root.dataset.accent;
   body.classList.toggle('no-nums', !s.showNumbers);
   body.classList.toggle('no-anim', !s.animations);
@@ -84,7 +86,7 @@ async function loadCachedEpg(src) {
     const c = await store.idbGet(`epg:${src.id}`);
     if (!c || state.source !== src || state.epgAt > c.at) return;
     state.epg = epgFrom(c); state.epgAt = c.at; state.epgUrls = c.urls;
-    state.epgStatus = `Guía guardada del ${new Date(c.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' })} · actualizando…`;
+    state.epgStatus = `Guía guardada del ${new Date(c.at).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' })} · actualizando…`;
     updateFocusInfo(); updateEpgStatus();
   } catch { /* sin caché disponible */ }
 }
@@ -482,7 +484,7 @@ function renderHome(g) {
     b.dataset.nav = '';
     b.dataset.home = k;
     b.innerHTML = `<span class="home-icon">${SECTION_ICONS[k]}</span><span class="home-name">${SECTIONS[k]}</span>
-      <span class="home-count">${n ? `${n.toLocaleString('es-CL')} ${({ live: ['canal', 'canales'], movie: ['película', 'películas'], series: ['serie', 'series'] })[k][n === 1 ? 0 : 1]}` : 'Sin contenido en esta lista'}</span>`;
+      <span class="home-count">${n ? `${n.toLocaleString(locale())} ${({ live: ['canal', 'canales'], movie: ['película', 'películas'], series: ['serie', 'series'] })[k][n === 1 ? 0 : 1]}` : 'Sin contenido en esta lista'}</span>`;
     b.onclick = () => enterSection(k);
     const info = () => { $('fiName').textContent = SECTIONS[k]; $('fiEpg').textContent = n ? `${[...new Set(state.items.filter((i) => i.kind === k).map((i) => i.group))].length} categorías` : ''; };
     b.addEventListener('focus', info);
@@ -857,7 +859,7 @@ function toggleInfo() {
 async function copyForVlc() {
   const url = state.playing?.url || '';
   try { await navigator.clipboard.writeText(url); toast('Enlace copiado: en VLC usa Medio → Abrir ubicación de red y pégalo', 5000); }
-  catch { prompt('Copia este enlace y pégalo en VLC (Medio → Abrir ubicación de red):', url); }
+  catch { prompt(t('Copia este enlace y pégalo en VLC (Medio → Abrir ubicación de red):'), url); }
 }
 
 function setVolume(v) {

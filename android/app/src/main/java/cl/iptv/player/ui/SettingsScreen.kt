@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +69,7 @@ private fun sections(vm: AppViewModel): List<Section> {
             Row.Choice("Desfase de la guía", "Corrige guías que muestran la hora corrida", offsets, { it.epgOffset.toString() }, { s, v -> s.copy(epgOffset = v.toInt()) }),
         )),
         Section("look", "Apariencia", SecIcon.LOOK, listOf(
+            Row.Choice("Idioma", "Idioma de la app", listOf("auto" to "Automático (idioma del sistema)", "es" to "Español", "en" to "English"), get = { it.lang }, set = { s, v -> s.copy(lang = v) }),
             Row.Choice("Tema", options = listOf("light" to "Claro", "dark" to "Oscuro", "system" to "Según el sistema"), get = { it.theme }, set = { s, v -> s.copy(theme = v) }),
             Row.Choice("Color de acento", options = listOf("celeste" to "Celeste", "verde" to "Verde", "naranja" to "Naranja", "rosa" to "Rosa", "violeta" to "Violeta"), get = { it.accent }, set = { s, v -> s.copy(accent = v) }),
             Row.Choice("Tamaño de los mosaicos", options = listOf("normal" to "Normal", "large" to "Grande", "small" to "Compacto"), get = { it.tileSize }, set = { s, v -> s.copy(tileSize = v) }),
@@ -150,7 +150,7 @@ fun SettingsScreen(vm: AppViewModel) {
             }
             val visible: List<Pair<Section, List<Row>>> =
                 if (query.isNotBlank()) all.mapNotNull { s ->
-                    val r = s.rows.filter { (it.label + " " + it.desc).contains(query.trim(), ignoreCase = true) }
+                    val r = s.rows.filter { listOf(it.label, it.desc, tr(it.label), tr(it.desc)).joinToString(" ").contains(query.trim(), ignoreCase = true) }
                     if (r.isEmpty()) null else s to r
                 } else listOf(all.first { it.id == current }.let { it to it.rows })
 

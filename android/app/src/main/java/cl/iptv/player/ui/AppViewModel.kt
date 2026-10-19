@@ -183,7 +183,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (source?.id != src.id || epgAt > 0) return@launch     // ya llegó una más nueva
         epg = e
         epgAt = files.maxOf { it.lastModified() }
-        epgStatus = "Guía guardada del ${java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("es", "CL")).format(java.util.Date(epgAt))} · actualizando…"
+        epgStatus = "Guía guardada del ${java.text.SimpleDateFormat("dd/MM HH:mm", I18n.locale).format(java.util.Date(epgAt))} · actualizando…"
     }
 
     /** Descarga una o varias guías (separadas por coma o espacio), las guarda y las combina. */

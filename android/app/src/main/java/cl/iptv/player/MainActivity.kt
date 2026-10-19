@@ -41,7 +41,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { IptvTheme(vm.settings.theme, vm.settings.accent) { App(vm) } }
+        cl.iptv.player.ui.I18n.load(this)
+        setContent {
+            cl.iptv.player.ui.I18n.apply(vm.settings.lang)
+            IptvTheme(vm.settings.theme, vm.settings.accent) { App(vm) }
+        }
     }
 
     override fun onStart() {

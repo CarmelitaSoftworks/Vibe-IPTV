@@ -74,6 +74,7 @@ data class Settings(
     val autoNext: Boolean = true,
     val animations: Boolean = true,
     // Apariencia: el menú es blanco por defecto
+    val lang: String = "auto",            // auto (idioma del sistema) | es | en
     val theme: String = "light",          // light | dark | system
     val accent: String = "celeste",       // celeste | verde | naranja | rosa | violeta
     val tileSize: String = "normal",      // small | normal | large

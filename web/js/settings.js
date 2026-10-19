@@ -1,5 +1,6 @@
 // Pantalla de Ajustes (dos columnas, inspirada en OwnTV): secciones a la izquierda,
 // filas con su valor a la derecha, búsqueda y sección "Rápido" con interruptores.
+import { t } from './i18n.js';
 import * as store from './storage.js';
 import { moveFocus, keyDir, isBack, isOk } from './nav.js';
 
@@ -44,6 +45,7 @@ function sections() {
       { type: 'choice', key: 'epgOffset', label: 'Desfase de la guía', desc: 'Corrige guías que muestran la hora corrida', options: OFFSETS },
     ] },
     { id: 'look', name: 'Apariencia', rows: [
+      { type: 'choice', key: 'lang', label: 'Idioma', desc: 'Idioma de la app', options: [['auto', 'Automático (idioma del sistema)'], ['es', 'Español'], ['en', 'English']] },
       { type: 'choice', key: 'theme', label: 'Tema', options: [['light', 'Claro'], ['dark', 'Oscuro'], ['system', 'Según el sistema']] },
       { type: 'choice', key: 'accent', label: 'Color de acento', options: ACCENTS },
       { type: 'choice', key: 'tileSize', label: 'Tamaño de los mosaicos', options: [['normal', 'Normal'], ['large', 'Grande'], ['small', 'Compacto']] },
@@ -125,7 +127,7 @@ function renderPanel() {
   let html = '';
   if (q) {
     for (const sec of all) {
-      const rows = sec.rows.map((r, i) => [r, i]).filter(([r]) => (r.label + ' ' + (r.desc || '')).toLowerCase().includes(q));
+      const rows = sec.rows.map((r, i) => [r, i]).filter(([r]) => [r.label, r.desc || '', t(r.label), t(r.desc || '')].join(' ').toLowerCase().includes(q));
       if (rows.length) html += `<h3 class="set-group">${sec.name}</h3>` + rows.map(([r, i]) => rowHtml(r, s, i, sec.id)).join('');
     }
     if (!html) html = `<p class="set-empty">No hay ajustes que coincidan con “${esc(q)}”.</p>`;

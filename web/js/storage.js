@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS = {
   convert: 'auto', convertQuality: 'fast', volume: 1, muted: false, aspect: 'fit',
   // Rápido / apariencia
   showNumbers: true, showEpgInfo: true, animations: true,
-  theme: 'light', accent: 'celeste', tileSize: 'normal',
+  lang: 'auto', theme: 'light', accent: 'celeste', tileSize: 'normal',
   // Guía
   epgEvery: 4, epgOffset: 0,
   // Subtítulos
