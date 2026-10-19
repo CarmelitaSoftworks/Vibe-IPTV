@@ -21,6 +21,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
@@ -252,6 +255,35 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
 
+    // Vigilante de congelamiento: el canal ya andaba pero la imagen se detuvo (sin error).
+    // 1.º recarga, 2.º otro motor (en automático) y si no queda otro, avisa con "Reintentar".
+    var userPaused by remember(item.id) { mutableStateOf(false) }
+    // Gesto de brillo / volumen en curso (para el indicador)
+    var gesture by remember { mutableStateOf<Pair<String, Float>?>(null) }
+    var gestureAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(item.id, engine) {
+        val d = cl.iptv.player.data.StallDetector(firstStartMs = Long.MAX_VALUE / 4)   // el arranque lo vigila el bloque anterior
+        d.reset(System.currentTimeMillis())
+        while (true) {
+            delay(2000)
+            if (error != null) continue
+            if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) { d.reset(System.currentTimeMillis()); continue }
+            val k = if (useAlt) alt else exo
+            if (k == null) continue
+            val next = when (engine) { "exo" -> "vlc"; "vlc" -> if (android.os.Build.VERSION.SDK_INT >= 26) "mpv" else null; else -> null }
+            val canSwitch = vm.settings.engine == "auto" && next != null
+            when (d.check(System.currentTimeMillis(), k.position, !userPaused, canSwitch)) {
+                cl.iptv.player.data.StallDetector.Action.RELOAD -> { vm.message = "La imagen se detuvo: reconectando…"; reloadKey++ }
+                cl.iptv.player.data.StallDetector.Action.SWITCH_ENGINE -> switchEngine(next!!, "Se volvió a detener: probando con ${engineName[next]}…")
+                cl.iptv.player.data.StallDetector.Action.GIVE_UP -> {
+                    if (engine == "exo") player.stop() else alt?.pause()
+                    error = "La transmisión se detuvo y no se recuperó. Puede ser un corte del proveedor."
+                }
+                else -> Unit
+            }
+        }
+    }
+
     // Subtítulo externo en VLC / MPV
     LaunchedEffect(subtitle, alt) { val f = subtitle; if (useAlt && f != null) runCatching { alt?.addExternalSubtitle(f) } }
 
@@ -316,6 +348,8 @@ fun PlayerScreen(vm: AppViewModel) {
         if (!activity.isTv) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         activity.pipEnabled = true
         onDispose {
+            // El brillo ajustado con el gesto sólo vale dentro del reproductor
+            runCatching { val lp = win.attributes; lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE; win.attributes = lp }
             wc.show(WindowInsetsCompat.Type.systemBars())
             activity.requestedOrientation = prevOrientation
             activity.pipEnabled = false
@@ -347,7 +381,7 @@ fun PlayerScreen(vm: AppViewModel) {
                 KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> { if (down) vm.zap(1); return@handler true }
                 KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> { if (down) vm.zap(-1); return@handler true }
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                    if (down) { ctlOf(useAlt, alt, exo)?.togglePause(); poke() }; return@handler true
+                    if (down) { val k = ctlOf(useAlt, alt, exo); userPaused = k?.isPlaying == true; k?.togglePause(); poke() }; return@handler true
                 }
                 KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { if (down && !live) { ctlOf(useAlt, alt, exo)?.seekBy(30_000); poke() }; return@handler true }
                 KeyEvent.KEYCODE_MEDIA_REWIND -> { if (down && !live) { ctlOf(useAlt, alt, exo)?.seekBy(-10_000); poke() }; return@handler true }
@@ -422,7 +456,7 @@ fun PlayerScreen(vm: AppViewModel) {
             PAction.NEXT -> vm.zap(1)
             PAction.REW -> k?.seekBy(-10_000)
             PAction.FWD -> k?.seekBy(10_000)
-            PAction.PLAY -> k?.togglePause()
+            PAction.PLAY -> { userPaused = k?.isPlaying == true; k?.togglePause() }
             PAction.FAV -> {
                 val wasFav = item.id in vm.favorites
                 vm.toggleFavorite(item)
@@ -495,12 +529,61 @@ fun PlayerScreen(vm: AppViewModel) {
             update = { v -> v.resizeMode = resize },
         )
 
-        // Tocar la imagen muestra u oculta los controles
+        // Tocar la imagen muestra u oculta los controles.
+        // Deslizadores invisibles: arrastrar arriba/abajo en el borde izquierdo = brillo, en el derecho = volumen.
+        val audio = remember { ctx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
+        val maxVol = remember { audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
         Box(
-            Modifier.fillMaxSize().clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null,
-            ) { if (panel != null) panel = null else if (controls) controls = false else poke() },
+            Modifier.fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { if (panel != null) panel = null else if (controls) controls = false else poke() })
+                }
+                .pointerInput(Unit) {
+                    var zone = 0          // -1 brillo, 1 volumen, 0 nada (centro)
+                    var level = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { o ->
+                            zone = when { o.x < size.width * 0.3f -> -1; o.x > size.width * 0.7f -> 1; else -> 0 }
+                            level = if (zone == -1) {
+                                activity.window.attributes.screenBrightness.takeIf { it >= 0f }
+                                    ?: (android.provider.Settings.System.getInt(ctx.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS, 128) / 255f)
+                            } else audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / maxVol
+                        },
+                        onDragEnd = { zone = 0 },
+                        onDragCancel = { zone = 0 },
+                    ) { change, dy ->
+                        if (zone == 0) return@detectVerticalDragGestures
+                        change.consume()
+                        level = (level - dy / (size.height * 0.8f)).coerceIn(0f, 1f)   // arrastrar todo el alto ≈ 0 → 100 %
+                        if (zone == -1) {
+                            val lp = activity.window.attributes
+                            lp.screenBrightness = level.coerceAtLeast(0.01f)
+                            activity.window.attributes = lp
+                            gesture = "brillo" to level
+                        } else {
+                            audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, Math.round(level * maxVol), 0)
+                            gesture = "volumen" to level
+                        }
+                        gestureAt = System.currentTimeMillis()
+                    }
+                },
         )
+        // Indicador de brillo / volumen mientras se ajusta
+        gesture?.takeIf { now - gestureAt < 1200 || System.currentTimeMillis() - gestureAt < 1200 }?.let { (kind, v) ->
+            Column(
+                Modifier.align(if (kind == "brillo") Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 36.dp)
+                    .clip(RoundedCornerShape(16.dp)).background(Color(0xCC101417)).padding(horizontal = 14.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(if (kind == "brillo") "☀" else if (v == 0f) "🔇" else "🔊", color = Color.White, fontSize = 22.sp)
+                Spacer(Modifier.height(10.dp))
+                Box(Modifier.width(8.dp).height(140.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.25f)), contentAlignment = Alignment.BottomCenter) {
+                    Box(Modifier.fillMaxWidth().fillMaxHeight(v).background(c.accent))
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("${Math.round(v * 100)} %", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
 
         AnimatedVisibility(showBanner, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
             Row(

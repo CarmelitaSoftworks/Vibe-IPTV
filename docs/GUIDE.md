@@ -147,6 +147,8 @@ In **Live TV**, the **📅 Guide** button on the category bar opens the grid: ch
 - **Profiles (Android):** on the lists screen (👤 button) or **Settings → Parental control → Profile**. Each profile has its own favorites and "Continue watching". A **kids** profile never shows adult content and, with a PIN, leaving it asks for the PIN.
 - **Player controls size:** **Settings → Playback**, 70 %–150 % on Android and 80 %–140 % on the web. Handy on large TVs or phones.
 - **Channel list in the player:** shows logo, name (no number) and the current show with its progress.
+- **Brightness and volume without leaving the video (Android, touchscreen):** swipe up or down on the **left edge** for brightness and on the **right edge** for volume. An indicator shows while you adjust; brightness returns to the system level when you leave the player.
+- **If the picture freezes:** the player detects it (the position stops moving without you pausing), reconnects the channel and, if it stops again, tries another engine (in automatic). If nothing works it shows the notice with **Retry**.
 
 ## 13. Language
 

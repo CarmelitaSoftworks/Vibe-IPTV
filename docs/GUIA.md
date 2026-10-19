@@ -147,6 +147,8 @@ En **TV en vivo**, el botón **📅 Guía** de la barra de categorías abre la g
 - **Perfiles (Android):** en la pantalla de listas (botón 👤) o en **Ajustes → Control parental → Perfil**. Cada perfil tiene sus favoritos y su «Seguir viendo». Un perfil **infantil** nunca muestra contenido para adultos y, si hay PIN, salir de él lo pide.
 - **Tamaño de los controles del reproductor:** **Ajustes → Reproducción**, de 70 % a 150 % en Android y de 80 % a 140 % en la web. Útil en TV grandes o en celulares.
 - **Lista de canales en el reproductor:** muestra logo, nombre (sin número) y el programa actual con su avance.
+- **Brillo y volumen sin salir del video (Android, pantalla táctil):** desliza arriba o abajo en el **borde izquierdo** para el brillo y en el **borde derecho** para el volumen. Aparece un indicador mientras ajustas; al salir del reproductor el brillo vuelve al del sistema.
+- **Si la imagen se congela:** el reproductor lo detecta solo (la posición deja de avanzar sin que hayas pausado), reconecta el canal y, si se vuelve a detener, prueba otro motor (en automático). Si nada funciona, muestra el aviso con **Reintentar**.
 
 ## 13. Idioma
 
