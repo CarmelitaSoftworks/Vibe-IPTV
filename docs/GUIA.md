@@ -1,18 +1,19 @@
 # Guía de uso — Vibe IPTV
 
-> Volver al [README](../README.md)
+> Volver al [README](../README.md) · 🇬🇧 [English](GUIDE.md)
 
 Dos apps nativas que comparten el mismo diseño de menú (cuadrícula de mosaicos redondeados con paginación lateral y barra inferior con categoría y fecha/hora):
 
 | | Web (navegador) | Android / Android TV |
 |---|---|---|
-| Tecnología | HTML/CSS/JS sin framework + hls.js + mpegts.js | Kotlin + Jetpack Compose + Media3 (ExoPlayer) |
+| Tecnología | HTML/CSS/JS sin framework + hls.js + mpegts.js (+ ffmpeg) | Kotlin + Jetpack Compose + ExoPlayer, VLC y MPV |
 | Listas M3U / M3U8 | URL o archivo | URL o archivo |
 | Xtream Codes | En vivo, películas y series (episodios) | En vivo, películas y series (episodios) |
 | Guía EPG XMLTV (.xml / .xml.gz) | Sí (ahora / luego + progreso) | Sí (ahora / luego + progreso) |
 | Favoritos, búsqueda, categorías, varias listas | Sí | Sí |
 | Control remoto / D-pad | Flechas, Enter, Atrás, RePág/AvPág | Lanzador de Android TV, banner, D-pad, CH+/CH−, MENÚ, INFO |
-| Subtítulos | Pistas internas, .srt/.vtt local, búsqueda en OpenSubtitles | Pistas internas (botón CC), .srt/.vtt local, OpenSubtitles, "Abrir en VLC" |
+| Subtítulos | Pistas internas, archivo local, OpenSubtitles · SubDL · Podnapisi | Pistas internas, archivo local, OpenSubtitles · SubDL · Podnapisi, "Abrir en VLC" |
+| Idioma | Español o inglés (Ajustes → Apariencia → Idioma) | Español o inglés (Ajustes → Apariencia → Idioma) |
 
 > La app es sólo un **reproductor**: no incluye canales. Úsala con listas a las que tengas acceso legítimo.
 
@@ -29,23 +30,25 @@ node server/server.js          # http://localhost:8080
 node server/server.js --lan
 ```
 
-Requiere Node 18+ y **no tiene dependencias** (hls.js y mpegts.js ya están en `web/vendor/`).
+Requiere Node 18+ y **no tiene dependencias obligatorias** (hls.js y mpegts.js ya están en `web/vendor/`; ffmpeg es opcional).
 
-**¿Por qué un servidor?** Casi ningún proveedor IPTV permite que un navegador lea sus streams (CORS) y muchos usan `http://`. `server.js` sirve la app y hace de proxy: reescribe las listas HLS para que los segmentos también pasen por él, sigue redirecciones y envía un User-Agent de reproductor. La app primero intenta la conexión directa y, si falla, usa el proxy automáticamente (se puede cambiar en Ajustes). No expongas el servidor a Internet: es un proxy abierto pensado para tu PC o tu red local.
+Para dejarlo instalado en un NAS, Raspberry Pi o servidor, mira [Instalar en tu propio servidor](SERVIDOR-PROPIO.md).
+
+**¿Por qué un servidor?** Casi ningún proveedor IPTV permite que un navegador lea sus streams (CORS) y muchos usan `http://`. `server.js` sirve la app y hace de proxy: reescribe las listas HLS para que los segmentos también pasen por él, sigue redirecciones y envía un User-Agent de reproductor. La app primero intenta la conexión directa y, si falla, usa el proxy automáticamente (se puede cambiar en Ajustes). No expongas el servidor a Internet sin contraseña (`VIBE_PASSWORD`): es un proxy pensado para tu PC o tu red local.
 
 También se puede instalar como app (PWA) desde Chrome en Android: menú ⋮ → "Instalar app".
 
 **Teclas:** flechas para moverse (← → al borde cambian de página), Enter para abrir, Esc/Atrás para volver, `F` marca favorito, `/` busca. En el reproductor: ▲/▼ cambia de canal, ◄/► avanza 10 s en películas, Enter muestra los controles.
 
-Pruebas: `npm test` (parsers M3U/XMLTV/SRT y reescritura del proxy).
+Pruebas: `npm test` (parsers M3U/XMLTV/SRT, proxy, contraseña y traducciones).
 
 ## 2. App Android / Android TV
 
-1. Abre la carpeta `android/` con **Android Studio** (Ladybug o más nuevo). Descargará Gradle 8.11.1 y las dependencias.
+1. Abre la carpeta `android/` con **Android Studio** (Meerkat o más nuevo). Descargará Gradle 8.13 y las dependencias.
 2. Conecta un teléfono o un Android TV con depuración USB/ADB y pulsa ▶ *Run*.
 3. Para generar un APK: *Build → Build App Bundle(s) / APK(s) → Build APK(s)*, o en terminal `./gradlew assembleRelease`. Se generan APK por arquitectura (más livianos): la mayoría de los Android TV y TV box usan `armeabi-v7a` o `arm64-v8a`; si no sabes cuál, usa el `universal` (el release se firma con la clave de depuración para poder probarlo; cambia la firma antes de publicar).
 
-**Sin Android Studio (compilar en la nube):** sube la carpeta `iptv-app` a un repositorio de GitHub (puede ser privado). En la pestaña **Actions** se ejecuta "Compilar APK" (o pulsa *Run workflow*); al terminar (≈10 min), descarga **Vibe-IPTV-APK** en *Artifacts*. Usa el APK `universal` si no sabes la arquitectura de tu equipo.
+**Sin Android Studio (compilar en la nube):** cada cambio en GitHub ejecuta "Compilar APK" en la pestaña **Actions** (o pulsa *Run workflow*). Al terminar (≈10 min), el APK queda en **Releases → versión de prueba** y en *Artifacts* (**Vibe-IPTV-APK**). Usa el APK `universal` si no sabes la arquitectura de tu equipo. Si la compilación falla, el registro completo queda en la rama `build-logs`.
 
 Instalar en el teléfono: copia el APK, ábrelo y permite "Instalar apps desconocidas" para el administrador de archivos o el navegador.
 
@@ -53,7 +56,7 @@ Instalar en un Android TV sin Android Studio: activa *Opciones de desarrollador 
 
 **Android TV:** aparece en el lanzador de TV (banner incluido), no requiere pantalla táctil y todo se maneja con el control: D-pad en la cuadrícula (al llegar al borde cambia de página), mantener pulsado OK o la tecla MENÚ marca favorito, CH+/CH− y ▲/▼ cambian de canal en el reproductor, MENÚ abre las opciones (favorito, subtítulos, Abrir en VLC), INFO muestra la guía.
 
-**Teléfono:** desliza la cuadrícula para cambiar de página, mantén pulsado un mosaico para marcarlo como favorito; el reproductor pasa a horizontal y admite imagen en imagen (PiP) al salir con Inicio.
+**Teléfono:** la app se abre en horizontal, como un TV. Desliza la cuadrícula para cambiar de página y mantén pulsado un mosaico para marcarlo como favorito; el reproductor admite imagen en imagen (PiP) al salir con Inicio.
 
 ## 3. Secciones: TV en vivo, Películas y Series
 
@@ -81,7 +84,7 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
 - **Pantalla de listas**: tres opciones grandes para añadir (lista M3U por enlace, archivo M3U, Xtream Codes) y tus listas guardadas para abrirlas con un clic. Se abre con el botón de la lista (arriba a la izquierda).
 - **Ajustes** (botón con engranaje), al estilo de OwnTV: secciones a la izquierda con su número de opciones y, a la derecha, cada ajuste con su valor; buscador arriba. Con el control: ▲▼ entre secciones, ► entra, ◄ vuelve.
   - Rápido: números de canal, guía bajo los mosaicos, siguiente episodio automático, animaciones.
-  - Listas y guía · Apariencia (el menú es **blanco por defecto**; tema oscuro y color de acento opcionales; tamaño de mosaicos) · Reproducción · Subtítulos · Red (sólo web) · Inicio de la app (última lista, pantalla de listas o último canal) · Datos · Acerca de.
+  - Listas y guía · Apariencia (**idioma** español/inglés; el menú es **blanco por defecto**; tema oscuro y color de acento opcionales; tamaño de mosaicos) · Reproducción · Subtítulos · Red (sólo web) · Inicio de la app (última lista, pantalla de listas o último canal) · Datos · Acerca de.
 
 ## 6. Reproductor y canales de TV de cable (AC-3, MP2, MPEG-2)
 
@@ -89,7 +92,7 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
 
 **Formatos de la TV de cable:** muchos canales en vivo traen audio **AC-3 / MP2** o video **MPEG-2 entrelazado**, que los navegadores no reproducen.
 - **Web:** el servidor local los convierte al vuelo con **ffmpeg** (sólo lo necesario: copia el video H.264 y convierte el audio a AAC; si el video es MPEG-2 lo desentrelaza y lo pasa a H.264 a 720p). `iniciar.bat` instala ffmpeg sola la primera vez (`npm install`, unos 70 MB). En Ajustes → Reproducción: *Automático* (cuando el canal falla o queda sin sonido), *Siempre en TV en vivo* o *Nunca*, y la calidad de conversión.
-- **Android / TV:** tres motores: **ExoPlayer**, **VLC (LibVLC)** y **MPV (libmpv, el mismo de OwnTV)**. En *Automático* prueba en ese orden: si ExoPlayer no puede, pasa a VLC y, si VLC tampoco, a MPV; los siguientes canales en vivo parten con el último motor que funcionó. En *Automático* empieza con ExoPlayer y, si el equipo no tiene decodificador para el audio o el video del canal, cambia solo a VLC (y los siguientes canales en vivo parten directo en VLC). En el menú del reproductor (tecla MENÚ) se puede cambiar de motor, el formato de pantalla y la pista de audio.
+- **Android / TV:** tres motores: **ExoPlayer**, **VLC (LibVLC)** y **MPV (libmpv, el mismo de OwnTV)**. En *Automático* prueba en ese orden: si ExoPlayer no puede, pasa a VLC y, si VLC tampoco, a MPV (Android 8.0+); los siguientes canales en vivo parten con el último motor que funcionó. En el menú del reproductor (tecla MENÚ) se puede cambiar de motor, el formato de pantalla y la pista de audio.
 
 ## 7. Subtítulos de varias fuentes
 
@@ -104,11 +107,15 @@ La búsqueda consulta **a la vez** varias fuentes y muestra de cuál viene cada 
 - Se descomprimen solos los `.zip`, se convierten `.ass`/`.ssa`, y se corrige la codificación: los `.srt` en español que vienen en Windows-1252 ya no muestran `Ã±`.
 - **Desfase:** si el subtítulo va adelantado o atrasado, en el menú de subtítulos usa "Aparecen antes / después" (pasos de 0,5 s).
 - También puedes cargar tu propio archivo y elegir las pistas que trae el video.
-- En la web la búsqueda la hace el servidor local (por eso necesita `iniciar.bat`); en la vista previa dentro de Claude sólo queda OpenSubtitles con clave.
+- En la web la búsqueda la hace el servidor local (por eso necesita `iniciar.bat` o el servidor); en la vista previa dentro de Claude sólo queda OpenSubtitles con clave.
 
 ## 8. Categorías y subcategorías
 
 Dentro de TV en vivo, Películas y Series aparece una barra con las categorías de la lista y, si los grupos traen subniveles (`CHILE | DEPORTES`, `Series » Drama » Turcas`, `LATINO - Noticias`), una segunda barra con las subcategorías. Un prefijo que sólo repite la sección ("Películas | Acción") se omite.
+
+## 9. Idioma
+
+La app está en **español** y en **inglés**. Por defecto sigue el idioma del sistema (español si el equipo está en español; si no, inglés) y se puede fijar en **Ajustes → Apariencia → Idioma**. Las traducciones están en `i18n/en.json`, un solo diccionario para la web y Android: para corregir o agregar un texto, edítalo ahí y ejecuta `node i18n/build.mjs`.
 
 ## Versión de vista previa (artefacto)
 
@@ -124,14 +131,20 @@ web/
   js/xtream.js     cliente Xtream Codes
   js/epg.js        parser XMLTV
   js/player.js     hls.js / mpegts.js / nativo, reintento por proxy
-  js/subtitles.js  OpenSubtitles, SRT→VTT
+  js/subtitles.js  subtítulos de varias fuentes, SRT→VTT
   js/nav.js        navegación espacial con flechas
-  server/server.js servidor + proxy (sin dependencias)
+  js/i18n.js       traducción al inglés
+  server/          servidor + proxy + subtítulos + conversión ffmpeg
+  Dockerfile, docker-compose.yml, deploy/   instalación en servidor propio
+i18n/en.json       diccionario español → inglés (web y Android)
 android/
   app/src/main/java/cl/iptv/player/
     MainActivity.kt          teclas del mando, PiP, detección de TV
-    data/                    modelos, M3U, Xtream, EPG, OpenSubtitles, almacenamiento
+    data/                    modelos, M3U, Xtream, EPG, subtítulos, almacenamiento
+    ui/SplashScreen.kt       pantalla de inicio
     ui/MenuScreen.kt         cuadrícula de mosaicos + barra inferior
-    ui/PlayerScreen.kt       ExoPlayer, guía, opciones, subtítulos, VLC
-    ui/Dialogs.kt            listas, ajustes, categorías, búsqueda
+    ui/PlayerScreen.kt       reproductor, guía, opciones, subtítulos
+    ui/VlcEngine.kt, ui/MpvEngine.kt   motores VLC y MPV
+    ui/SettingsScreen.kt     ajustes
+    ui/I18n.kt               traducción al inglés
 ```

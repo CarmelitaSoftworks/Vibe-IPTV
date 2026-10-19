@@ -6,6 +6,8 @@
 
 Listas M3U/M3U8 · Xtream Codes · Guía XMLTV · Pensado para el control remoto
 
+🇨🇱 **Español** · 🇬🇧 [English](README.en.md)
+
 ![Plataformas](https://img.shields.io/badge/plataformas-Web%20%7C%20Android%20%7C%20Android%20TV-3ddc84)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7f52ff?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-4285f4?logo=jetpackcompose&logoColor=white)
@@ -68,6 +70,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - Ajustes por secciones (rápidos, listas y guía, apariencia, reproducción, subtítulos, red, inicio, datos).
 - Tema claro (predeterminado), oscuro o del sistema, con colores de acento.
 - Al abrir la app puede volver directamente al último canal visto.
+- **En español y en inglés**: sigue el idioma del equipo o se elige en Ajustes → Apariencia → Idioma.
 
 ### 🔒 Privacidad
 - **Sin cuentas, sin anuncios y sin telemetría.** Tus listas, favoritos y ajustes se guardan solo en tu equipo.
@@ -84,9 +87,8 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 ## 📥 Instalación
 
 ### Android / Android TV
-1. Ve a la pestaña **[Actions](../../actions)** (o a **[Releases](../../releases)** cuando haya versiones publicadas).
-2. Abre la última compilación correcta y descarga **Vibe-IPTV-APK**.
-3. Elige el APK según tu equipo:
+1. Ve a **[Releases](../../releases)** y abre la **versión de prueba** más reciente (también está en **[Actions](../../actions)** → última compilación → *Artifacts* → **Vibe-IPTV-APK**).
+2. Elige el APK según tu equipo:
 
    | Archivo | Para |
    |---|---|
@@ -95,9 +97,9 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
    | `x86_64` | Emuladores y algunos Chromebook |
    | `universal` | Si no sabes cuál elegir (pesa más) |
 
-4. Instálalo permitiendo **“Instalar apps desconocidas”**. En Android TV puedes usar una app como *Downloader* o *Send Files to TV*.
+3. Instálalo permitiendo **“Instalar apps desconocidas”**. En Android TV puedes usar una app como *Downloader* o *Send Files to TV*.
 
-Requiere **Android 7.0 (API 24)** o superior.
+Requiere **Android 7.0 (API 24)** o superior (el motor MPV, desde Android 8.0).
 
 ### Navegador (PC, Mac, celular)
 1. Descarga el repositorio (**Code → Download ZIP**) y descomprímelo.
@@ -122,7 +124,8 @@ Threadfin o xTeVe: **[docs/SERVIDOR-PROPIO.md](docs/SERVIDOR-PROPIO.md)**.
 ### En la nube (sin instalar nada)
 Cada cambio en la rama `main` compila el APK automáticamente con **GitHub Actions**
 ([`compilar-apk.yml`](.github/workflows/compilar-apk.yml)). También puedes lanzarlo a mano desde
-**Actions → Compilar APK → Run workflow**.
+**Actions → Compilar APK → Run workflow**. El APK se publica en **Releases → versión de prueba**, y si algo
+falla el registro completo queda en la rama `build-logs`.
 
 ### En tu computador
 ```bash
@@ -144,7 +147,7 @@ npm test
 
 | Parte | Tecnología |
 |---|---|
-| Android | Kotlin 2.1, Jetpack Compose, Gradle 8.11 / AGP 8.7 |
+| Android | Kotlin 2.1, Jetpack Compose, Gradle 8.13 / AGP 8.11, SDK 36 |
 | Reproducción Android | Media3 ExoPlayer, LibVLC, libmpv |
 | Red e imágenes | OkHttp, Coil |
 | Web | JavaScript (módulos ES) sin frameworks, PWA |
@@ -156,7 +159,8 @@ npm test
 android/   App nativa para Android y Android TV (Kotlin + Compose)
 web/       App web / PWA, servidor local en Node.js y archivos Docker
 web/deploy Ejemplos de servicio systemd, Caddy y nginx
-docs/      Guía de uso e instalación en servidor propio
+docs/      Guía de uso e instalación en servidor propio (español e inglés)
+i18n/      Diccionario español → inglés compartido por la web y Android
 .github/   Compilación automática del APK
 ```
 
@@ -169,6 +173,9 @@ un **pull request** con tus mejoras. Te pedimos mantener el enfoque del proyecto
 neutral, sin contenido incluido** (no se aceptan listas, enlaces a canales ni credenciales).
 
 Al reportar un problema con un canal, **no publiques tu usuario, contraseña ni la URL completa de tu lista**.
+
+**Traducciones:** los textos en inglés están en [`i18n/en.json`](i18n/en.json). Corrige o agrega una frase ahí y
+ejecuta `node i18n/build.mjs` para actualizar la web y Android.
 
 ---
 

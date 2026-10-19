@@ -1,5 +1,7 @@
 package cl.iptv.player.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -88,7 +90,7 @@ fun WelcomeScreen(vm: AppViewModel) {
                     )
                 }
                 if (vm.source != null && !narrow) Pill("‹ Volver al menú") { vm.showWelcome = false }
-                RoundButton(androidx.compose.material.icons.Icons.Filled.Settings, "Ajustes", size = if (narrow) 48 else 58) { vm.showSettings = true }
+                RoundButton(Icons.Filled.Settings, "Ajustes", size = if (narrow) 48 else 58) { vm.showSettings = true }
             }
 
             // Opciones para añadir

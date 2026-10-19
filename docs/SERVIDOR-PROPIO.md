@@ -1,6 +1,6 @@
 # 🖥️ Instalar Vibe IPTV en tu propio servidor
 
-> Volver al [README](../README.md) · [Guía de uso](GUIA.md)
+> Volver al [README](../README.md) · [Guía de uso](GUIA.md) · 🇬🇧 [English](SELF-HOSTING.md)
 
 Esta guía es para quien tiene **un equipo siempre encendido**: un NAS, una Raspberry Pi, un mini PC,
 un PC con Windows o Linux, o un VPS. También sirve si tienes **tu propio servidor IPTV**
@@ -189,6 +189,7 @@ Recomendado, de más a menos seguro:
 | `VIBE_PASSWORD` | Contraseña de acceso (cualquier usuario + esta clave) | sin contraseña |
 | `FFMPEG_PATH` | Ruta a ffmpeg si no se detecta solo | se busca automáticamente |
 | `IPTV_UA` | User-Agent con que se piden los canales | `VLC/3.0.21 LibVLC/3.0.21` |
+| `VIBE_LANG` | Idioma de los mensajes de la consola (`es` o `en`) | el del sistema |
 
 También acepta las opciones `--lan` (equivale a `HOST=0.0.0.0`) y `--open` (abre el navegador al iniciar).
 

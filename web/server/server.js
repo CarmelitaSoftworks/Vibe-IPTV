@@ -463,28 +463,34 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
   if (!authorized(req) && reqUrl.pathname !== '/proxy/health') {
     res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Vibe IPTV", charset="UTF-8"', 'Content-Type': 'text/plain; charset=utf-8' });
-    return res.end('Vibe IPTV: se necesita la contraseña de acceso');
+    return res.end('Vibe IPTV: se necesita la contraseña de acceso / access password required');
   }
   if (reqUrl.pathname === '/proxy' || reqUrl.pathname.startsWith('/proxy/')) return handleProxy(req, res, reqUrl);
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   serveStatic(req, res, reqUrl);
 });
 
+// Idioma de los mensajes de la consola: VIBE_LANG=es|en, o el del sistema.
+const SYS_LANG = (process.env.VIBE_LANG || process.env.LANG || Intl.DateTimeFormat().resolvedOptions().locale || 'es').toLowerCase();
+const L = (es, en) => (SYS_LANG.startsWith('es') ? es : en);
+
 if (require.main === module) {
   server.on('error', (e) => {
-    console.error(e.code === 'EADDRINUSE' ? `El puerto ${PORT} ya está en uso: ¿la app ya está abierta en otra ventana?` : e.message);
+    console.error(e.code === 'EADDRINUSE' ? L(`El puerto ${PORT} ya está en uso: ¿la app ya está abierta en otra ventana?`, `Port ${PORT} is already in use: is the app already open in another window?`) : e.message);
   });
   server.listen(PORT, HOST, () => {
-    console.log(`Vibe IPTV en http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+    console.log(`Vibe IPTV ${L('en', 'at')} http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
     if (HOST === '0.0.0.0') {
       const ips = Object.values(require('os').networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal).map((n) => n.address);
-      console.log('Desde el TV o el celular (misma red WiFi):');
+      console.log(L('Desde el TV o el celular (misma red WiFi):', 'From the TV or phone (same WiFi network):'));
       ips.forEach((ip) => console.log(`  http://${ip}:${PORT}`));
     }
-    console.log(FFMPEG ? 'Conversión de formatos (ffmpeg): activa.' : 'Conversión de formatos (ffmpeg): no instalada. Los canales con audio AC-3 o video MPEG-2 no se verán en el navegador.');
-    if (PASSWORD) console.log('Acceso protegido con contraseña (VIBE_PASSWORD).');
-    else if (HOST !== '127.0.0.1' && HOST !== 'localhost') console.log('Aviso: sin contraseña. Úsalo sólo en tu red de casa o define VIBE_PASSWORD.');
-    console.log('Deja esta ventana abierta mientras usas la app.');
+    console.log(FFMPEG ? L('Conversión de formatos (ffmpeg): activa.', 'Format conversion (ffmpeg): active.')
+      : L('Conversión de formatos (ffmpeg): no instalada. Los canales con audio AC-3 o video MPEG-2 no se verán en el navegador.',
+        'Format conversion (ffmpeg): not installed. Channels with AC-3 audio or MPEG-2 video won\'t play in the browser.'));
+    if (PASSWORD) console.log(L('Acceso protegido con contraseña (VIBE_PASSWORD).', 'Access protected with a password (VIBE_PASSWORD).'));
+    else if (HOST !== '127.0.0.1' && HOST !== 'localhost') console.log(L('Aviso: sin contraseña. Úsalo sólo en tu red de casa o define VIBE_PASSWORD.', 'Warning: no password. Use it only on your home network or set VIBE_PASSWORD.'));
+    console.log(L('Deja esta ventana abierta mientras usas la app.', 'Keep this window open while you use the app.'));
     if (process.argv.includes('--open')) {   // abre el navegador (usado por iniciar.bat)
       const url = `http://localhost:${PORT}`;
       const cmd = process.platform === 'win32' ? `start "" ${url}` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`;
