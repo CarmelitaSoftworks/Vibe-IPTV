@@ -68,6 +68,8 @@ fun MpvVideo(
     userAgent: String,
     referrer: String,
     aspect: String,
+    cacheSecs: Int = 20,
+    maxMiB: Int = 64,
     modifier: Modifier = Modifier,
     onReady: (MpvHandle) -> Unit,
     onPlaying: () -> Unit,
@@ -96,8 +98,9 @@ fun MpvVideo(
             setOptionString("ao", "audiotrack,opensles")
             setOptionString("deinterlace", "auto")                    // TV de cable entrelazada
             setOptionString("cache", "yes")
-            setOptionString("cache-secs", "20")
-            setOptionString("demuxer-max-bytes", "64MiB")
+            setOptionString("cache-secs", cacheSecs.toString())
+            setOptionString("demuxer-max-bytes", "${maxMiB}MiB")
+            setOptionString("demuxer-readahead-secs", cacheSecs.toString())
             setOptionString("network-timeout", "15")
             setOptionString("tls-verify", "no")
             setOptionString("user-agent", userAgent.ifBlank { Http.DEFAULT_UA })

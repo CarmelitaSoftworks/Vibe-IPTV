@@ -70,6 +70,12 @@ class Storage(private val ctx: Context) {
     }.getOrDefault(emptyMap())
     fun saveCatOrder(sourceId: String, m: Map<String, List<String>>) =
         prefs.edit().putString("catord_$sourceId${suffix()}", org.json.JSONObject(m.mapValues { JSONArray(it.value) }).toString()).apply()
+    /** Búfer aprendido por canal: +1 o +2 niveles para los que se cortan seguido. */
+    fun bufferBoosts(): Map<String, Int> = runCatching {
+        val o = org.json.JSONObject(prefs.getString("bufboost", "{}")!!); o.keys().asSequence().associateWith { o.getInt(it) }
+    }.getOrDefault(emptyMap())
+    fun saveBufferBoosts(m: Map<String, Int>) =
+        prefs.edit().putString("bufboost", org.json.JSONObject(m.entries.toList().takeLast(300).associate { it.key to it.value }).toString()).apply()
     fun saveRecent(sourceId: String, ids: List<String>) = prefs.edit().putString(rk(sourceId), JSONArray(ids).toString()).apply()
 
     fun profiles(): List<Profile> {
@@ -108,7 +114,7 @@ class Storage(private val ctx: Context) {
             subSize = str("subSize", d.subSize), startup = str("startup", d.startup),
             engine = str("engine", d.engine), aspect = str("aspect", d.aspect), subdlKey = str("subdlKey", ""),
             parentalPin = str("parentalPin", ""),
-            showDetails = prefs.getBoolean("showDetails", d.showDetails), hudScale = prefs.getFloat("hudScale", d.hudScale), tmdbKey = str("tmdbKey", ""),
+            showDetails = prefs.getBoolean("showDetails", d.showDetails), hudScale = prefs.getFloat("hudScale", d.hudScale), buffer = str("buffer", d.buffer), tmdbKey = str("tmdbKey", ""),
         )
     }
 
@@ -121,7 +127,7 @@ class Storage(private val ctx: Context) {
         .putInt("epgEvery", s.epgEvery).putInt("epgOffset", s.epgOffset)
         .putString("subSize", s.subSize).putString("startup", s.startup)
         .putString("engine", s.engine).putString("aspect", s.aspect).putString("subdlKey", s.subdlKey).putString("parentalPin", s.parentalPin)
-        .putBoolean("showDetails", s.showDetails).putFloat("hudScale", s.hudScale).putString("tmdbKey", s.tmdbKey)
+        .putBoolean("showDetails", s.showDetails).putFloat("hudScale", s.hudScale).putString("buffer", s.buffer).putString("tmdbKey", s.tmdbKey)
         .apply()
 
     var lastItemId: String?

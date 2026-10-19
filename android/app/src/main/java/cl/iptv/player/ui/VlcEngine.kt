@@ -67,6 +67,7 @@ fun VlcVideo(
     userAgent: String,
     referrer: String,
     aspect: String,
+    cachingMs: Int = 2500,
     modifier: Modifier = Modifier,
     onReady: (VlcHandle) -> Unit,
     onPlaying: () -> Unit,
@@ -76,7 +77,7 @@ fun VlcVideo(
     val ctx = LocalContext.current
     val libVlc = remember {
         LibVLC(ctx.applicationContext, arrayListOf(
-            "--network-caching=2500", "--live-caching=2500",
+            "--network-caching=$cachingMs", "--live-caching=$cachingMs", "--file-caching=$cachingMs",
             "--deinterlace=1", "--deinterlace-mode=yadif",   // la TV de cable suele venir entrelazada
             "--http-reconnect", "--audio-time-stretch", "--no-stats", "--avcodec-skiploopfilter=1",
         ))

@@ -170,10 +170,27 @@ fun PlayerScreen(vm: AppViewModel) {
         if (controls && panel == null) { delay(80); runCatching { playFocus.requestFocus() } }
     }
 
-    val player = remember {
-        // Búfer más generoso y velocidad fija en directo: evita cortes y saltos hacia adelante
+    // Búfer según Ajustes → Reproducción, más lo aprendido para este canal (sube solo si se corta seguido)
+    val bumpTick = remember { mutableStateOf(0) }                         // cambia cuando se sube el búfer de un canal
+    val bufLevel = remember(item.id, bumpTick.value) { vm.bufferLevel(item) }
+    val memMb = remember { (ctx.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).memoryClass }
+    val buf = cl.iptv.player.data.BufferProfile.of(bufLevel, live, memMb)
+    val rebuffers = remember { mutableStateMapOf<String, Int>() }      // veces que cada canal se quedó cargando
+    fun countRebuffer(it0: Item) {
+        val n = (rebuffers[it0.id] ?: 0) + 1
+        rebuffers[it0.id] = n
+        if (n >= 3 && it0.kind == Kind.LIVE) {
+            rebuffers[it0.id] = 0
+            if (vm.bumpBuffer(it0)) bumpTick.value++
+        }
+    }
+    val player = remember(bufLevel, live) {
+        // Búfer medido en segundos (no en megas: con canales 1080p pesados el límite en megas lo dejaba en pocos
+        // segundos) y velocidad fija en directo: evita cortes y saltos hacia adelante
         val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15_000, 60_000, 2_500, 5_000)
+            .setBufferDurationsMs(buf.minMs, buf.maxMs, buf.startMs, buf.rebufferMs)
+            .setTargetBufferBytes(buf.targetBytes)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val liveSpeed = androidx.media3.exoplayer.DefaultLivePlaybackSpeedControl.Builder()
             .setFallbackMinPlaybackSpeed(1f).setFallbackMaxPlaybackSpeed(1f)
@@ -191,7 +208,7 @@ fun PlayerScreen(vm: AppViewModel) {
     val ctl: PlaybackControl? = if (useAlt) alt else exo
 
     // Cargar el elemento actual (o recargar al añadir subtítulos conservando la posición)
-    LaunchedEffect(item.id, subtitle, playUrl, engine, reloadKey) {
+    LaunchedEffect(item.id, subtitle, playUrl, engine, reloadKey, player) {
         error = null
         if (useAlt) { player.stop(); player.clearMediaItems(); bannerUntil = System.currentTimeMillis() + 4500; return@LaunchedEffect }
         val saved = if (item.kind != Kind.LIVE) vm.resumeFor(item) else null
@@ -247,7 +264,7 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
     // Guardar dónde va cada 10 s
-    LaunchedEffect(item.id, engine) {
+    LaunchedEffect(item.id, engine, player) {
         if (live) return@LaunchedEffect
         while (true) {
             delay(10_000)
@@ -275,9 +292,15 @@ fun PlayerScreen(vm: AppViewModel) {
         delay((at - System.currentTimeMillis()).coerceAtLeast(0))
         vm.setSleep(0); vm.closePlayer()
     }
+    // Cambio de canal más rápido: resolver ya la dirección del servidor de los canales vecinos (sólo DNS, sin conectar)
+    LaunchedEffect(item.id) {
+        val hosts = listOf(-1, 1).mapNotNull { vm.playList.getOrNull((vm.playIndex + it).mod(vm.playList.size.coerceAtLeast(1))) }
+            .mapNotNull { runCatching { Uri.parse(it.url).host }.getOrNull() }.plus(Uri.parse(item.url).host).filterNotNull().distinct()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { hosts.forEach { h -> runCatching { cl.iptv.player.data.Http.dns.lookup(h) } } }
+    }
     LaunchedEffect(item.id) { vm.logEvent("Reproducir: ${item.name} [${item.kind}] ${item.url}") }
     var gestureAt by remember { mutableStateOf(0L) }
-    LaunchedEffect(item.id, engine) {
+    LaunchedEffect(item.id, engine, player) {
         val d = cl.iptv.player.data.StallDetector(firstStartMs = Long.MAX_VALUE / 4)   // el arranque lo vigila el bloque anterior
         d.reset(System.currentTimeMillis())
         while (true) {
@@ -289,7 +312,7 @@ fun PlayerScreen(vm: AppViewModel) {
             val next = when (engine) { "exo" -> "vlc"; "vlc" -> if (android.os.Build.VERSION.SDK_INT >= 26) "mpv" else null; else -> null }
             val canSwitch = vm.settings.engine == "auto" && next != null
             when (d.check(System.currentTimeMillis(), k.position, !userPaused, canSwitch)) {
-                cl.iptv.player.data.StallDetector.Action.RELOAD -> { vm.message = "La imagen se detuvo: reconectando…"; reloadKey++ }
+                cl.iptv.player.data.StallDetector.Action.RELOAD -> { vm.message = "La imagen se detuvo: reconectando…"; countRebuffer(item); reloadKey++ }
                 cl.iptv.player.data.StallDetector.Action.SWITCH_ENGINE -> switchEngine(next!!, "Se volvió a detener: probando con ${engineName[next]}…")
                 cl.iptv.player.data.StallDetector.Action.GIVE_UP -> {
                     if (engine == "exo") player.stop() else alt?.pause()
@@ -333,6 +356,8 @@ fun PlayerScreen(vm: AppViewModel) {
             override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) { started = true; error = null; liveRetries = 0 } }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) started = true
+                // Se quedó cargando en pleno directo (no al arrancar): cuenta para el búfer aprendido
+                if (state == Player.STATE_BUFFERING && started && player.playWhenReady) countRebuffer(currentItem)
                 // Siguiente episodio automático (Ajustes → Rápido)
                 val cur = vm.playing
                 if (state == Player.STATE_ENDED && vm.settings.autoNext && cur != null && cur.episode > 0 &&
@@ -347,7 +372,7 @@ fun PlayerScreen(vm: AppViewModel) {
     }
 
     // Al salir del elemento (otro canal o volver al menú): guardar dónde quedó
-    DisposableEffect(item.id, engine) {
+    DisposableEffect(item.id, engine, player) {
         onDispose {
             // Sólo ExoPlayer: VLC y MPV ya se cerraron a esta altura (su posición se guarda cada 10 s)
             if (!live && !useAlt) runCatching { vm.savePosition(item, exo.position, exo.duration) }
@@ -374,7 +399,7 @@ fun PlayerScreen(vm: AppViewModel) {
 
     // Pausar en segundo plano (salvo en PiP)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle) {
+    DisposableEffect(lifecycle, player) {
         var wasPlaying = false
         val obs = LifecycleEventObserver { _, ev ->
             when (ev) {
@@ -389,7 +414,7 @@ fun PlayerScreen(vm: AppViewModel) {
 
     // Mando a distancia. Con los controles a la vista, ▲▼◄► y OK se mueven entre los botones;
     // ocultos: ▲▼ cambia de canal (en vivo), ◄► avanza o retrocede, OK muestra los controles.
-    DisposableEffect(item.id, engine) {
+    DisposableEffect(item.id, engine, player) {
         activity.keyInterceptor = handler@{ ev ->
             val code = ev.keyCode
             val down = ev.action == KeyEvent.ACTION_DOWN
@@ -518,9 +543,9 @@ fun PlayerScreen(vm: AppViewModel) {
             if (vm.settings.autoNext && cur != null && cur.episode > 0 && vm.playIndex < vm.playList.size - 1) vm.zap(1)
         }
         if (engine == "vlc") {
-            key(item.id, "vlc", playUrl, reloadKey) {
+            key(item.id, "vlc", playUrl, reloadKey, bufLevel) {
                 VlcVideo(
-                    url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
+                    url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect, cachingMs = buf.vlcCachingMs,
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
                     onPlaying = { started = true; error = null },
@@ -531,9 +556,10 @@ fun PlayerScreen(vm: AppViewModel) {
             }
             DisposableEffect(Unit) { onDispose { alt = null } }
         } else if (engine == "mpv") {
-            key(item.id, "mpv", playUrl, reloadKey) {
+            key(item.id, "mpv", playUrl, reloadKey, bufLevel) {
                 MpvVideo(
                     url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
+                    cacheSecs = buf.mpvSecs, maxMiB = buf.mpvMaxMiB,
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
                     onPlaying = { started = true; error = null },
@@ -554,7 +580,7 @@ fun PlayerScreen(vm: AppViewModel) {
                     setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                 }
             },
-            update = { v -> v.resizeMode = resize },
+            update = { v -> v.resizeMode = resize; if (v.player !== player) v.player = player },
         )
 
         // Tocar la imagen muestra u oculta los controles.
@@ -563,7 +589,7 @@ fun PlayerScreen(vm: AppViewModel) {
         val maxVol = remember { audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(live, engine) {
+                .pointerInput(live, engine, player) {
                     val tap: (androidx.compose.ui.geometry.Offset) -> Unit = { if (panel != null) panel = null else if (controls) controls = false else poke() }
                     if (live) detectTapGestures(onTap = tap)
                     // Películas y series: doble toque a la izquierda / derecha = −10 s / +10 s

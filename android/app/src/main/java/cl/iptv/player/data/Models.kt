@@ -79,6 +79,8 @@ data class Settings(
     val showDetails: Boolean = true,
     /** Tamaño de los controles del reproductor (0.7 = 70 %, 1.5 = 150 %). */
     val hudScale: Float = 1f,
+    /** Búfer: fast (cambia de canal antes) | balanced | stable (aguanta mejor los cortes). */
+    val buffer: String = "balanced",
     val tmdbKey: String = "",
     // Rápido
     val showNumbers: Boolean = true,

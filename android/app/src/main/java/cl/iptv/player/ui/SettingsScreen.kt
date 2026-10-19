@@ -80,6 +80,9 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
         Section("play", "Reproducción", SecIcon.PLAY, listOf(
             Row.Slider("Tamaño de los controles del reproductor", "Botones, textos y paneles del reproductor (HUD)",
                 min = 0.7f, max = 1.5f, step = 0.05f, format = { "${Math.round(it * 100)} %" }, get = { it.hudScale }, set = { s, v -> s.copy(hudScale = v) }),
+            Row.Choice("Búfer", "Cuánto video se carga por adelantado. Si un canal se corta seguido, la app le sube el búfer sola",
+                listOf("fast" to "Rápido: cambia de canal antes", "balanced" to "Equilibrado (recomendado)", "stable" to "Estable: para proveedores que se cortan"),
+                get = { it.buffer }, set = { s, v -> s.copy(buffer = v) }),
             Row.Choice("Motor de reproducción", "VLC reproduce el audio AC-3 / MP2 y el video MPEG-2 de la TV de cable",
                 listOf("auto" to "Automático: ExoPlayer, y VLC o MPV si hace falta", "exo" to "ExoPlayer", "vlc" to "VLC siempre", "mpv" to "MPV siempre"),
                 { it.engine }, { s, v -> s.copy(engine = v) }),
@@ -123,6 +126,7 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Danger("Borrar \"Seguir viendo\"", "Olvida dónde quedaste en películas y series de esta lista") { vm.clearResume() },
             Row.Danger("Borrar guías guardadas", "Se vuelven a descargar al abrir cada lista") { vm.clearEpgCache() },
             Row.Danger("Borrar favoritos de esta lista") { vm.clearFavorites() },
+            Row.Danger("Olvidar búfer aprendido", "Vuelve al búfer elegido en todos los canales") { vm.forgetBufferBoosts() },
             Row.Danger("Restablecer ajustes", "Vuelve a los valores de fábrica (no borra tus listas)") { vm.resetSettings() },
         )),
         Section("about", "Acerca de", SecIcon.ABOUT, listOf(

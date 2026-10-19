@@ -691,6 +691,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun resetSettings() { updateSettings(Settings()); message = "Ajustes restablecidos" }
 
+    // ---------- Búfer (Ajustes → Reproducción) y búfer aprendido por canal ----------
+    var bufferBoosts by mutableStateOf(store.bufferBoosts()); private set
+    fun bufferLevel(item: Item): Int =
+        (BufferProfile.levelOf(settings.buffer) + (bufferBoosts[item.id] ?: 0)).coerceAtMost(3)
+    /** El canal se quedó cargando varias veces: subir su búfer y recordarlo. */
+    fun bumpBuffer(item: Item): Boolean {
+        val cur = bufferBoosts[item.id] ?: 0
+        if (cur >= 2 || bufferLevel(item) >= 3) return false
+        bufferBoosts = (bufferBoosts - item.id) + (item.id to cur + 1)
+        store.saveBufferBoosts(bufferBoosts)
+        logEvent("Búfer aumentado para ${item.name} (+${cur + 1})")
+        message = "Este canal se corta seguido: aumentando el búfer"
+        return true
+    }
+    fun forgetBufferBoosts() { bufferBoosts = emptyMap(); store.saveBufferBoosts(bufferBoosts); message = "Búfer aprendido borrado" }
+
     // ---------- SubDL ----------
     var subdlStatus by mutableStateOf(""); private set
     fun checkSubdl() {
