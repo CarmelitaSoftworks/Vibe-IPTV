@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.view.KeyEvent
-import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,17 +14,15 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -124,7 +121,6 @@ fun PlayerScreen(vm: AppViewModel) {
     val c = LocalIptv.current
     val item = vm.playing ?: return
 
-    var controllerVisible by remember { mutableStateOf(true) }
     var bannerUntil by remember { mutableStateOf(0L) }
     var error by remember { mutableStateOf<String?>(null) }
     var subtitle by remember(item.id) { mutableStateOf<File?>(null) }
@@ -140,8 +136,9 @@ fun PlayerScreen(vm: AppViewModel) {
         else -> if (item.kind == Kind.LIVE) vm.preferLiveEngine ?: "exo" else "exo"
     }
     val engine = engineFor?.takeIf { it.first == item.id }?.second ?: defaultEngine
-    val useVlc = engine != "exo"          // motor alternativo (VLC o MPV) en vez de ExoPlayer
-    var vlc by remember { mutableStateOf<AltEngine?>(null) }
+    val useAlt = engine != "exo"          // motor alternativo (VLC o MPV) en vez de ExoPlayer
+    var alt by remember { mutableStateOf<AltEngine?>(null) }
+    var reloadKey by remember { mutableStateOf(0) }
     var liveRetries by remember { mutableStateOf(0) }
     fun switchEngine(to: String, reason: String) {
         val it0 = currentItem
@@ -150,12 +147,22 @@ fun PlayerScreen(vm: AppViewModel) {
         if (it0.kind == Kind.LIVE) vm.preferLiveEngine = to
         vm.message = reason
     }
-    fun switchToVlc(reason: String) = switchEngine("vlc", reason)
     val engineName = mapOf("exo" to "ExoPlayer", "vlc" to "VLC", "mpv" to "MPV")
-    var showOptions by remember { mutableStateOf(false) }
     var showSubs by remember { mutableStateOf(false) }
-    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    var panel by remember { mutableStateOf<PAction?>(null) }
     val live = item.kind == Kind.LIVE
+
+    // Controles en pantalla: se muestran al tocar o con cualquier tecla y se ocultan solos
+    var controls by remember { mutableStateOf(true) }
+    var lastTouch by remember { mutableStateOf(System.currentTimeMillis()) }
+    val playFocus = remember { FocusRequester() }
+    fun poke() { lastTouch = System.currentTimeMillis(); if (!controls) controls = true }
+    LaunchedEffect(lastTouch, panel, controls, error) {
+        if (controls && panel == null && error == null) { delay(5000); controls = false }
+    }
+    LaunchedEffect(controls, panel) {
+        if (controls && panel == null) { delay(80); runCatching { playFocus.requestFocus() } }
+    }
 
     val player = remember {
         // Búfer más generoso y velocidad fija en directo: evita cortes y saltos hacia adelante
@@ -165,16 +172,22 @@ fun PlayerScreen(vm: AppViewModel) {
         val liveSpeed = androidx.media3.exoplayer.DefaultLivePlaybackSpeedControl.Builder()
             .setFallbackMinPlaybackSpeed(1f).setFallbackMaxPlaybackSpeed(1f)
             .build()
-        ExoPlayer.Builder(ctx).setLoadControl(load).setLivePlaybackSpeedControl(liveSpeed).build().apply {
+        // Decodificador FFmpeg incluido: audio AC-3 / E-AC-3 / DTS aunque el equipo no lo traiga
+        val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(ctx)
+            .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setEnableDecoderFallback(true)
+        ExoPlayer.Builder(ctx, renderers).setLoadControl(load).setLivePlaybackSpeedControl(liveSpeed).build().apply {
             playWhenReady = true
             setHandleAudioBecomingNoisy(true)
         }
     }
+    val exo = remember(player) { ExoControl(player) }
+    val ctl: PlaybackControl? = if (useAlt) alt else exo
 
     // Cargar el elemento actual (o recargar al añadir subtítulos conservando la posición)
-    LaunchedEffect(item.id, subtitle, playUrl, engine) {
+    LaunchedEffect(item.id, subtitle, playUrl, engine, reloadKey) {
         error = null
-        if (useVlc) { player.stop(); player.clearMediaItems(); bannerUntil = System.currentTimeMillis() + 4500; return@LaunchedEffect }
+        if (useAlt) { player.stop(); player.clearMediaItems(); bannerUntil = System.currentTimeMillis() + 4500; return@LaunchedEffect }
         val pos = if (subtitle != null && player.currentMediaItem?.mediaId == item.id) player.currentPosition else C.TIME_UNSET
         val http = OkHttpDataSource.Factory(Http.client)
             .setUserAgent(item.userAgent.ifBlank { Http.DEFAULT_UA })
@@ -186,6 +199,8 @@ fun PlayerScreen(vm: AppViewModel) {
         player.play()
         bannerUntil = System.currentTimeMillis() + 4500
     }
+    // Subtítulo externo en VLC / MPV
+    LaunchedEffect(subtitle, alt) { val f = subtitle; if (useAlt && f != null) runCatching { alt?.addExternalSubtitle(f) } }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -202,17 +217,17 @@ fun PlayerScreen(vm: AppViewModel) {
                     return
                 }
                 if (altFormat(it0.url) != null && altFor != it0.id) { altFor = it0.id; return }   // probar el otro formato del canal
-                if (vm.settings.engine == "auto") { switchToVlc("Probando con el motor VLC…"); return }
+                if (vm.settings.engine == "auto") { switchEngine("vlc", "Probando con el motor VLC…"); return }
                 error = errorText(e)
             }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                // Audio AC-3 / MP2 o video MPEG-2 sin decodificador en el equipo: pasar a VLC
+                // Sin decodificador para el video (MPEG-2, etc.) ni con FFmpeg: pasar a VLC
                 if (vm.settings.engine != "auto") return
                 val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                 val video = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
                 val badAudio = audio.isNotEmpty() && audio.none { it.isSupported }
                 val badVideo = video.isNotEmpty() && video.none { it.isSupported }
-                if (badAudio || badVideo) switchToVlc(if (badVideo) "Video no compatible con este equipo: usando VLC" else "Audio no compatible con este equipo: usando VLC")
+                if (badAudio || badVideo) switchEngine("vlc", if (badVideo) "Video no compatible con este equipo: usando VLC" else "Audio no compatible con este equipo: usando VLC")
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) { error = null; liveRetries = 0 } }
             override fun onPlaybackStateChanged(state: Int) {
@@ -232,14 +247,14 @@ fun PlayerScreen(vm: AppViewModel) {
     // Pantalla completa inmersiva + horizontal en teléfonos; PiP al salir con el botón Inicio
     DisposableEffect(Unit) {
         val win = activity.window
-        val ctl = WindowCompat.getInsetsController(win, win.decorView)
-        ctl.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        ctl.hide(WindowInsetsCompat.Type.systemBars())
+        val wc = WindowCompat.getInsetsController(win, win.decorView)
+        wc.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        wc.hide(WindowInsetsCompat.Type.systemBars())
         val prevOrientation = activity.requestedOrientation
         if (!activity.isTv) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         activity.pipEnabled = true
         onDispose {
-            ctl.show(WindowInsetsCompat.Type.systemBars())
+            wc.show(WindowInsetsCompat.Type.systemBars())
             activity.requestedOrientation = prevOrientation
             activity.pipEnabled = false
         }
@@ -251,8 +266,8 @@ fun PlayerScreen(vm: AppViewModel) {
         var wasPlaying = false
         val obs = LifecycleEventObserver { _, ev ->
             when (ev) {
-                Lifecycle.Event.ON_STOP -> { wasPlaying = player.playWhenReady || vlc?.isPlaying == true; player.pause(); vlc?.pause() }
-                Lifecycle.Event.ON_START -> if (wasPlaying) { if (vlc != null) vlc?.resume() else player.play() }
+                Lifecycle.Event.ON_STOP -> { wasPlaying = player.playWhenReady || alt?.isPlaying == true; player.pause(); alt?.pause() }
+                Lifecycle.Event.ON_START -> if (wasPlaying) { if (alt != null) alt?.resume() else player.play() }
                 else -> Unit
             }
         }
@@ -260,68 +275,49 @@ fun PlayerScreen(vm: AppViewModel) {
         onDispose { lifecycle.removeObserver(obs) }
     }
 
-    // Mando a distancia: zapping, avance/retroceso, menú de opciones
-    DisposableEffect(item.id, controllerVisible, engine) {
+    // Mando a distancia. Con los controles a la vista, ▲▼◄► y OK se mueven entre los botones;
+    // ocultos: ▲▼ cambia de canal (en vivo), ◄► avanza o retrocede, OK muestra los controles.
+    DisposableEffect(item.id, engine) {
         activity.keyInterceptor = handler@{ ev ->
             val code = ev.keyCode
-            if (useVlc) {
-                // Motor VLC: controles propios con el mando
-                val down = ev.action == KeyEvent.ACTION_DOWN
-                return@handler when (code) {
-                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> {
-                        if (down) { vlc?.togglePause(); bannerUntil = System.currentTimeMillis() + 4000 }; true
-                    }
-                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                        if (down) { if (live) vm.zap(if (code == KeyEvent.KEYCODE_DPAD_UP) -1 else 1) else { bannerUntil = System.currentTimeMillis() + 4000 } }; true
-                    }
-                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                        if (down && !live) { vlc?.seekBy(if (code == KeyEvent.KEYCODE_DPAD_LEFT) -10_000 else 10_000); bannerUntil = System.currentTimeMillis() + 3000 }
-                        !live
-                    }
-                    KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> { if (down) vm.zap(1); true }
-                    KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> { if (down) vm.zap(-1); true }
-                    KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BOOKMARK -> { if (ev.action == KeyEvent.ACTION_UP) showOptions = true; true }
-                    KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE -> { if (down) bannerUntil = System.currentTimeMillis() + 5000; true }
-                    else -> false
+            val down = ev.action == KeyEvent.ACTION_DOWN
+            when (code) {
+                KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> { if (down) vm.zap(1); return@handler true }
+                KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> { if (down) vm.zap(-1); return@handler true }
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                    if (down) { ctlOf(useAlt, alt, exo)?.togglePause(); poke() }; return@handler true
                 }
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { if (down && !live) { ctlOf(useAlt, alt, exo)?.seekBy(30_000); poke() }; return@handler true }
+                KeyEvent.KEYCODE_MEDIA_REWIND -> { if (down && !live) { ctlOf(useAlt, alt, exo)?.seekBy(-10_000); poke() }; return@handler true }
+                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BOOKMARK -> { if (ev.action == KeyEvent.ACTION_UP) { panel = null; poke() }; return@handler true }
+                KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE -> { if (down) { bannerUntil = System.currentTimeMillis() + 5000; poke() }; return@handler true }
+                KeyEvent.KEYCODE_CAPTIONS -> { if (down) { poke(); panel = PAction.SUBS }; return@handler true }
             }
-            val handled = when (code) {
-                KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> { if (ev.action == KeyEvent.ACTION_DOWN) vm.zap(1); true }
-                KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> { if (ev.action == KeyEvent.ACTION_DOWN) vm.zap(-1); true }
-                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BOOKMARK -> { if (ev.action == KeyEvent.ACTION_UP) showOptions = true; true }
-                KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE -> {
-                    if (ev.action == KeyEvent.ACTION_DOWN) { bannerUntil = System.currentTimeMillis() + 5000; playerView?.showController() }
-                    true
-                }
+            if (controls || panel != null) { if (down) lastTouch = System.currentTimeMillis(); return@handler false }
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_SPACE -> { if (down) poke(); true }
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (controllerVisible) false
-                    else {
-                        if (ev.action == KeyEvent.ACTION_DOWN) {
-                            if (live) vm.zap(if (code == KeyEvent.KEYCODE_DPAD_UP) -1 else 1) else playerView?.showController()
-                        }
-                        true
-                    }
+                    if (down) { if (live) vm.zap(if (code == KeyEvent.KEYCODE_DPAD_UP) -1 else 1) else poke() }; true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (controllerVisible || live) false
-                    else {
-                        if (ev.action == KeyEvent.ACTION_DOWN) {
-                            val d = if (code == KeyEvent.KEYCODE_DPAD_LEFT) -10_000 else 10_000
-                            player.seekTo((player.currentPosition + d).coerceAtLeast(0))
-                            playerView?.showController()
-                        }
-                        true
+                    if (down) {
+                        if (live) poke()
+                        else { ctlOf(useAlt, alt, exo)?.seekBy(if (code == KeyEvent.KEYCODE_DPAD_LEFT) -10_000 else 10_000); poke() }
                     }
+                    true
                 }
                 else -> false
             }
-            handled
         }
         onDispose { activity.keyInterceptor = null }
     }
 
     BackHandler {
-        if (!useVlc && controllerVisible && playerView != null) playerView?.hideController() else vm.closePlayer()
+        when {
+            panel != null -> panel = null
+            controls && error == null -> controls = false
+            else -> vm.closePlayer()
+        }
     }
 
     val subsPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -340,6 +336,7 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
 
+    /** Abre el canal en la app VLC instalada (opcional: Vibe IPTV ya trae VLC por dentro). */
     fun openInVlc() {
         val i = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(Uri.parse(item.url), "video/*")
@@ -347,17 +344,38 @@ fun PlayerScreen(vm: AppViewModel) {
             putExtra("title", item.name)
             subtitle?.let { putExtra("subtitles_location", it.absolutePath) }
         }
-        try { player.pause(); vlc?.pause(); ctx.startActivity(i) }
+        try { player.pause(); alt?.pause(); ctx.startActivity(i) }
         catch (e: ActivityNotFoundException) {
             try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=org.videolan.vlc"))) }
             catch (e2: ActivityNotFoundException) { vm.message = "VLC no está instalado" }
         }
     }
 
+    fun onAction(a: PAction) {
+        poke()
+        val k = ctl
+        when (a) {
+            PAction.BACK -> vm.closePlayer()
+            PAction.PREV -> vm.zap(-1)
+            PAction.NEXT -> vm.zap(1)
+            PAction.REW -> k?.seekBy(-10_000)
+            PAction.FWD -> k?.seekBy(10_000)
+            PAction.PLAY -> k?.togglePause()
+            PAction.FAV -> {
+                val wasFav = item.id in vm.favorites
+                vm.toggleFavorite(item)
+                vm.message = if (wasFav) "${item.name} quitado de favoritos" else "★ ${item.name} añadido a favoritos"
+            }
+            PAction.PIP -> { if (!activity.enterPip()) vm.message = "Este equipo no permite imagen en imagen" }
+            PAction.EXTERNAL -> openInVlc()
+            else -> panel = a
+        }
+    }
+
     // Reloj para el banner
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
-    val showBanner = !activity.inPip && ((!useVlc && controllerVisible) || now < bannerUntil || error != null)
+    val showBanner = !activity.inPip && (controls || now < bannerUntil || error != null)
     val resize = when (vm.settings.aspect) {
         "fill", "zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -370,64 +388,57 @@ fun PlayerScreen(vm: AppViewModel) {
             if (vm.settings.autoNext && cur != null && cur.episode > 0 && vm.playIndex < vm.playList.size - 1) vm.zap(1)
         }
         if (engine == "vlc") {
-            key(item.id, "vlc") {
+            key(item.id, "vlc", playUrl, reloadKey) {
                 VlcVideo(
                     url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
                     modifier = Modifier.fillMaxSize(),
-                    onReady = { vlc = it },
+                    onReady = { alt = it },
                     onPlaying = { error = null },
                     // VLC tampoco pudo: en automático, último intento con MPV
                     onError = { msg -> if (vm.settings.engine == "auto" && android.os.Build.VERSION.SDK_INT >= 26) switchEngine("mpv", "Probando con el motor MPV…") else { error = msg } },
                     onEnded = onAltEnded,
                 )
             }
-            DisposableEffect(Unit) { onDispose { vlc = null } }
+            DisposableEffect(Unit) { onDispose { alt = null } }
         } else if (engine == "mpv") {
-            key(item.id, "mpv") {
+            key(item.id, "mpv", playUrl, reloadKey) {
                 MpvVideo(
                     url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
                     modifier = Modifier.fillMaxSize(),
-                    onReady = { vlc = it },
+                    onReady = { alt = it },
                     onPlaying = { error = null },
                     onError = { error = it },
                     onEnded = onAltEnded,
                 )
             }
-            DisposableEffect(Unit) { onDispose { vlc = null } }
+            DisposableEffect(Unit) { onDispose { alt = null } }
         } else AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
                 PlayerView(context).apply {
                     this.player = player
-                    useController = true
-                    controllerShowTimeoutMs = 4000
-                    controllerHideOnTouch = true
-                    setShowSubtitleButton(true)       // pistas de subtítulos internas (CC)
-                    setShowNextButton(false)
-                    setShowPreviousButton(false)
-                    setShowFastForwardButton(!live)
-                    setShowRewindButton(!live)
+                    useController = false                 // los controles son los de Vibe IPTV (iguales en los tres motores)
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     subtitleView?.setFractionalTextSize(androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale(vm.settings.subSize))
                     keepScreenOn = true
-                    setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v -> controllerVisible = v == View.VISIBLE })
-                    isFocusable = true
-                    requestFocus()
-                    playerView = this
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                 }
             },
-            update = { v ->
-                v.setShowFastForwardButton(!live)
-                v.setShowRewindButton(!live)
-                v.resizeMode = resize
-            },
+            update = { v -> v.resizeMode = resize },
+        )
+
+        // Tocar la imagen muestra u oculta los controles
+        Box(
+            Modifier.fillMaxSize().clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null,
+            ) { if (panel != null) panel = null else if (controls) controls = false else poke() },
         )
 
         AnimatedVisibility(showBanner, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
             Row(
                 Modifier.fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
-                    .padding(start = 24.dp, end = 12.dp, top = 16.dp, bottom = 36.dp),
+                    .padding(start = 24.dp, end = 20.dp, top = 16.dp, bottom = 36.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 if (item.logo.isNotBlank()) {
@@ -454,53 +465,80 @@ fun PlayerScreen(vm: AppViewModel) {
                         }
                         next?.let { Text("Luego: ${it.title} · ${fmtTime(it.start + sh)}", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, maxLines = 1) }
                     }
-                    error?.let {
-                        Spacer(Modifier.height(6.dp))
-                        Text("⚠ $it", color = Color(0xFFFFB4A9), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    }
                 }
                 Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(horizontal = 8.dp)) {
                     Text(fmtTime(now), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                     Text("Motor: ${engineName[engine]}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
                 }
-                IconButton(onClick = { showOptions = true }) { Icon(Icons.Filled.MoreVert, "Opciones", tint = Color.White) }
             }
         }
-    }
 
-    if (showOptions) {
-        Sheet("Opciones", onDismiss = { showOptions = false }) {
-            val fav = item.id in vm.favorites
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ActionButton(if (fav) "★ Quitar de favoritos" else "☆ Añadir a favoritos", Modifier.fillMaxWidth()) { vm.toggleFavorite(item); showOptions = false }
-                ActionButton("Subtítulos (OpenSubtitles / archivo)", Modifier.fillMaxWidth()) { showOptions = false; showSubs = true }
-                // Cambiar de motor para este canal: ExoPlayer → VLC → MPV → ExoPlayer
-                val nextEngine = when (engine) { "exo" -> "vlc"; "vlc" -> "mpv"; else -> "exo" }
-                ActionButton("Motor: ${engineName[engine]} · cambiar a ${engineName[nextEngine]}", Modifier.fillMaxWidth(), ghost = true) {
-                    engineFor = item.id to nextEngine; showOptions = false
+        // Error: qué pasó y qué se puede hacer, sin salir del reproductor
+        error?.let { msg ->
+            Column(
+                Modifier.align(Alignment.Center).widthIn(max = 520.dp).padding(24.dp).clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xF0161A1D)).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("No se pudo reproducir", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                Text(msg, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ActionButton("Reintentar") { error = null; altFor = null; reloadKey++ }
+                    val other = if (engine == "vlc") "mpv" else if (engine == "mpv") "exo" else "vlc"
+                    if (other != "mpv" || android.os.Build.VERSION.SDK_INT >= 26)
+                        ActionButton("Probar con ${engineName[other]}", ghost = true) { error = null; engineFor = item.id to other }
                 }
-                val aspects = listOf("fit" to "Ajustar", "fill" to "Rellenar", "stretch" to "Estirar", "zoom" to "Zoom")
-                val ai = aspects.indexOfFirst { it.first == vm.settings.aspect }.coerceAtLeast(0)
-                ActionButton("Formato de pantalla: ${aspects[ai].second}", Modifier.fillMaxWidth(), ghost = true) {
-                    vm.updateSettings(vm.settings.copy(aspect = aspects[(ai + 1) % aspects.size].first))
-                }
-                val tracks = vlc?.audioTracks().orEmpty()
-                if (useVlc && tracks.size > 1) {
-                    val ti = tracks.indexOfFirst { it.first == vlc?.audioTrack }.coerceAtLeast(0)
-                    ActionButton("Audio: ${tracks[ti].second}", Modifier.fillMaxWidth(), ghost = true) {
-                        vlc?.audioTrack = tracks[(ti + 1) % tracks.size].first
-                        showOptions = false; vm.message = "Audio: ${tracks[(ti + 1) % tracks.size].second}"
-                    }
-                }
-                ActionButton("Abrir en la app VLC", Modifier.fillMaxWidth(), ghost = true) { showOptions = false; openInVlc() }
-                if (vm.playList.size > 1) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ActionButton("‹ Anterior", Modifier.weight(1f), ghost = true) { vm.zap(-1); showOptions = false }
-                    ActionButton("Siguiente ›", Modifier.weight(1f), ghost = true) { vm.zap(1); showOptions = false }
-                }
-                ActionButton("Volver al menú", Modifier.fillMaxWidth(), ghost = true) { showOptions = false; vm.closePlayer() }
             }
-            Spacer(Modifier.height(8.dp))
-            Text("Consejo: en el control, ▲/▼ cambia de canal, OK pausa y MENÚ abre estas opciones. Con ExoPlayer, las pistas de audio y subtítulos se eligen en los controles.", color = c.inkSoft, fontSize = 12.sp)
+        }
+
+        AnimatedVisibility(controls && !activity.inPip, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+            PlayerControlsBar(
+                ctl = ctl, live = live, hasList = vm.playList.size > 1, fav = item.id in vm.favorites,
+                showQuality = !useAlt && exo.qualities().isNotEmpty(),
+                playFocus = playFocus, onAction = ::onAction, onInteract = { lastTouch = System.currentTimeMillis() },
+            )
+        }
+
+        // Paneles laterales de opciones
+        panel?.let { p ->
+            val k = ctl
+            val rows: List<PanelRow> = when (p) {
+                PAction.LIST -> vm.playList.mapIndexed { i, it ->
+                    val cur = if (it.kind == Kind.LIVE) vm.epg.nowNext(it, now - vm.epgShift).first else null
+                    PanelRow((it.num?.let { n -> "$n · " } ?: "") + it.name, i == vm.playIndex, cur?.title.orEmpty()) { vm.playAt(i); panel = null }
+                }
+                PAction.AUDIO -> k?.audioTracks().orEmpty().map { t -> PanelRow(t.label, t.selected) { k?.selectAudio(t.id); panel = null } }
+                PAction.SUBS -> buildList {
+                    val tracks = k?.subtitleTracks().orEmpty()
+                    add(PanelRow("Desactivados", tracks.none { it.selected } && subtitle == null) { k?.selectSubtitle(null); subtitle = null; panel = null })
+                    tracks.forEach { t -> add(PanelRow(t.label, t.selected) { k?.selectSubtitle(t.id); panel = null }) }
+                    add(PanelRow("Buscar subtítulos…", detail = "OpenSubtitles · SubDL · Podnapisi") { panel = null; showSubs = true })
+                    add(PanelRow("Cargar archivo .srt / .vtt / .ass") {
+                        panel = null
+                        try { subsPicker.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }
+                    })
+                }
+                PAction.QUALITY -> buildList {
+                    add(PanelRow("Automática", !exo.qualityLocked) { exo.selectQuality(null); panel = null })
+                    exo.qualities().forEach { q -> add(PanelRow(q.label, exo.qualityLocked && q.selected) { exo.selectQuality(q.id); panel = null }) }
+                }
+                PAction.ASPECT -> listOf("fit" to "Ajustar (sin recortar)", "fill" to "Rellenar pantalla", "stretch" to "Estirar", "zoom" to "Zoom").map { (id, name) ->
+                    PanelRow(name, vm.settings.aspect == id) { vm.updateSettings(vm.settings.copy(aspect = id)); panel = null }
+                }
+                PAction.SPEED -> listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).map { v ->
+                    PanelRow(if (v == 1f) "Normal" else "${v}×".replace(".0×", "×"), kotlin.math.abs((k?.speed ?: 1f) - v) < 0.01f) { k?.speed = v; panel = null }
+                }
+                PAction.ENGINE -> buildList {
+                    add(PanelRow("ExoPlayer", engine == "exo", "Rápido y liviano; con FFmpeg para audio AC-3") { engineFor = item.id to "exo"; panel = null })
+                    add(PanelRow("VLC", engine == "vlc", "TV de cable: MPEG-2, AC-3, MP2 (incluido en la app)") { engineFor = item.id to "vlc"; panel = null })
+                    if (android.os.Build.VERSION.SDK_INT >= 26)
+                        add(PanelRow("MPV", engine == "mpv", "Casi cualquier formato, buena tolerancia a cortes") { engineFor = item.id to "mpv"; panel = null })
+                }
+                PAction.INFO -> (listOf("Motor" to engineName[engine].orEmpty()) + k?.info().orEmpty() +
+                    listOfNotNull(Uri.parse(playUrl).host?.let { "Servidor del canal" to it })).map { (l, v) -> PanelRow(l, detail = v) {} }
+                else -> emptyList()
+            }
+            PlayerSidePanel(p.label, rows, onClose = { panel = null }, modifier = Modifier.align(Alignment.CenterEnd))
         }
     }
 
@@ -512,6 +550,8 @@ fun PlayerScreen(vm: AppViewModel) {
         onDismiss = { showSubs = false },
     )
 }
+
+private fun ctlOf(useAlt: Boolean, alt: AltEngine?, exo: ExoControl): PlaybackControl? = if (useAlt) alt else exo
 
 @Composable
 private fun SubtitlesDialog(

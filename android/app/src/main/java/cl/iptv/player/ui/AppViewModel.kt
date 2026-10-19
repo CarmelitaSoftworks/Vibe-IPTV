@@ -339,6 +339,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         screen = Screen.PLAYER
     }
 
+    /** Ir directo a un elemento de la lista que se está reproduciendo (lista de canales en el reproductor). */
+    fun playAt(index: Int) {
+        if (index !in playList.indices) return
+        playIndex = index
+        playing?.let { store.lastItemId = it.id }
+    }
+
     fun zap(delta: Int) {
         if (playList.size < 2) return
         playIndex = (playIndex + delta).mod(playList.size)

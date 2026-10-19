@@ -17,23 +17,41 @@ import dev.jdtech.mpv.MPVLib
  */
 class MpvHandle(private val mpv: MPVLib) : AltEngine {
     override val isPlaying get() = mpv.getPropertyBoolean("pause") == false && mpv.getPropertyBoolean("idle-active") != true
+    override val position get() = ((mpv.getPropertyDouble("time-pos") ?: 0.0) * 1000).toLong()
+    override val duration get() = if (mpv.getPropertyBoolean("seekable") == true) ((mpv.getPropertyDouble("duration") ?: 0.0) * 1000).toLong() else -1L
     override fun togglePause() { mpv.setPropertyBoolean("pause", !(mpv.getPropertyBoolean("pause") ?: false)) }
+    override fun seekTo(ms: Long) { mpv.command(arrayOf("seek", (ms / 1000.0).toString(), "absolute")) }
     override fun seekBy(ms: Long) { mpv.command(arrayOf("seek", (ms / 1000.0).toString(), "relative")) }
     override fun pause() { mpv.setPropertyBoolean("pause", true) }
     override fun resume() { mpv.setPropertyBoolean("pause", false) }
-    override fun audioTracks(): List<Pair<Int, String>> {
+
+    private fun tracks(type: String, selectedProp: String): List<TrackOpt> {
         val n = mpv.getPropertyInt("track-list/count") ?: return emptyList()
+        val sel = mpv.getPropertyString(selectedProp)
         return (0 until n).mapNotNull { i ->
-            if (mpv.getPropertyString("track-list/$i/type") != "audio") return@mapNotNull null
+            if (mpv.getPropertyString("track-list/$i/type") != type) return@mapNotNull null
             val id = mpv.getPropertyInt("track-list/$i/id") ?: return@mapNotNull null
             val name = listOfNotNull(mpv.getPropertyString("track-list/$i/lang"), mpv.getPropertyString("track-list/$i/title"),
-                mpv.getPropertyString("track-list/$i/codec")).joinToString(" · ").ifBlank { "Audio $id" }
-            id to name
+                mpv.getPropertyString("track-list/$i/codec")).joinToString(" · ").ifBlank { if (type == "audio") "Audio $id" else "Subtítulo $id" }
+            TrackOpt(id.toString(), name, sel == id.toString())
         }
     }
-    override var audioTrack: Int
-        get() = mpv.getPropertyInt("aid") ?: 0
-        set(v) { mpv.setPropertyInt("aid", v) }
+    override fun audioTracks() = tracks("audio", "aid")
+    override fun selectAudio(id: String) { mpv.setPropertyString("aid", id) }
+    override fun subtitleTracks() = tracks("sub", "sid")
+    override fun selectSubtitle(id: String?) { mpv.setPropertyString("sid", id ?: "no") }
+
+    override var speed: Float
+        get() = (mpv.getPropertyDouble("speed") ?: 1.0).toFloat()
+        set(v) { mpv.setPropertyDouble("speed", v.toDouble()) }
+
+    override fun addExternalSubtitle(file: java.io.File) { mpv.command(arrayOf("sub-add", file.absolutePath, "select")) }
+
+    override fun info(): List<Pair<String, String>> = listOfNotNull(
+        mpv.getPropertyString("video-codec")?.let { c -> "Video" to listOfNotNull(c, mpv.getPropertyInt("width")?.let { "${it}×${mpv.getPropertyInt("height")}" }).joinToString(" · ") },
+        mpv.getPropertyString("audio-codec-name")?.let { "Audio" to it },
+        mpv.getPropertyString("hwdec-current")?.let { "Decodificación" to if (it == "no") "Software" else "Hardware ($it)" },
+    )
 }
 
 private fun applyAspect(mpv: MPVLib, aspect: String) {

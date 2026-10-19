@@ -82,7 +82,7 @@ object ScreenshotParser {
             val path = u.rawPath ?: ""
             if (Regex("""xmltv\.php|\.xml(?:\.gz)?$|epg""", I).containsMatchIn(path)) { if (epg.isBlank()) epg = link; continue }
             if (user.isNotBlank() && pass.isNotBlank() && username.isBlank()) { username = user; password = pass; server = asServer(link) }
-            if (Regex("""get\.php|\.m3u8?$|type=m3u|output=(?:ts|m3u8|hls)""", I).containsMatchIn(path + "?" + (u.rawQuery ?: ""))) { if (url.isBlank()) url = link }
+            if (Regex("""get\.php|\.m3u8?$|type=m3u|output=(?:ts|m3u8|hls)""", I).containsMatchIn(path + (u.rawQuery?.let { "?$it" } ?: ""))) { if (url.isBlank()) url = link }
             else if (server.isBlank()) server = asServer(link)
         }
 
