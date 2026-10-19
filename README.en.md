@@ -45,6 +45,8 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Three engines on Android** that take over from each other automatically: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv). If one can't handle a channel, the next one tries; you can also pin one in Settings.
 - **Cable-TV formats**: interlaced MPEG-2 video and AC-3 / E-AC-3 / MP2 audio, with automatic deinterlacing.
 - **In the browser**: hls.js and mpegts.js, plus on-the-fly **ffmpeg** conversion through the local server when the browser can't play a format.
+- **Configures itself for your device**: at startup it detects memory, CPU and decoders. On modest TV boxes (Xiaomi Mi Box / Mi TV Stick, 1–2 GB devices) it turns on **lite mode**: menus without shadows or animations, lighter artwork and lighter video processing.
+- **Continue watching on the home screen**: your half-watched movies and series, with their progress bar.
 - **Adjustable buffer** (Fast / Balanced / Stable) across all three engines, plus a **learned buffer**: if a channel keeps stalling, the app raises its buffer on its own and remembers it.
 - **Stable live channels**: no jumping ahead or flickering, with automatic reconnection if the signal drops.
 - Player menu with audio tracks, quality, aspect ratio, speed, technical channel info, favorites, picture-in-picture (PiP) and a channel list without leaving the video.
