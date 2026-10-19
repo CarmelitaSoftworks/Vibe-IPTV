@@ -67,6 +67,18 @@ fun MenuScreen(vm: AppViewModel) {
     val c = LocalIptv.current
     var dialog by remember { mutableStateOf(MenuDialog.NONE) }
     var focusedItem by remember { mutableStateOf<Item?>(null) }
+    // Teléfono en horizontal (poca altura): pantalla completa y barras más bajas para que se vean las carátulas
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 500
+    val activity = androidx.compose.ui.platform.LocalContext.current as? cl.iptv.player.MainActivity
+    DisposableEffect(compact) {
+        val win = activity?.window
+        val wc = win?.let { androidx.core.view.WindowCompat.getInsetsController(it, it.decorView) }
+        if (compact && wc != null) {
+            wc.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            wc.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { }
+    }
 
 
     Column(
@@ -76,11 +88,11 @@ fun MenuScreen(vm: AppViewModel) {
             .brushedLines(c.bgLines)
             .systemBarsPadding()
     ) {
-        TopBar(vm, onSources = { vm.showWelcome = true }, onSearch = { dialog = MenuDialog.SEARCH })
+        TopBar(vm, compact, onSources = { vm.showWelcome = true }, onSearch = { dialog = MenuDialog.SEARCH })
         if (vm.source != null && !vm.home && vm.series == null && vm.query.isBlank()) CategoryBar(vm)
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            TileGrid(vm, onFocusItem = { focusedItem = it }, onAddList = { vm.showWelcome = true })
+            TileGrid(vm, compact, onFocusItem = { focusedItem = it }, onAddList = { vm.showWelcome = true })
             vm.loading?.let { text ->
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = c.accent)
@@ -90,8 +102,9 @@ fun MenuScreen(vm: AppViewModel) {
             }
         }
 
-        FocusInfo(vm, focusedItem)
+        FocusInfo(vm, focusedItem, compact)
         Dock(
+            compact = compact,
             title = vm.title(),
             pageText = vm.pageInfo,
             onCategories = { dialog = if (vm.source != null) MenuDialog.CATEGORIES else MenuDialog.SOURCES },
@@ -129,10 +142,10 @@ private fun CategoryBar(vm: AppViewModel) {
 }
 
 @Composable
-private fun TopBar(vm: AppViewModel, onSources: () -> Unit, onSearch: () -> Unit) {
+private fun TopBar(vm: AppViewModel, compact: Boolean, onSources: () -> Unit, onSearch: () -> Unit) {
     val c = LocalIptv.current
     Row(
-        Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 4.dp),
+        Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = if (compact) 6.dp else 12.dp, bottom = if (compact) 2.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -159,7 +172,7 @@ private fun TopBar(vm: AppViewModel, onSources: () -> Unit, onSearch: () -> Unit
 }
 
 @Composable
-private fun TileGrid(vm: AppViewModel, onFocusItem: (Item?) -> Unit, onAddList: () -> Unit) {
+private fun TileGrid(vm: AppViewModel, compact: Boolean, onFocusItem: (Item?) -> Unit, onAddList: () -> Unit) {
     val c = LocalIptv.current
     if (vm.source == null) {
         Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -170,17 +183,20 @@ private fun TileGrid(vm: AppViewModel, onFocusItem: (Item?) -> Unit, onAddList: 
         return
     }
 
-    if (vm.home && vm.query.isBlank()) { HomeGrid(vm, onFocusItem); return }
+    if (vm.home && vm.query.isBlank()) { HomeGrid(vm, compact, onFocusItem); return }
 
-    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 12.dp)) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = if (compact) 30.dp else 40.dp, vertical = if (compact) 6.dp else 12.dp)) {
+        // Películas y series: carátula vertical 2:3 con el nombre debajo. TV en vivo: mosaico apaisado con el logo.
         val poster = vm.series == null && vm.section != Kind.LIVE
-        val gap: Dp = if (maxWidth < 600.dp) 10.dp else 16.dp
-        var cols = when { maxWidth < 480.dp -> 2; maxWidth < 820.dp -> 3; else -> 4 }
-        if (poster) cols += if (maxWidth < 480.dp) 1 else 2
-        when (vm.settings.tileSize) { "large" -> cols = maxOf(2, cols - 1); "small" -> cols += 1 }
-        val tileW = (maxWidth - gap * (cols - 1)) / cols
-        val ratio = if (poster) 1.45f else 0.56f
-        val rows = ((maxHeight + gap) / (tileW * ratio + gap)).let { Math.round(it) }.coerceIn(2, 5)
+        val gap: Dp = if (maxWidth < 600.dp || compact) 10.dp else 16.dp
+        val zoom = when (vm.settings.tileSize) { "large" -> 1.25f; "small" -> 0.8f; else -> 1f }
+        val nameH = 34.dp                                   // franja del nombre bajo la carátula (2 líneas)
+        // 1) filas según la altura disponible, 2) columnas según el ancho que deja la proporción del mosaico
+        val minH = (if (poster) 200.dp else 96.dp) * zoom
+        val rows = ((maxHeight + gap) / (minH + gap)).toInt().coerceIn(1, 5)
+        val tileH = (maxHeight - gap * (rows - 1)) / rows
+        val idealW = if (poster) (tileH - nameH) / 1.5f else tileH * 1.65f
+        val cols = ((maxWidth + gap) / (idealW + gap)).let { Math.round(it) }.coerceIn(2, 10)
         val perPage = cols * rows
         val view = vm.view
         val pages = maxOf(1, (view.size + perPage - 1) / perPage)
@@ -289,14 +305,15 @@ private fun TileGrid(vm: AppViewModel, onFocusItem: (Item?) -> Unit, onAddList: 
             }
         }
 
-        if (vm.page > 0) PagerArrow(left = true, Modifier.align(Alignment.CenterStart).offset(x = (-34).dp)) { go(-1, 0) }
-        if (vm.page < pages - 1) PagerArrow(left = false, Modifier.align(Alignment.CenterEnd).offset(x = 34.dp)) { go(1, 0) }
+        val arrowX = if (compact) 27.dp else 34.dp
+        if (vm.page > 0) PagerArrow(left = true, Modifier.align(Alignment.CenterStart).offset(x = -arrowX)) { go(-1, 0) }
+        if (vm.page < pages - 1) PagerArrow(left = false, Modifier.align(Alignment.CenterEnd).offset(x = arrowX)) { go(1, 0) }
     }
 }
 
 /** Inicio: tres mosaicos grandes (TV en vivo, Películas, Series). */
 @Composable
-private fun HomeGrid(vm: AppViewModel, onFocusItem: (Item?) -> Unit) {
+private fun HomeGrid(vm: AppViewModel, compact: Boolean, onFocusItem: (Item?) -> Unit) {
     val requesters = remember { Kind.entries.associateWith { FocusRequester() } }
     LaunchedEffect(Unit) {
         delay(60)
@@ -304,7 +321,7 @@ private fun HomeGrid(vm: AppViewModel, onFocusItem: (Item?) -> Unit) {
         vm.returnHomeKind = null
         runCatching { requesters.getValue(k).requestFocus() }
     }
-    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = if (compact) 8.dp else 12.dp), contentAlignment = Alignment.Center) {
         val narrow = maxWidth < 560.dp
         val gap = if (narrow) 12.dp else 18.dp
         if (narrow) {
@@ -372,12 +389,15 @@ private fun HomeTile(
                     Text(countText, color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
-        } else {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SectionIcon(kind, c.accentDeep, Modifier.size(120.dp))
-                Spacer(Modifier.height(10.dp))
-                Text(kind.label, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp)
-                Text(countText, color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        } else BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // El ícono y los textos se ajustan a la altura del mosaico (teléfono en horizontal, TV, tablet)
+            val k = (maxHeight / 380.dp).coerceIn(0.5f, 1f)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((6 * k).dp), modifier = Modifier.padding(horizontal = 12.dp)) {
+                SectionIcon(kind, c.accentDeep, Modifier.size((120 * k).dp))
+                Spacer(Modifier.height((8 * k).dp))
+                Text(kind.label, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = (32 * k).coerceAtLeast(20f).sp, maxLines = 1)
+                Text(countText, color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = (15 * k).coerceAtLeast(12f).sp,
+                    maxLines = 2, textAlign = TextAlign.Center)
             }
         }
     }
@@ -411,24 +431,36 @@ private fun Tile(
             .combinedClickable(interactionSource = src, indication = null, onClick = onClick, onLongClick = onLongClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (!imgFailed) {
-            AsyncImage(
-                model = item.logo, contentDescription = null,
-                contentScale = if (usePoster) ContentScale.Crop else ContentScale.Fit,
-                onError = { imgFailed = true },
-                modifier = if (usePoster) Modifier.fillMaxSize() else Modifier.fillMaxWidth(0.72f).fillMaxHeight(0.55f).offset(y = (-8).dp),
-            )
+        if (poster) {
+            // Carátula completa arriba y el nombre debajo (hasta 2 líneas), sin taparla
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    if (!imgFailed) AsyncImage(
+                        model = item.logo, contentDescription = null, contentScale = ContentScale.Crop,
+                        onError = { imgFailed = true }, modifier = Modifier.fillMaxSize(),
+                    ) else Text(initials(item.name), color = c.inkSoft, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp)
+                }
+                Box(Modifier.fillMaxWidth().height(34.dp).background(c.tileA).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        item.name, color = c.ink, fontWeight = FontWeight.Bold, fontSize = 11.sp, lineHeight = 13.sp,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
         } else {
-            Text(initials(item.name), color = c.inkSoft, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp)
-        }
-        Box(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .background(if (usePoster) Brush.verticalGradient(listOf(Color.Transparent, Color(0xC0000000))) else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent)))
-                .padding(horizontal = 10.dp, vertical = 6.dp)
-        ) {
+            if (!imgFailed) {
+                AsyncImage(
+                    model = item.logo, contentDescription = null, contentScale = ContentScale.Fit,
+                    onError = { imgFailed = true },
+                    modifier = Modifier.fillMaxWidth(0.72f).fillMaxHeight(0.55f).offset(y = (-8).dp),
+                )
+            } else {
+                Text(initials(item.name), color = c.inkSoft, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, modifier = Modifier.offset(y = (-8).dp))
+            }
             Text(
-                item.name, color = if (usePoster) Color.White else c.ink, fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                item.name, color = c.ink, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
             )
         }
         item.num?.takeIf { showNumber }?.let { Text("$it", color = c.inkSoft, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) }
@@ -461,7 +493,7 @@ private fun PagerArrow(left: Boolean, modifier: Modifier, onClick: () -> Unit) {
 }
 
 @Composable
-private fun FocusInfo(vm: AppViewModel, item: Item?) {
+private fun FocusInfo(vm: AppViewModel, item: Item?, compact: Boolean) {
     val c = LocalIptv.current
     val extra = when {
         item == null -> ""
@@ -473,7 +505,7 @@ private fun FocusInfo(vm: AppViewModel, item: Item?) {
         }
         else -> item.group
     }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 40.dp).height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 40.dp).height(if (compact) 20.dp else 24.dp), verticalAlignment = Alignment.CenterVertically) {
         if (item != null) {
             Text(item.name, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, maxLines = 1)
             Spacer(Modifier.width(10.dp))
@@ -483,14 +515,14 @@ private fun FocusInfo(vm: AppViewModel, item: Item?) {
 }
 
 @Composable
-private fun Dock(title: String, pageText: String, onCategories: () -> Unit, onSettings: () -> Unit) {
+private fun Dock(compact: Boolean = false, title: String, pageText: String, onCategories: () -> Unit, onSettings: () -> Unit) {
     val c = LocalIptv.current
     val clock by produceState(initialValue = clockText()) {
         while (true) { value = clockText(); delay(15_000) }
     }
-    Box(Modifier.fillMaxWidth().height(116.dp)) {
+    Box(Modifier.fillMaxWidth().height(if (compact) 62.dp else 116.dp)) {
         Canvas(Modifier.matchParentSize()) {
-            val w = size.width; val top = 30.dp.toPx(); val bump = 4.dp.toPx()
+            val w = size.width; val top = (if (compact) 16.dp else 30.dp).toPx(); val bump = (if (compact) 2.dp else 4.dp).toPx()
             val mid = w / 2; val half = minOf(w * 0.2f, 260.dp.toPx())
             val path = Path().apply {
                 moveTo(0f, top); lineTo(mid - half - 60f, top)
@@ -503,13 +535,21 @@ private fun Dock(title: String, pageText: String, onCategories: () -> Unit, onSe
             drawPath(fill, c.dock)
             drawPath(path, c.accent, style = Stroke(width = 2.5.dp.toPx()))
         }
-        RoundButton(Icons.Filled.List, "Categorías", Modifier.align(Alignment.CenterStart).padding(start = 28.dp, top = 22.dp), onClick = onCategories)
-        Column(Modifier.align(Alignment.Center).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        val btn = if (compact) 46 else 76
+        val btnTop = if (compact) 10.dp else 22.dp
+        RoundButton(Icons.Filled.List, "Categorías", Modifier.align(Alignment.CenterStart).padding(start = 28.dp, top = btnTop), size = btn, onClick = onCategories)
+        if (compact) {
+            Row(Modifier.align(Alignment.Center).padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 300.dp))
+                Text("  ·  $clock", color = c.inkSoft, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, maxLines = 1)
+            }
+        } else Column(Modifier.align(Alignment.Center).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 420.dp))
             Text(clock, color = c.inkSoft, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp)
         }
-        if (pageText.isNotEmpty()) Text(pageText, color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 120.dp, bottom = 14.dp))
-        RoundButton(Icons.Filled.Settings, "Ajustes", Modifier.align(Alignment.CenterEnd).padding(end = 28.dp, top = 22.dp), onClick = onSettings)
+        if (pageText.isNotEmpty()) Text(pageText, color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = if (compact) 90.dp else 120.dp, bottom = if (compact) 8.dp else 14.dp))
+        RoundButton(Icons.Filled.Settings, "Ajustes", Modifier.align(Alignment.CenterEnd).padding(end = 28.dp, top = btnTop), size = btn, onClick = onSettings)
     }
 }
 
