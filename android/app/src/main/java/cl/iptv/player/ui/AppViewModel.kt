@@ -145,7 +145,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var resumeLastChannel = store.settings().startup == "lastChannel"
     private var loadJob: Job? = null
 
+    // ---------- Equipo detectado al iniciar y modo liviano (TV boxes de Xiaomi y otros modestos) ----------
+    val hw: Device.Hw = Device.detect(app)
+    val lowEnd: Boolean = hw.lowEnd
+    /**
+     * Primera vez (o "Volver a detectar"): configura según el equipo. Después respeta lo que el usuario cambie;
+     * si el equipo es otro (respaldo importado en otra TV) se vuelve a configurar.
+     */
+    fun autoConfigure(force: Boolean = false) {
+        val key = "${hw.name}|${hw.ramMb / 256}"
+        if (!force && store.hwConfigured == key) return
+        store.hwConfigured = key
+        updateSettings(settings.copy(lite = "auto", buffer = hw.buffer, animations = !hw.lite))
+        logEvent("Equipo: ${hw.text()}")
+        message = "Equipo detectado: ${hw.name}" + (if (hw.lite) " · modo liviano activado" else "") +
+            (if (hw.liveEngine != null) " · TV en vivo con VLC" else "")
+    }
+    var lite by mutableStateOf(false); private set
+    fun applyLite() {
+        lite = when (settings.lite) { "on" -> true; "off" -> false; else -> lowEnd }
+        Perf.lite = lite
+    }
+
     init {
+        applyLite()
+        hw.liveEngine?.let { preferLiveEngine = it }   // sin MPEG-2 por hardware: la TV de cable arranca directo con VLC
+        autoConfigure()
         val last = sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull()
         if (last != null && settings.startup != "welcome") open(last) else showWelcome = true
         // Renovación periódica de la guía mientras la app está abierta
@@ -439,6 +464,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val pinChanged = s.parentalPin != settings.parentalPin
         settings = s
         store.saveSettings(s)
+        applyLite()
         if (pinChanged) { adultUnlocked = false; applyParental() }
         if (formatChanged) source?.takeIf { it.type == SourceType.XTREAM }?.let { open(it) }
     }

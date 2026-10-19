@@ -264,7 +264,7 @@ private fun TileGrid(vm: AppViewModel, compact: Boolean, onFocusItem: (Item?) ->
         LaunchedEffect(vm.page) {
             val dir = (vm.page - prevPage).coerceIn(-1, 1)
             prevPage = vm.page
-            if (dir != 0) { slide.snapTo(dir * 60f); slide.animateTo(0f, tween(240)) }
+            if (dir != 0 && !cl.iptv.player.data.Perf.lite && vm.settings.animations) { slide.snapTo(dir * 60f); slide.animateTo(0f, tween(240)) }
         }
         val page = vm.page
         val start = page * perPage
@@ -407,14 +407,14 @@ private fun HomeTile(
     val src = remember { MutableInteractionSource() }
     val focused by src.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocused() }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, label = "home")
+    val scale by animateFloatAsState(if (focused && !cl.iptv.player.data.Perf.lite) 1.04f else 1f, label = "home")
     val shape = RoundedCornerShape(22.dp)
     val countText = if (count == 0) "Sin contenido en esta lista" else "$count ${if (count == 1) kind.one else kind.many}" + if (groups > 1) " · $groups categorías" else ""
     Box(
         modifier
             .zIndex(if (focused) 1f else 0f)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .shadow(if (focused) 20.dp else 3.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
+            .softShadow(if (focused) 20.dp else 3.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
             .clip(shape)
             .background(Brush.verticalGradient(listOf(c.tileA, c.tileB)))
             .brushedLines(c.tileLines, 7f)
@@ -456,7 +456,7 @@ private fun Tile(
     val src = remember { MutableInteractionSource() }
     val focused by src.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocused() }
-    val scale by animateFloatAsState(if (focused && animate) 1.05f else 1f, label = "tile")
+    val scale by animateFloatAsState(if (focused && animate && !cl.iptv.player.data.Perf.lite) 1.05f else 1f, label = "tile")
     val shape = RoundedCornerShape(18.dp)
     var imgFailed by remember(item.logo) { mutableStateOf(item.logo.isBlank()) }
     val usePoster = poster && !imgFailed
@@ -465,7 +465,7 @@ private fun Tile(
         modifier
             .zIndex(if (focused) 1f else 0f)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .shadow(if (focused) 18.dp else 2.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
+            .softShadow(if (focused) 18.dp else 2.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
             .clip(shape)
             .background(Brush.verticalGradient(listOf(c.tileA, c.tileB)))
             .brushedLines(c.tileLines, 7f)

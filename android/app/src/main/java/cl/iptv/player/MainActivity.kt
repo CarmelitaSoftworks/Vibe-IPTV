@@ -42,6 +42,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         cl.iptv.player.ui.I18n.load(this)
+        vm.applyLite()
+        // Carátulas: en modo liviano menos memoria (colores de 16 bits, caché chica) y sin fundidos
+        val lite = cl.iptv.player.data.Perf.lite
+        coil.Coil.setImageLoader(
+            coil.ImageLoader.Builder(this)
+                .memoryCache { coil.memory.MemoryCache.Builder(this).maxSizePercent(if (lite) 0.12 else 0.25).build() }
+                .allowRgb565(lite)
+                .crossfade(!lite)
+                .build()
+        )
         if (savedInstanceState == null) {
             vm.checkUpdate(isTv)   // aviso de versión nueva (sólo lee el número de versión)
             intent?.data?.let { vm.openLink(it) }

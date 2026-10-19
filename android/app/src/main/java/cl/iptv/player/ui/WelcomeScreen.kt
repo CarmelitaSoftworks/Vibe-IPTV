@@ -161,7 +161,7 @@ private fun OptionTile(option: AddOption, horizontal: Boolean, modifier: Modifie
         modifier
             .zIndex(if (focused) 1f else 0f)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .shadow(if (focused) 20.dp else 3.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
+            .softShadow(if (focused) 20.dp else 3.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
             .clip(shape)
             .background(Brush.verticalGradient(listOf(c.tileA, c.tileB)))
             .brushedLines(c.tileLines, 7f)
@@ -201,7 +201,7 @@ private fun SavedCard(s: Source, current: Boolean, modifier: Modifier, onClick: 
         modifier
             .width(250.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .shadow(if (focused) 16.dp else 2.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
+            .softShadow(if (focused) 16.dp else 2.dp, shape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
             .clip(shape)
             .background(Brush.verticalGradient(listOf(c.tileA, c.tileB)))
             .border(if (focused) 4.dp else if (current) 2.dp else 1.dp, if (focused) c.focus else if (current) c.accent else c.tileEdge, shape)
@@ -221,7 +221,7 @@ private fun SavedCard(s: Source, current: Boolean, modifier: Modifier, onClick: 
 @Composable
 private fun AppLogo(modifier: Modifier) {
     val c = LocalIptv.current
-    Canvas(modifier.shadow(3.dp, RoundedCornerShape(22)).clip(RoundedCornerShape(22)).background(c.tileA)) {
+    Canvas(modifier.softShadow(3.dp, RoundedCornerShape(22)).clip(RoundedCornerShape(22)).background(c.tileA)) {
         val s = size.minDimension / 512f
         fun tile(x: Float, y: Float, a: Float) = drawRoundRect(c.accent.copy(alpha = a), Offset(x * s, y * s), Size(148 * s, 104 * s), CornerRadius(26 * s))
         tile(96f, 128f, 1f); tile(268f, 128f, .45f); tile(96f, 256f, .45f); tile(268f, 256f, .45f)

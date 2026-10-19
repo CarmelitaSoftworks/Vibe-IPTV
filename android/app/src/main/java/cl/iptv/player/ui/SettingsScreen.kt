@@ -60,6 +60,9 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Toggle("Números de canal", "Muestra el número en cada mosaico de TV en vivo", { it.showNumbers }, { s, v -> s.copy(showNumbers = v) }),
             Row.Toggle("Guía bajo los mosaicos", "Programa actual y siguiente del canal enfocado", { it.showEpgInfo }, { s, v -> s.copy(showEpgInfo = v) }),
             Row.Toggle("Siguiente episodio automático", "Al terminar un episodio empieza el siguiente", { it.autoNext }, { s, v -> s.copy(autoNext = v) }),
+            Row.Choice("Modo liviano (TV boxes)", "Menos efectos y memoria: más fluido en Xiaomi Mi Box / Mi TV Stick y equipos de 1–2 GB · ${cl.iptv.player.data.Device.summary(ctx)}",
+                listOf("auto" to "Automático (${if (vm.lowEnd) "activado" else "desactivado"} en este equipo)", "on" to "Activado", "off" to "Desactivado"),
+                get = { it.lite }, set = { s, v -> s.copy(lite = v) }),
             Row.Toggle("Animaciones", "Zoom de mosaicos y transiciones", { it.animations }, { s, v -> s.copy(animations = v) }),
         )),
         Section("sources", "Listas y guía", SecIcon.SOURCES, listOf(
@@ -151,6 +154,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
                 catch (e: android.content.ActivityNotFoundException) { onSaveLog() }
             },
             Row.Action("Guardar registro en un archivo", "Útil en TV, donde no siempre se puede compartir", arrow = true) { onSaveLog() },
+            Row.Info("Equipo detectado", vm.hw.text()),
+            Row.Action("Volver a detectar y configurar", "Ajusta modo liviano, búfer y animaciones según este equipo", arrow = true) { vm.autoConfigure(force = true) },
             Row.Info("Desarrollado por", "Carmelita Softworks"),
             Row.Info("Licencia", "Código abierto · GPLv3"),
             Row.Info("Reproducción", "ExoPlayer · VLC · MPV"),

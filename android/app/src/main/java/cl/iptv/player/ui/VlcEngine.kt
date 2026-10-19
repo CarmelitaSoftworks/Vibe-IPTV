@@ -78,7 +78,8 @@ fun VlcVideo(
     val libVlc = remember {
         LibVLC(ctx.applicationContext, arrayListOf(
             "--network-caching=$cachingMs", "--live-caching=$cachingMs", "--file-caching=$cachingMs",
-            "--deinterlace=1", "--deinterlace-mode=yadif",   // la TV de cable suele venir entrelazada
+            // La TV de cable suele venir entrelazada; en modo liviano, un desentrelazado más barato para el procesador
+            "--deinterlace=1", if (cl.iptv.player.data.Perf.lite) "--deinterlace-mode=bob" else "--deinterlace-mode=yadif",
             "--http-reconnect", "--audio-time-stretch", "--no-stats", "--avcodec-skiploopfilter=1",
         ))
     }

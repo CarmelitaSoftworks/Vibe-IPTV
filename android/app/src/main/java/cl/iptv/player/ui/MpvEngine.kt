@@ -97,6 +97,12 @@ fun MpvVideo(
             setOptionString("hwdec-codecs", "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1")
             setOptionString("ao", "audiotrack,opensles")
             setOptionString("deinterlace", "auto")                    // TV de cable entrelazada
+            if (cl.iptv.player.data.Perf.lite) {
+                // TV boxes modestos (Amlogic / Mali): escalado simple y sin interpolación
+                setOptionString("scale", "bilinear"); setOptionString("dscale", "bilinear")
+                setOptionString("interpolation", "no"); setOptionString("video-sync", "audio")
+                setOptionString("vd-lavc-skiploopfilter", "nonref"); setOptionString("deband", "no")
+            }
             setOptionString("cache", "yes")
             setOptionString("cache-secs", cacheSecs.toString())
             setOptionString("demuxer-max-bytes", "${maxMiB}MiB")

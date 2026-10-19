@@ -28,7 +28,12 @@ import androidx.compose.ui.unit.sp
 import cl.iptv.player.ui.theme.LocalIptv
 
 /** Rayas horizontales finas (textura "metal cepillado"). */
-fun Modifier.brushedLines(color: Color, step: Float = 9f) = drawBehind {
+/** Sombra que se omite en modo liviano (en GPUs chicas cada sombra se redibuja al mover el foco). */
+fun Modifier.softShadow(elevation: androidx.compose.ui.unit.Dp, shape: androidx.compose.ui.graphics.Shape,
+                        ambientColor: Color = Color.Black, spotColor: Color = Color.Black): Modifier =
+    if (cl.iptv.player.data.Perf.lite) this else this.shadow(elevation, shape, ambientColor = ambientColor, spotColor = spotColor)
+
+fun Modifier.brushedLines(color: Color, step: Float = 9f): Modifier = if (cl.iptv.player.data.Perf.lite) this else drawBehind {
     var y = 0f
     while (y < size.height) {
         drawLine(color, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
@@ -76,7 +81,7 @@ fun RoundButton(icon: ImageVector, description: String, modifier: Modifier = Mod
         modifier
             .size(size.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .shadow(if (focused) 14.dp else 5.dp, CircleShape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
+            .softShadow(if (focused) 14.dp else 5.dp, CircleShape, ambientColor = c.focus, spotColor = if (focused) c.focus else Color.Black)
             .clip(CircleShape)
             .background(Brush.radialGradient(listOf(Color.White, Color(0xFFDFE5E9))))
             .border(3.dp, Color.White, CircleShape)
