@@ -250,7 +250,7 @@ fun SourcesDialog(
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CategoriesDialog(vm: AppViewModel, onDismiss: () -> Unit) {
-    val cats = remember(vm.view, vm.section, vm.series) { vm.categories() }
+    val cats = remember(vm.view, vm.section, vm.series, vm.hiddenCats, vm.catOrder) { vm.categories() }
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { delay(80); runCatching { first.requestFocus() } }
     Sheet(if (vm.home) "Secciones" else "Categorías", onDismiss, wide = true) {
@@ -262,10 +262,34 @@ fun CategoriesDialog(vm: AppViewModel, onDismiss: () -> Unit) {
             }
             return@Sheet
         }
+        var organize by remember { mutableStateOf(false) }
+        if (organize) {
+            val all = remember(vm.items, vm.section, vm.hiddenCats, vm.catOrder) { vm.categories(includeHidden = true) }
+            Text("Sube, baja u oculta categorías. Las ocultas tampoco aparecen en “Todos”.", color = LocalIptv.current.inkSoft, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill("✓ Listo", active = true, modifier = Modifier.focusRequester(first)) { organize = false }
+                Pill("Restablecer") { vm.resetCats() }
+            }
+            Spacer(Modifier.height(8.dp))
+            all.forEach { (g, n) ->
+                val hidden = g in vm.hiddenCats
+                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text((if (hidden) "🚫 " else "") + "$g  $n", color = if (hidden) LocalIptv.current.inkSoft else LocalIptv.current.ink,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Pill("▲") { vm.moveCat(g, -1) }
+                    Pill("▼") { vm.moveCat(g, 1) }
+                    Pill(if (hidden) "Mostrar" else "Ocultar") { vm.toggleHidden(g) }
+                }
+            }
+            return@Sheet
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Todos", active = vm.category == CAT_ALL && vm.query.isBlank(), modifier = Modifier.focusRequester(first)) { vm.selectCategory(CAT_ALL); onDismiss() }
             Pill("★ Favoritos", active = vm.category == CAT_FAV) { vm.selectCategory(CAT_FAV); onDismiss() }
+            if (vm.recent.isNotEmpty()) Pill("🕘 Recientes", active = vm.category == CAT_RECENT) { vm.selectCategory(CAT_RECENT); onDismiss() }
             cats.forEach { (g, n) -> Pill("$g  $n", active = vm.category == g) { vm.selectCategory(g); onDismiss() } }
+            Pill("✎ Organizar categorías") { organize = true }
         }
     }
 }

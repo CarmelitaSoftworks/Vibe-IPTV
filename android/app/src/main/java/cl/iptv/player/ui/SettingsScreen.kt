@@ -53,7 +53,7 @@ private sealed class Row(val label: String, val desc: String = "") {
 private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
 private class Section(val id: String, val name: String, val icon: SecIcon, val rows: List<Row>)
 
-private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}, onProfiles: () -> Unit = {}): List<Section> {
+private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}, onProfiles: () -> Unit = {}, onSaveLog: () -> Unit = {}): List<Section> {
     val offsets = (-3..3).map { h -> h.toString() to if (h == 0) "Sin desfase" else "${if (h > 0) "+" else ""}$h h" }
     return listOf(
         Section("quick", "Rápido", SecIcon.QUICK, listOf(
@@ -135,6 +135,16 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
                     vm.message = "Sin navegador: usa Downloader con el código 9370754"
                 }
             },
+            Row.Action("Enviar registro", "Para reportar un problema: errores y cambios de motor recientes, sin usuarios ni contraseñas", arrow = true) {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, "Vibe IPTV · registro")
+                    putExtra(android.content.Intent.EXTRA_TEXT, vm.logReport(ctx))
+                }
+                try { ctx.startActivity(android.content.Intent.createChooser(send, "Enviar registro")) }
+                catch (e: android.content.ActivityNotFoundException) { onSaveLog() }
+            },
+            Row.Action("Guardar registro en un archivo", "Útil en TV, donde no siempre se puede compartir", arrow = true) { onSaveLog() },
             Row.Info("Desarrollado por", "Carmelita Softworks"),
             Row.Info("Licencia", "Código abierto · GPLv3"),
             Row.Info("Reproducción", "ExoPlayer · VLC · MPV"),
@@ -155,10 +165,16 @@ fun SettingsScreen(vm: AppViewModel) {
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")) { uri -> if (uri != null) vm.exportBackup(uri) }
     val importer = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importBackup(uri) }
+    val logSaver = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain")) { uri -> if (uri != null) vm.exportLog(uri) }
     var showProfiles by remember { mutableStateOf(false) }
     if (showProfiles) ProfilesDialog(vm) { showProfiles = false }
     val all = sections(vm, ctx, (ctx as? cl.iptv.player.MainActivity)?.isTv == true,
         onProfiles = { showProfiles = true },
+        onSaveLog = {
+            try { logSaver.launch("vibe-iptv-registro.txt") }
+            catch (e: android.content.ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }
+        },
         onExport = {
             try { exporter.launch("vibe-iptv-respaldo-${java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())}.json") }
             catch (e: android.content.ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }

@@ -150,6 +150,7 @@ fun PlayerScreen(vm: AppViewModel) {
         if (engineFor?.first == it0.id && engineFor?.second == to) return
         engineFor = it0.id to to
         if (it0.kind == Kind.LIVE) vm.preferLiveEngine = to
+        vm.logEvent("Cambio de motor → $to (${it0.name}): $reason")
         vm.message = reason
     }
     val engineName = mapOf("exo" to "ExoPlayer", "vlc" to "VLC", "mpv" to "MPV")
@@ -260,6 +261,21 @@ fun PlayerScreen(vm: AppViewModel) {
     var userPaused by remember(item.id) { mutableStateOf(false) }
     // Gesto de brillo / volumen en curso (para el indicador)
     var gesture by remember { mutableStateOf<Pair<String, Float>?>(null) }
+    var seekFlash by remember { mutableStateOf(0 to 0L) }        // doble toque: -1 / +1 y cuándo
+    var digits by remember { mutableStateOf("") }                // teclas numéricas del control
+    LaunchedEffect(digits) {
+        if (digits.isNotEmpty()) { delay(1600); digits.toIntOrNull()?.let { vm.jumpToNumber(it) }; digits = "" }
+    }
+    // Temporizador para dormir: avisa un minuto antes y cierra el reproductor
+    LaunchedEffect(vm.sleepAt) {
+        val at = vm.sleepAt
+        if (at <= 0L) return@LaunchedEffect
+        val warn = at - 60_000 - System.currentTimeMillis()
+        if (warn > 0) { delay(warn); vm.message = "El reproductor se apagará en 1 minuto" }
+        delay((at - System.currentTimeMillis()).coerceAtLeast(0))
+        vm.setSleep(0); vm.closePlayer()
+    }
+    LaunchedEffect(item.id) { vm.logEvent("Reproducir: ${item.name} [${item.kind}] ${item.url}") }
     var gestureAt by remember { mutableStateOf(0L) }
     LaunchedEffect(item.id, engine) {
         val d = cl.iptv.player.data.StallDetector(firstStartMs = Long.MAX_VALUE / 4)   // el arranque lo vigila el bloque anterior
@@ -388,6 +404,15 @@ fun PlayerScreen(vm: AppViewModel) {
                 KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BOOKMARK -> { if (ev.action == KeyEvent.ACTION_UP) { panel = null; poke() }; return@handler true }
                 KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE -> { if (down) { bannerUntil = System.currentTimeMillis() + 5000; poke() }; return@handler true }
                 KeyEvent.KEYCODE_CAPTIONS -> { if (down) { poke(); panel = PAction.SUBS }; return@handler true }
+                KeyEvent.KEYCODE_LAST_CHANNEL -> { if (down) vm.previousChannel(); return@handler true }
+                in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9, in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> {
+                    if (vm.playList.size < 2) return@handler false
+                    if (down && ev.repeatCount == 0) {
+                        val d = if (code <= KeyEvent.KEYCODE_9) code - KeyEvent.KEYCODE_0 else code - KeyEvent.KEYCODE_NUMPAD_0
+                        if (digits.length < 5) digits += d
+                    }
+                    return@handler true
+                }
             }
             if (controls || panel != null) { if (down) lastTouch = System.currentTimeMillis(); return@handler false }
             when (code) {
@@ -465,6 +490,8 @@ fun PlayerScreen(vm: AppViewModel) {
             PAction.PIP -> { if (!activity.enterPip()) vm.message = "Este equipo no permite imagen en imagen" }
             PAction.EXTERNAL -> openInVlc()
             PAction.RECORD -> if (vm.recording?.item?.id == item.id) vm.stopRecording() else vm.startRecording(item)
+            PAction.LASTCH -> vm.previousChannel()
+            PAction.MULTI -> vm.openMultiview(item)
             else -> panel = a
         }
     }
@@ -472,6 +499,7 @@ fun PlayerScreen(vm: AppViewModel) {
     // Reloj para el banner
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
+    LaunchedEffect(error) { error?.let { vm.logEvent("Error [$engine] ${item.name}: $it · ${playUrl}") } }
     val showBanner = !activity.inPip && (controls || now < bannerUntil || error != null || vm.recording != null)
     val resize = when (vm.settings.aspect) {
         "fill", "zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
@@ -535,8 +563,15 @@ fun PlayerScreen(vm: AppViewModel) {
         val maxVol = remember { audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { if (panel != null) panel = null else if (controls) controls = false else poke() })
+                .pointerInput(live, engine) {
+                    val tap: (androidx.compose.ui.geometry.Offset) -> Unit = { if (panel != null) panel = null else if (controls) controls = false else poke() }
+                    if (live) detectTapGestures(onTap = tap)
+                    // Películas y series: doble toque a la izquierda / derecha = −10 s / +10 s
+                    else detectTapGestures(onTap = tap, onDoubleTap = { o ->
+                        val dir = when { o.x < size.width * 0.4f -> -1; o.x > size.width * 0.6f -> 1; else -> 0 }
+                        if (dir == 0) { val k = ctlOf(useAlt, alt, exo); userPaused = k?.isPlaying == true; k?.togglePause() }
+                        else { ctlOf(useAlt, alt, exo)?.seekBy(dir * 10_000L); seekFlash = dir to System.currentTimeMillis() }
+                    })
                 }
                 .pointerInput(Unit) {
                     var zone = 0          // -1 brillo, 1 volumen, 0 nada (centro)
@@ -568,6 +603,19 @@ fun PlayerScreen(vm: AppViewModel) {
                     }
                 },
         )
+        // Doble toque: indicador ±10 s
+        if (seekFlash.first != 0 && System.currentTimeMillis() - seekFlash.second < 700) {
+            LaunchedEffect(seekFlash) { delay(720); seekFlash = 0 to 0L }
+            Text(if (seekFlash.first < 0) "«  10 s" else "10 s  »", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
+                modifier = Modifier.align(if (seekFlash.first < 0) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 60.dp)
+                    .clip(RoundedCornerShape(30.dp)).background(Color(0x99000000)).padding(horizontal = 18.dp, vertical = 10.dp))
+        }
+        // Número de canal que se está escribiendo con el control
+        if (digits.isNotEmpty()) {
+            Text(digits, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 44.sp,
+                modifier = Modifier.align(Alignment.TopEnd).padding(28.dp).clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xCC101417)).padding(horizontal = 22.dp, vertical = 8.dp))
+        }
         // Indicador de brillo / volumen mientras se ajusta
         gesture?.takeIf { now - gestureAt < 1200 || System.currentTimeMillis() - gestureAt < 1200 }?.let { (kind, v) ->
             Column(
@@ -623,6 +671,7 @@ fun PlayerScreen(vm: AppViewModel) {
                             color = Color(0xFFFF6B6B), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                     }
                     Text(fmtTime(now), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                    if (vm.sleepAt > 0) Text("⏾ ${((vm.sleepAt - now) / 60_000 + 1).coerceAtLeast(1)} min", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text("Motor: ${engineName[engine]}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
                 }
             }
@@ -695,6 +744,11 @@ fun PlayerScreen(vm: AppViewModel) {
                     add(PanelRow("VLC", engine == "vlc", "TV de cable: MPEG-2, AC-3, MP2 (incluido en la app)") { engineFor = item.id to "vlc"; panel = null })
                     if (android.os.Build.VERSION.SDK_INT >= 26)
                         add(PanelRow("MPV", engine == "mpv", "Casi cualquier formato, buena tolerancia a cortes") { engineFor = item.id to "mpv"; panel = null })
+                }
+                PAction.SLEEP -> listOf(0, 15, 30, 60, 90, 120).map { m ->
+                    val left = if (vm.sleepAt > 0) ((vm.sleepAt - now) / 60_000 + 1) else 0
+                    PanelRow(if (m == 0) "Desactivado" else "$m min", if (m == 0) vm.sleepAt == 0L else false,
+                        if (m == 0 && vm.sleepAt > 0) "Quedan $left min" else "") { vm.setSleep(m); panel = null }
                 }
                 PAction.INFO -> (listOf("Motor" to engineName[engine].orEmpty()) + k?.info().orEmpty() +
                     listOfNotNull(Uri.parse(playUrl).host?.let { "Servidor del canal" to it })).map { (l, v) -> PanelRow(l, detail = v) {} }

@@ -35,6 +35,7 @@ fun App(vm: AppViewModel) {
                 BackHandler(enabled = !vm.home || vm.series != null || vm.query.isNotBlank()) { vm.back() }
                 MenuScreen(vm)
             }
+            vm.multiview != null -> MultiviewScreen(vm)
             else -> PlayerScreen(vm)
         }
 

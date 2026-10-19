@@ -57,6 +57,20 @@ class Storage(private val ctx: Context) {
     private fun suffix() = profileId.takeIf { it.isNotBlank() }?.let { "@$it" } ?: ""
     private fun fk(sourceId: String) = "favs_$sourceId${suffix()}"
     private fun pk(sourceId: String) = "pos_$sourceId${suffix()}"
+    private fun rk(sourceId: String) = "recent_$sourceId${suffix()}"
+
+    fun recent(sourceId: String): List<String> = runCatching {
+        val a = JSONArray(prefs.getString(rk(sourceId), "[]")); (0 until a.length()).map { a.getString(it) }
+    }.getOrDefault(emptyList())
+    fun hiddenCats(sourceId: String): Set<String> = prefs.getStringSet("hidcat_$sourceId${suffix()}", emptySet())!!.toSet()
+    fun saveHiddenCats(sourceId: String, s: Set<String>) = prefs.edit().putStringSet("hidcat_$sourceId${suffix()}", s).apply()
+    fun catOrder(sourceId: String): Map<String, List<String>> = runCatching {
+        val o = org.json.JSONObject(prefs.getString("catord_$sourceId${suffix()}", "{}")!!)
+        o.keys().asSequence().associateWith { k -> o.getJSONArray(k).let { a -> (0 until a.length()).map { a.getString(it) } } }
+    }.getOrDefault(emptyMap())
+    fun saveCatOrder(sourceId: String, m: Map<String, List<String>>) =
+        prefs.edit().putString("catord_$sourceId${suffix()}", org.json.JSONObject(m.mapValues { JSONArray(it.value) }).toString()).apply()
+    fun saveRecent(sourceId: String, ids: List<String>) = prefs.edit().putString(rk(sourceId), JSONArray(ids).toString()).apply()
 
     fun profiles(): List<Profile> {
         val arr = runCatching { JSONArray(prefs.getString("profiles", "[]")) }.getOrDefault(JSONArray())

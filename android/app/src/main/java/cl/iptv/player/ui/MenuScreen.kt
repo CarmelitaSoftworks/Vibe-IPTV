@@ -125,7 +125,8 @@ fun MenuScreen(vm: AppViewModel) {
 /** Barra de categorías y, si la lista las trae, de subcategorías ("CHILE | DEPORTES"). */
 @Composable
 private fun CategoryBar(vm: AppViewModel) {
-    val cats = remember(vm.items, vm.section) { vm.categories() }
+    val cats = remember(vm.items, vm.section, vm.hiddenCats, vm.catOrder) { vm.categories() }
+    val nRecent = remember(vm.items, vm.section, vm.recent) { vm.recentInSection() }
     val subs = remember(vm.items, vm.section, vm.category) { vm.subcategories() }
     val nFav = vm.favoritesInSection()
     val nResume = remember(vm.items, vm.section, vm.resume) { vm.resumeInSection() }
@@ -138,6 +139,7 @@ private fun CategoryBar(vm: AppViewModel) {
             item { Pill("Todos  $total", active = vm.category == CAT_ALL) { vm.selectCategory(CAT_ALL) } }
             if (nResume > 0) item { Pill("▶ Seguir viendo  $nResume", active = vm.category == CAT_RESUME) { vm.selectCategory(CAT_RESUME) } }
             if (nFav > 0) item { Pill("★ Favoritos  $nFav", active = vm.category == CAT_FAV) { vm.selectCategory(CAT_FAV) } }
+            if (nRecent > 0) item { Pill("🕘 Recientes  $nRecent", active = vm.category == CAT_RECENT) { vm.selectCategory(CAT_RECENT) } }
             items(cats, key = { it.first }) { (c, n) -> Pill("$c  $n", active = vm.category == c) { vm.selectCategory(c) } }
             // Control parental: categorías para adultos ocultas con PIN
             if (vm.parentalOn && !vm.adultUnlocked && !vm.profile.kid && vm.hiddenAdult > 0) item { Pill("🔒 Adultos") { askPin = true } }

@@ -42,11 +42,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         cl.iptv.player.ui.I18n.load(this)
-        if (savedInstanceState == null) vm.checkUpdate(isTv)   // aviso de versión nueva (sólo lee el número de versión)
+        if (savedInstanceState == null) {
+            vm.checkUpdate(isTv)   // aviso de versión nueva (sólo lee el número de versión)
+            intent?.data?.let { vm.openLink(it) }
+        }
         setContent {
             cl.iptv.player.ui.I18n.apply(vm.settings.lang)
             IptvTheme(vm.settings.theme, vm.settings.accent) { App(vm) }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        intent.data?.let { vm.openLink(it) }
     }
 
     override fun onStart() {

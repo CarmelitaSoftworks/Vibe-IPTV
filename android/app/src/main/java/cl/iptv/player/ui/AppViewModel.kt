@@ -22,6 +22,7 @@ enum class Screen { MENU, PLAYER }
 const val CAT_ALL = "__all__"
 const val CAT_FAV = "__fav__"
 const val CAT_RESUME = "__resume__"
+const val CAT_RECENT = "__recent__"
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val store = Storage(app)
@@ -39,7 +40,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var epgUrls = ""
     private var epgJob: Job? = null
     var loading by mutableStateOf<String?>(null); private set
-    var message by mutableStateOf<String?>(null)
+    private val log = ArrayDeque<String>()
+    private var messageState = mutableStateOf<String?>(null)
+    /** Aviso breve en pantalla; también queda en el registro (Ajustes → Enviar registro). */
+    var message: String?
+        get() = messageState.value
+        set(v) { messageState.value = v; if (v != null) logEvent("Aviso: $v") }
 
     /** Pantalla de inicio con los mosaicos TV en vivo / Películas / Series. */
     var home by mutableStateOf(true); private set
@@ -59,7 +65,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun switchProfile(p: Profile, pin: String? = null): Boolean {
         if (profile.kid && !p.kid && parentalOn && pin != settings.parentalPin) return false
         store.profileId = p.id; profile = p
-        source?.let { favorites = store.favorites(it.id); resume = store.resume(it.id) }
+        source?.let { favorites = store.favorites(it.id); resume = store.resume(it.id); recent = store.recent(it.id); loadCatPrefs() }
         adultUnlocked = false; applyParental()
         message = "Perfil: ${p.name}"
         return true
@@ -84,7 +90,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Perfil infantil: el contenido para adultos nunca se muestra
         items = if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems
         hiddenAdult = allItems.size - items.size
-        if (category != CAT_ALL && category != CAT_FAV && category != CAT_RESUME && items.none { it.cat == category }) { category = CAT_ALL; subcategory = "" }
+        if (category !in setOf(CAT_ALL, CAT_FAV, CAT_RESUME, CAT_RECENT) && items.none { it.cat == category }) { category = CAT_ALL; subcategory = "" }
         recompute(false)
     }
     /** Devuelve false si el PIN no coincide. */
@@ -188,8 +194,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var subcategory by mutableStateOf(""); private set
 
     /** Categorías de la sección actual con su cantidad, en el orden de la lista. */
-    fun categories(): List<Pair<String, Int>> =
-        items.filter { it.kind == section }.groupingBy { it.cat }.eachCount().toList()
+    fun categories(includeHidden: Boolean = false): List<Pair<String, Int>> {
+        val all = items.filter { it.kind == section }.groupingBy { it.cat }.eachCount().toList()
+        val order = catOrder[section.name].orEmpty()
+        val sorted = all.sortedBy { (c, _) -> order.indexOf(c).let { if (it < 0) Int.MAX_VALUE else it } }
+        return if (includeHidden) sorted else sorted.filter { it.first !in hiddenCats }
+    }
+
+    // ---------- Ocultar / ordenar categorías (por lista y perfil) ----------
+    var hiddenCats by mutableStateOf<Set<String>>(emptySet()); private set
+    var catOrder by mutableStateOf<Map<String, List<String>>>(emptyMap()); private set
+    private fun loadCatPrefs() {
+        val src = source ?: return
+        hiddenCats = store.hiddenCats(src.id); catOrder = store.catOrder(src.id)
+    }
+    fun toggleHidden(cat: String) {
+        val src = source ?: return
+        hiddenCats = if (cat in hiddenCats) hiddenCats - cat else hiddenCats + cat
+        store.saveHiddenCats(src.id, hiddenCats)
+        if (category == cat) { category = CAT_ALL; subcategory = "" }
+        recompute(false)
+    }
+    /** Mueve una categoría un lugar hacia arriba (delta -1) o abajo (+1). */
+    fun moveCat(cat: String, delta: Int) {
+        val src = source ?: return
+        val cur = categories(includeHidden = true).map { it.first }.toMutableList()
+        val i = cur.indexOf(cat); val j = i + delta
+        if (i < 0 || j !in cur.indices) return
+        cur.removeAt(i); cur.add(j, cat)
+        catOrder = catOrder + (section.name to cur)
+        store.saveCatOrder(src.id, catOrder)
+    }
+    fun resetCats() {
+        val src = source ?: return
+        hiddenCats = emptySet(); catOrder = emptyMap()
+        store.saveHiddenCats(src.id, hiddenCats); store.saveCatOrder(src.id, catOrder); recompute(false)
+    }
     /** Subcategorías de la categoría elegida (vacío si la lista no las trae). */
     fun subcategories(): List<Pair<String, Int>> =
         if (category == CAT_ALL || category == CAT_FAV) emptyList()
@@ -250,6 +290,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         showWelcome = false
         favorites = store.favorites(src.id)
         resume = store.resume(src.id)
+        recent = store.recent(src.id)
+        loadCatPrefs()
         store.lastSourceId = src.id
         recompute(true)
         loadJob = viewModelScope.launch {
@@ -280,6 +322,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 category = CAT_ALL; query = ""
                 recompute(true)
                 loading = null
+                publishTvHome()
+                // Abierto desde la pantalla de inicio de Android TV
+                pendingLink?.let { (sid, id) ->
+                    if (sid == src.id) { pendingLink = null; resumeLastChannel = false; playLinked(id) }
+                }
                 // Inicio de la app → "Último canal visto"
                 if (resumeLastChannel) {
                     resumeLastChannel = false
@@ -400,8 +447,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             list = list.filter { norm(it.name).contains(q) }
         } else if (series == null) {
             list = when (category) {
-                CAT_ALL -> list
+                CAT_ALL -> if (hiddenCats.isEmpty()) list else list.filter { it.cat !in hiddenCats }
                 CAT_FAV -> list.filter { it.id in favorites }
+                CAT_RECENT -> { val byId = list.associateBy { it.id }; recent.mapNotNull { byId[it] } }
                 CAT_RESUME -> {
                     val parents = resume.values.map { it.parent }.toSet()
                     list.filter { it.id in resume || it.id in parents }
@@ -429,6 +477,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         category == CAT_ALL -> "${section.label} · Todos"
         category == CAT_FAV -> "Favoritos"
         category == CAT_RESUME -> "Seguir viendo"
+        category == CAT_RECENT -> "Vistos recientemente"
         else -> if (subcategory.isNotEmpty()) "$category · $subcategory" else category
     }
 
@@ -450,6 +499,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.saveFavorites(src.id, favorites)
         message = if (item.id in favorites) "★ ${item.name} en favoritos" else "${item.name} quitado de favoritos"
         if (category == CAT_FAV) recompute(false)
+        publishTvHome()
+    }
+
+    // ---------- Pantalla de inicio de Android TV ----------
+    private var pendingLink: Pair<String, String>? = null
+    private fun publishTvHome() {
+        val src = source ?: return
+        val app = getApplication<Application>()
+        if (!TvHome.supported(app)) return
+        val byId = items.associateBy { it.id }
+        val list = (favorites.mapNotNull { byId[it] }.filter { it.kind == Kind.LIVE } + recent.mapNotNull { byId[it] })
+            .distinctBy { it.id }
+        viewModelScope.launch(Dispatchers.IO) { TvHome.publish(app, src.id, list) }
+    }
+    /** Enlace vibeiptv://play?src=…&id=… (desde la fila de Vibe IPTV en el inicio de la TV). */
+    fun openLink(uri: Uri) {
+        if (uri.scheme != "vibeiptv" || uri.host != "play") return
+        val sid = uri.getQueryParameter("src") ?: return
+        val id = uri.getQueryParameter("id") ?: return
+        if (source?.id == sid && items.isNotEmpty()) { playLinked(id); return }
+        pendingLink = sid to id
+        if (source?.id != sid) sources.firstOrNull { it.id == sid }?.let { open(it) }
+    }
+    private fun playLinked(id: String) {
+        val it0 = items.firstOrNull { it.id == id } ?: run { message = "Ese canal ya no está en la lista"; return }
+        showSettings = false; showGuide = false; multiview = null
+        activate(it0, items.filter { it.kind == it0.kind })
     }
 
     // ---------- Grabación ----------
@@ -527,20 +603,80 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.lastItemId = item.id
         playList = list
         playIndex = list.indexOf(item).coerceAtLeast(0)
+        previousIndex = null
+        addRecent(item)
         screen = Screen.PLAYER
     }
 
-    /** Ir directo a un elemento de la lista que se está reproduciendo (lista de canales en el reproductor). */
+    /** Canal visto antes del actual (botón "Canal anterior" / tecla LAST del control). */
+    var previousIndex by mutableStateOf<Int?>(null); private set
+
     fun playAt(index: Int) {
-        if (index !in playList.indices) return
+        if (index !in playList.indices || index == playIndex) return
+        previousIndex = playIndex
         playIndex = index
-        playing?.let { store.lastItemId = it.id }
+        playing?.let { store.lastItemId = it.id; addRecent(it) }
     }
 
     fun zap(delta: Int) {
         if (playList.size < 2) return
-        playIndex = (playIndex + delta).mod(playList.size)
-        playing?.let { store.lastItemId = it.id }
+        playAt((playIndex + delta).mod(playList.size))
+    }
+
+    fun previousChannel() {
+        val p = previousIndex ?: run { message = "Todavía no hay un canal anterior"; return }
+        playAt(p)
+    }
+
+    /** Teclas numéricas: salta al canal con ese número (o a esa posición si la lista no trae números). */
+    fun jumpToNumber(n: Int) {
+        val i = playList.indexOfFirst { it.num == n }.takeIf { it >= 0 }
+            ?: (n - 1).takeIf { playList.none { it.num != null } && it in playList.indices }
+        if (i == null) message = "No hay canal $n" else playAt(i)
+    }
+
+    // ---------- Vistos recientemente ----------
+    var recent by mutableStateOf<List<String>>(emptyList()); private set
+    fun addRecent(item: Item) {
+        val src = source ?: return
+        if (item.id.startsWith("cu_")) return
+        recent = (listOf(item.id) + recent.filter { it != item.id }).take(40)
+        store.saveRecent(src.id, recent)
+    }
+    fun recentInSection() = recent.count { id -> items.any { it.id == id && it.kind == section } }
+
+    // ---------- Temporizador para dormir ----------
+    var sleepAt by mutableStateOf(0L); private set
+    fun setSleep(minutes: Int) {
+        sleepAt = if (minutes <= 0) 0L else System.currentTimeMillis() + minutes * 60_000L
+        message = if (minutes <= 0) "Temporizador desactivado" else "El reproductor se apagará en $minutes min"
+    }
+
+    // ---------- Registro de errores (sin usuarios ni contraseñas) ----------
+    fun logEvent(text: String) {
+        val line = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date()) + "  " + redact(text)
+        synchronized(log) { log.addLast(line); while (log.size > 300) log.removeFirst() }
+    }
+    private fun redact(s: String): String = s
+        .replace(Regex("/(live|movie|series|timeshift)/[^/\\s]+/[^/\\s]+/"), "/$1/***/***/")
+        .replace(Regex("(?i)(username|password|user|pass)=[^&\\s]+"), "$1=***")
+        .replace(Regex("(?i)//[^/@\\s]+:[^/@\\s]+@"), "//***:***@")
+    fun logReport(ctx: android.content.Context): String = buildString {
+        appendLine("Vibe IPTV ${Updates.currentName(ctx)} · Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
+        appendLine("Equipo: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · ABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}")
+        appendLine("Motor: ${settings.engine} · Formato en vivo: ${settings.liveFormat} · Lista: ${source?.type ?: "-"} · Canales: ${items.size}")
+        appendLine("---")
+        synchronized(log) { log.forEach { appendLine(it) } }
+        if (log.isEmpty()) appendLine("(sin eventos todavía)")
+    }
+    fun exportLog(uri: android.net.Uri) {
+        viewModelScope.launch {
+            runCatching {
+                val app = getApplication<Application>()
+                withContext(Dispatchers.IO) { app.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(logReport(app).toByteArray()) } }
+            }.onSuccess { message = "Registro guardado: no contiene usuarios ni contraseñas" }
+                .onFailure { message = "No se pudo guardar: ${it.message}" }
+        }
     }
 
     // ---------- Ajustes: acciones de "Datos" ----------
@@ -555,9 +691,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun resetSettings() { updateSettings(Settings()); message = "Ajustes restablecidos" }
 
+    // ---------- Multivista ----------
+    var multiview by mutableStateOf<List<Item>?>(null); private set
+    fun openMultiview(item: Item) {
+        val favs = playList.filter { it.id in favorites && it.id != item.id }
+        val near = (1..3).map { playList[(playIndex + it).mod(playList.size)] }
+        multiview = (listOf(item) + favs + near).distinctBy { it.id }.take(4)
+        message = "Multivista: elige con OK qué canal suena"
+    }
+    fun setMultiviewSlot(i: Int, item: Item?) {
+        val cur = multiview?.toMutableList() ?: return
+        when {
+            item == null -> if (i in cur.indices && cur.size > 1) cur.removeAt(i)
+            i in cur.indices -> cur[i] = item
+            cur.size < 4 -> cur.add(item)
+        }
+        multiview = cur
+    }
+    /** Sale de la multivista; con [item] lo abre en pantalla completa. */
+    fun closeMultiview(item: Item?) {
+        multiview = null
+        if (item != null) { val i = playList.indexOfFirst { it.id == item.id }; if (i >= 0) playAt(i) }
+    }
+
     fun closePlayer() {
         returnFocusId = playing?.id
         screen = Screen.MENU
+        publishTvHome()   // vistos recientemente → fila de la TV
     }
 
     fun subtitleDir() = File(getApplication<Application>().cacheDir, "subs")

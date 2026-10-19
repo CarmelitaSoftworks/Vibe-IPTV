@@ -46,7 +46,8 @@ enum class PAction(val label: String) {
     BACK("Volver"), PREV("Anterior"), REW("Retroceder 10 s"), PLAY("Reproducir / pausa"), FWD("Adelantar 10 s"), NEXT("Siguiente"),
     LIST("Lista de canales"), AUDIO("Audio"), SUBS("Subtítulos"), QUALITY("Calidad"), ASPECT("Formato de pantalla"),
     SPEED("Velocidad"), ENGINE("Motor de reproducción"), INFO("Información técnica"), FAV("Favorito"), PIP("Imagen en imagen"),
-    EXTERNAL("Abrir en la app VLC"), RECORD("Grabar"),
+    EXTERNAL("Abrir en la app VLC"), RECORD("Grabar"), LASTCH("Canal anterior"), SLEEP("Temporizador para dormir"),
+    MULTI("Multivista"),
 }
 
 /** Íconos dibujados (líneas simples, como los del menú). */
@@ -82,6 +83,9 @@ fun PlayerIcon(a: PAction, tint: Color, modifier: Modifier = Modifier, on: Boole
             PAction.PIP -> { rect(3f, 5f, 18f, 14f); rect(12f, 11.5f, 7f, 5.5f, 1f, true) }
             PAction.RECORD -> { drawCircle(tint, 9f * s, p(12f, 12f), style = Stroke(w)); drawCircle(if (on) Color(0xFFE53935) else tint, 5f * s, p(12f, 12f)) }
             PAction.EXTERNAL -> { line(13f, 4f, 20f, 4f, 20f, 11f); line(20f, 4f, 11f, 13f); line(17f, 14f, 17f, 19f, 5f, 19f, 5f, 7f, 10f, 7f) }
+            PAction.LASTCH -> { drawArc(tint, 200f, 250f, false, p(4f, 4f), Size(16f * s, 16f * s), style = Stroke(w, cap = StrokeCap.Round)); poly(true, 2.5f, 8.5f, 7.5f, 9.5f, 4f, 13.5f) }
+            PAction.SLEEP -> { drawArc(tint, 60f, 250f, false, p(4f, 4f), Size(16f * s, 16f * s), style = Stroke(w, cap = StrokeCap.Round)); line(12f, 8f, 12f, 12f, 15f, 14f) }
+            PAction.MULTI -> { rect(3f, 5f, 8.2f, 6.2f, 1.5f); rect(12.8f, 5f, 8.2f, 6.2f, 1.5f); rect(3f, 12.8f, 8.2f, 6.2f, 1.5f); rect(12.8f, 12.8f, 8.2f, 6.2f, 1.5f) }
         }
     }
 }
@@ -181,6 +185,8 @@ fun PlayerControlsBar(
                     add(PAction.ASPECT)
                     if (!live) add(PAction.SPEED)
                     if (live) add(PAction.RECORD)
+                    if (live && hasList) { add(PAction.LASTCH); add(PAction.MULTI) }
+                    add(PAction.SLEEP)
                     add(PAction.ENGINE); add(PAction.INFO); add(PAction.FAV); add(PAction.PIP); add(PAction.EXTERNAL)
                 }
                 extra.forEach { a -> CtlButton(a, on = (a == PAction.FAV && fav) || (a == PAction.RECORD && recording), onFocused = focused) { onAction(a) } }

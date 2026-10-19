@@ -59,8 +59,9 @@ fun GuideScreen(vm: AppViewModel) {
     val firstFocus = remember { FocusRequester() }
     var focused by remember { mutableStateOf<Pair<Item, Programme?>?>(null) }
     var detail by remember { mutableStateOf<Pair<Item, Programme>?>(null) }
+    var searching by remember { mutableStateOf(false) }
 
-    BackHandler { if (detail != null) detail = null else vm.showGuide = false }
+    BackHandler { if (detail != null) detail = null else if (searching) searching = false else vm.showGuide = false }
 
     // Empezar con "ahora" a la vista y el foco en el programa actual del primer canal
     LaunchedEffect(Unit) {
@@ -71,9 +72,10 @@ fun GuideScreen(vm: AppViewModel) {
         runCatching { firstFocus.requestFocus() }
     }
 
+    fun listFor(ch: Item) = if (channels.any { it.id == ch.id }) channels else listOf(ch)
     fun open(ch: Item, p: Programme?) {
         val playingNow = p == null || (p.start + sh <= now && p.stop + sh > now)
-        if (playingNow) vm.activate(ch, channels) else detail = ch to p!!
+        if (playingNow) vm.activate(ch, listFor(ch)) else detail = ch to p!!
     }
 
     Column(Modifier.fillMaxSize().background(c.bg).brushedLines(c.bgLines).systemBarsPadding()) {
@@ -86,6 +88,8 @@ fun GuideScreen(vm: AppViewModel) {
                 Text("${channels.size} canales" + if (vm.category != CAT_ALL && vm.section == cl.iptv.player.data.Kind.LIVE) " · ${vm.title()}" else "",
                     color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
+            Pill("🔍 Buscar programa") { searching = true }
+            Spacer(Modifier.width(14.dp))
             Text(fmtTime(now), color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
         }
 
@@ -143,6 +147,38 @@ fun GuideScreen(vm: AppViewModel) {
         }
     }
 
+    // Buscar un programa por su nombre en toda la guía (todos los canales en vivo)
+    if (searching) {
+        var q by remember { mutableStateOf("") }
+        var hits by remember { mutableStateOf<List<Pair<Item, Programme>>>(emptyList()) }
+        val fr = remember { FocusRequester() }
+        LaunchedEffect(Unit) { delay(80); runCatching { fr.requestFocus() } }
+        LaunchedEffect(q) {
+            delay(300)
+            val n = cl.iptv.player.data.Epg.norm(q)
+            hits = if (n.length < 2) emptyList() else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val from = System.currentTimeMillis() - sh - 3 * 86_400_000L
+                vm.items.asSequence().filter { it.kind == cl.iptv.player.data.Kind.LIVE }
+                    .flatMap { ch -> vm.epg.listFor(ch).asSequence().filter { it.stop > from && cl.iptv.player.data.Epg.norm(it.title).contains(n) }.map { ch to it } }
+                    .distinctBy { (ch, p) -> ch.id + p.start }
+                    .take(400).toList().sortedBy { it.second.start }.take(80)
+            }
+        }
+        val day = remember { java.text.SimpleDateFormat("EEE d", java.util.Locale.getDefault()) }
+        Sheet("Buscar en la guía", onDismiss = { searching = false }, wide = true) {
+            Field(q, { q = it }, "Nombre del programa", modifier = Modifier.focusRequester(fr))
+            Spacer(Modifier.height(8.dp))
+            if (q.length >= 2 && hits.isEmpty()) Text("Sin resultados en la guía cargada.", color = c.inkSoft, fontSize = 13.sp)
+            hits.forEach { (ch, p) ->
+                val s = p.start + sh; val e = p.stop + sh
+                val tag = when { s <= now && e > now -> "▶ AHORA"; e <= now -> "⏪"; else -> day.format(java.util.Date(s)) }
+                ActionButton("$tag ${fmtTime(s)} · ${p.title} — ${ch.name}", Modifier.fillMaxWidth().padding(vertical = 2.dp), ghost = true) {
+                    searching = false; open(ch, p)
+                }
+            }
+        }
+    }
+
     // Programa futuro o ya emitido: ficha con lo que se puede hacer
     detail?.let { (ch, p) ->
         val shifted = p.copy(start = p.start + sh, stop = p.stop + sh)
@@ -153,7 +189,7 @@ fun GuideScreen(vm: AppViewModel) {
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (catchup) ActionButton("⏪ Ver desde el inicio") { detail = null; vm.playCatchup(ch, shifted) }
-                ActionButton("Ver el canal en vivo", ghost = catchup) { detail = null; vm.activate(ch, channels) }
+                ActionButton("Ver el canal en vivo", ghost = catchup) { detail = null; vm.activate(ch, listFor(ch)) }
             }
             if (!catchup && shifted.stop <= now) {
                 Spacer(Modifier.height(8.dp))
