@@ -1,0 +1,17 @@
+{
+  "name": "vibe-iptv-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reproductor IPTV para navegador (M3U, Xtream Codes, EPG, subtítulos, conversión de formatos con ffmpeg)",
+  "scripts": {
+    "start": "node server/server.js",
+    "lan": "HOST=0.0.0.0 node server/server.js",
+    "test": "node --test test/*.test.mjs test/*.test.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "ffmpeg-static": "^5.2.0"
+  }
+}

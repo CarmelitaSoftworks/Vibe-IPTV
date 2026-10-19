@@ -1,0 +1,24 @@
+# Servicio systemd para Linux (Debian, Ubuntu, Raspberry Pi OS…)
+# Copiar a /etc/systemd/system/vibe-iptv.service y ajustar User y WorkingDirectory.
+[Unit]
+Description=Vibe IPTV (app web y proxy local)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vibe
+WorkingDirectory=/opt/vibe-iptv/web
+Environment=HOST=0.0.0.0
+Environment=PORT=8080
+# Environment=VIBE_PASSWORD=cambia-esta-clave
+ExecStart=/usr/bin/node server/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

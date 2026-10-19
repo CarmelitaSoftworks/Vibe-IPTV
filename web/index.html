@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vibe IPTV</title>
+  <meta name="theme-color" content="#e9edf0">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="vendor/hls.min.js"></script>
+  <script src="vendor/mpegts.js"></script>
+</head>
+<body>
+  <!-- ===== PANTALLA DE INICIO ===== -->
+  <div id="splash" class="splash" role="status" aria-label="Cargando Vibe IPTV">
+    <div class="splash-grid" aria-hidden="true">
+      <span class="splash-tile lit"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg></span>
+      <span class="splash-tile"></span><span class="splash-tile"></span>
+      <span class="splash-tile"></span><span class="splash-tile"></span><span class="splash-tile"></span>
+    </div>
+    <div class="splash-name">Vibe IPTV</div>
+    <div class="splash-tag">Libre · Código abierto</div>
+    <div class="splash-bar" aria-hidden="true"><i></i></div>
+  </div>
+  <!-- ===== MENÚ PRINCIPAL ===== -->
+  <main id="menu" class="menu">
+    <header class="topbar">
+      <button class="pill source-pill" id="btnSources" data-nav title="Mis listas">
+        <span class="dot"></span><span id="sourceName">Sin lista</span>
+      </button>
+      <nav class="tabs" id="tabs"></nav>
+      <div class="crumb" id="crumb" hidden>
+        <button class="pill" id="btnCrumbBack" data-nav>‹ Volver</button>
+        <span id="crumbTitle"></span>
+      </div>
+      <button class="pill icon-pill" id="btnSearch" data-nav title="Buscar" aria-label="Buscar">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      </button>
+    </header>
+
+    <div class="catbar" id="catBar" hidden>
+      <div class="chips-row" id="catRow" role="tablist" aria-label="Categorías"></div>
+      <div class="chips-row sub" id="subRow" role="tablist" aria-label="Subcategorías" hidden></div>
+    </div>
+    <section class="stage" id="stage">
+      <button class="pager prev" id="pgPrev" aria-label="Página anterior" hidden><svg viewBox="0 0 20 32"><path d="M17 3 4 16l13 13z"/></svg></button>
+      <div class="grid" id="grid" role="grid"></div>
+      <button class="pager next" id="pgNext" aria-label="Página siguiente" hidden><svg viewBox="0 0 20 32"><path d="M3 3l13 13L3 29z"/></svg></button>
+      <div class="empty" id="empty" hidden></div>
+      <div class="loader" id="loader" hidden><div class="spin"></div><span id="loaderText">Cargando…</span></div>
+    </section>
+
+    <div class="focus-info" id="focusInfo"><b id="fiName"></b><span id="fiEpg"></span></div>
+
+    <footer class="dock">
+      <svg class="dock-shape" viewBox="0 0 1000 120" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 34 H300 C350 34 360 6 410 6 H590 C640 6 650 34 700 34 H1000 V120 H0Z"/>
+        <path class="dock-line" d="M0 34 H300 C350 34 360 6 410 6 H590 C640 6 650 34 700 34 H1000"/>
+      </svg>
+      <button class="round-btn left" id="btnCategories" data-nav title="Categorías" aria-label="Categorías">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+      </button>
+      <div class="dock-center">
+        <div class="dock-title" id="dockTitle">Todos</div>
+        <div class="dock-clock" id="dockClock"></div>
+      </div>
+      <span class="page-ind" id="pageInd"></span>
+      <button class="round-btn right" id="btnSettings" data-nav title="Ajustes" aria-label="Ajustes">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </footer>
+  </main>
+
+  <!-- ===== PANTALLA DE INICIO: AÑADIR LISTAS ===== -->
+  <section id="welcome" class="welcome" hidden aria-label="Añadir listas">
+    <header class="welcome-head">
+      <svg class="welcome-logo" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="var(--tile-a)"/><g fill="var(--accent)"><rect x="96" y="128" width="148" height="104" rx="26"/><rect x="268" y="128" width="148" height="104" rx="26" opacity=".45"/><rect x="96" y="256" width="148" height="104" rx="26" opacity=".45"/><rect x="268" y="256" width="148" height="104" rx="26" opacity=".45"/></g><path d="M152 156v48l40-24z" fill="#fff"/></svg>
+      <div>
+        <h1>Vibe IPTV</h1>
+        <p id="welcomeSub">¿Cómo quieres agregar tu lista?</p>
+      </div>
+      <button class="pill" id="welcomeBack" data-nav hidden>‹ Volver al menú</button>
+      <button class="pill icon-pill gear-pill" id="welcomeSettings" data-nav title="Ajustes" aria-label="Ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </header>
+
+    <div class="welcome-options">
+      <button class="tile option-tile" data-nav data-add="m3u-url">
+        <span class="option-icon"><svg viewBox="0 0 48 48"><path d="M20 28a9 9 0 0 0 13 0l7-7a9 9 0 0 0-13-13l-3 3"/><path d="M28 20a9 9 0 0 0-13 0l-7 7a9 9 0 0 0 13 13l3-3"/></svg></span>
+        <span class="option-name">Lista M3U por enlace</span>
+        <span class="option-desc">Pega la URL .m3u o .m3u8 que te dio tu proveedor</span>
+      </button>
+      <button class="tile option-tile" data-nav data-add="m3u-file">
+        <span class="option-icon"><svg viewBox="0 0 48 48"><path d="M12 5h17l9 9v29H12z"/><path d="M29 5v9h9M24 21v14M18 29l6 6 6-6"/></svg></span>
+        <span class="option-name">Archivo M3U</span>
+        <span class="option-desc">Carga una lista guardada en este equipo</span>
+      </button>
+      <button class="tile option-tile" data-nav data-add="xtream">
+        <span class="option-icon"><svg viewBox="0 0 48 48"><rect x="7" y="7" width="34" height="12" rx="3"/><rect x="7" y="25" width="34" height="12" rx="3"/><circle cx="14" cy="13" r="1.6" fill="currentColor"/><circle cx="14" cy="31" r="1.6" fill="currentColor"/><path d="M24 37v6M16 43h16"/></svg></span>
+        <span class="option-name">Xtream Codes</span>
+        <span class="option-desc">Servidor, usuario y contraseña de tu cuenta</span>
+      </button>
+    </div>
+
+    <div class="welcome-saved" id="welcomeSaved" hidden>
+      <div class="welcome-saved-head">
+        <h2>Mis listas</h2>
+        <button class="pill" id="welcomeManage" data-nav>Administrar listas</button>
+      </div>
+      <div class="saved-row" id="welcomeLists"></div>
+    </div>
+    <p class="hint notice" id="welcomeNotice" hidden></p>
+  </section>
+
+  <!-- ===== REPRODUCTOR ===== -->
+  <section id="playerView" class="player" hidden>
+    <video id="video" playsinline crossorigin="anonymous"></video>
+    <div class="status" id="pStatus" hidden></div>
+    <div class="perror" id="pError" hidden role="alert">
+      <b id="pErrTitle">No se pudo reproducir</b>
+      <p id="pErrText"></p>
+      <div class="actions">
+        <button class="btn ghost" id="pCopy" data-nav>Copiar enlace para VLC</button>
+        <button class="btn" id="pRetry" data-nav>Reintentar</button>
+      </div>
+    </div>
+    <div class="osd" id="osd">
+      <div class="osd-top">
+        <button class="ctl back" id="pBack" data-nav data-tip="Volver al menú" aria-label="Volver al menú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+        <div class="osd-title"><img id="pLogo" alt=""><div><b id="pName"></b><small id="pGroup"></small></div></div>
+        <span class="live-badge" id="pLive"><i></i>EN VIVO</span>
+        <span class="clock" id="pClock"></span>
+      </div>
+      <div class="osd-bottom">
+        <div class="epg-now" id="pEpg"></div>
+        <div class="seek" id="pSeekWrap"><span id="pTimeCur">0:00</span><input type="range" id="pSeek" min="0" max="1000" value="0" data-nav aria-label="Posición"><span id="pTime">0:00</span></div>
+        <div class="controls">
+          <div class="ctl-group">
+            <button class="ctl" id="pPrev" data-nav data-tip="Anterior" aria-label="Anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14"/><path d="M19 5 9 12l10 7z" fill="currentColor"/></svg></button>
+            <button class="ctl" id="pRew" data-nav data-tip="Retroceder 10 s" aria-label="Retroceder 10 s"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><text x="12" y="15.5" font-size="7" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none">10</text></svg></button>
+            <button class="ctl big" id="pPlay" data-nav data-tip="Reproducir / pausa" aria-label="Reproducir / pausa"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M7 4.5v15l13-7.5z" fill="currentColor"/><g class="i-pause"><rect x="6" y="4.5" width="4" height="15" rx="1" fill="currentColor"/><rect x="14" y="4.5" width="4" height="15" rx="1" fill="currentColor"/></g></svg></button>
+            <button class="ctl" id="pFwd" data-nav data-tip="Adelantar 10 s" aria-label="Adelantar 10 s"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/><text x="12" y="15.5" font-size="7" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none">10</text></svg></button>
+            <button class="ctl" id="pNext" data-nav data-tip="Siguiente" aria-label="Siguiente"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14"/><path d="M5 5l10 7-10 7z" fill="currentColor"/></svg></button>
+            <div class="vol"><button class="ctl" id="pMute" data-nav data-tip="Silenciar" aria-label="Silenciar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><g class="i-waves"><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a7.5 7.5 0 0 1 0 11"/></g><g class="i-mute"><path d="m16 9 5 6M21 9l-5 6"/></g></svg></button><input type="range" id="pVol" min="0" max="100" value="100" data-nav aria-label="Volumen"></div>
+          </div>
+          <div class="ctl-group right">
+            <button class="ctl" id="pList" data-nav data-tip="Lista de canales" aria-label="Lista de canales"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" fill="currentColor"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor"/></svg></button>
+            <button class="ctl" id="pSubs" data-nav data-tip="Subtítulos" aria-label="Subtítulos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10.5 10.2a2.3 2.3 0 1 0 0 3.6M17.5 10.2a2.3 2.3 0 1 0 0 3.6"/></svg></button>
+            <button class="ctl" id="pAudio" data-nav data-tip="Audio" aria-label="Audio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="1.5"/></svg></button>
+            <button class="ctl" id="pQuality" data-nav data-tip="Calidad" aria-label="Calidad"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M7 9v6M7 12h3.5M10.5 9v6M14 9v6h1.5a3 3 0 0 0 0-6z"/></svg></button>
+            <button class="ctl" id="pAspect" data-nav data-tip="Formato de pantalla" aria-label="Formato de pantalla"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M6.5 10V8.5h2.5M17.5 14v1.5H15"/></svg></button>
+            <button class="ctl" id="pSpeed" data-nav data-tip="Velocidad" aria-label="Velocidad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 14 4-5"/><circle cx="12" cy="14" r="1.4" fill="currentColor"/></svg></button>
+            <button class="ctl" id="pInfoBtn" data-nav data-tip="Información" aria-label="Información"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.7" r="1.1" fill="currentColor"/></svg></button>
+            <button class="ctl" id="pFav" data-nav data-tip="Favorito" aria-label="Favorito"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></button>
+            <button class="ctl" id="pPip" data-nav data-tip="Imagen en imagen" aria-label="Imagen en imagen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><rect x="12" y="11" width="7" height="6" rx="1.2" fill="currentColor"/></svg></button>
+            <button class="ctl" id="pVlc" data-nav data-tip="Abrir en VLC" aria-label="Abrir en VLC"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8.5 8.5"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button>
+            <button class="ctl" id="pFull" data-nav data-tip="Pantalla completa" aria-label="Pantalla completa"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-enter"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></g><g class="i-exit"><path d="M9 4v3.5A1.5 1.5 0 0 1 7.5 9H4M20 9h-3.5A1.5 1.5 0 0 1 15 7.5V4M15 20v-3.5a1.5 1.5 0 0 1 1.5-1.5H20M4 15h3.5A1.5 1.5 0 0 1 9 16.5V20"/></g></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pmenu" id="pMenu" hidden role="menu"><h4 id="pMenuTitle"></h4><div id="pMenuList"></div></div>
+    <aside class="plist" id="pListPanel" hidden aria-label="Lista de canales">
+      <header><b id="pListTitle">Canales</b><button class="ctl small" id="pListClose" data-nav aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+      <div class="plist-items" id="pListItems"></div>
+    </aside>
+    <div class="pinfo" id="pInfo" hidden><h4>Información técnica</h4><dl id="pInfoList"></dl></div>
+  </section>
+
+  <!-- ===== PANELES ===== -->
+  <div class="sheet-backdrop" id="backdrop" hidden></div>
+
+  <div class="sheet" id="catSheet" hidden>
+    <h2>Categorías</h2>
+    <div class="chips" id="catList"></div>
+  </div>
+
+  <div class="sheet" id="searchSheet" hidden>
+    <h2>Buscar</h2>
+    <input class="field" id="searchInput" type="search" placeholder="Nombre del canal, película o serie" data-nav autocomplete="off">
+    <p class="hint">Busca en todas las categorías de la sección actual.</p>
+  </div>
+
+  <div class="sheet wide" id="sourcesSheet" hidden>
+    <h2 id="sourcesTitle">Mis listas</h2>
+    <div id="sourcesManage"><div class="source-list" id="sourceList"></div></div>
+    <h3 id="formTitle">Agregar lista</h3>
+    <form id="sourceForm" class="form">
+      <input type="hidden" name="id">
+      <div class="seg" role="radiogroup">
+        <label><input type="radio" name="type" value="m3u" checked><span data-nav tabindex="0">M3U / M3U8</span></label>
+        <label><input type="radio" name="type" value="xtream"><span data-nav tabindex="0">Xtream Codes</span></label>
+      </div>
+      <input class="field" name="name" placeholder="Nombre (opcional)" data-nav>
+      <div class="only-m3u">
+        <input class="field" name="url" placeholder="URL de la lista .m3u / .m3u8" data-nav>
+        <label class="file-btn" data-nav tabindex="0">o cargar archivo…<input type="file" name="file" accept=".m3u,.m3u8,.txt" hidden></label> <span class="file-name" id="fileName"></span>
+      </div>
+      <div class="only-xtream" hidden>
+        <input class="field" name="server" placeholder="Servidor (ej: http://dominio.com:8080)" data-nav>
+        <div class="row2">
+          <input class="field" name="username" placeholder="Usuario" data-nav autocomplete="off">
+          <input class="field" name="password" placeholder="Contraseña" type="password" data-nav autocomplete="off">
+        </div>
+      </div>
+      <input class="field" name="epgUrl" placeholder="Guía EPG XMLTV (opcional, varias separadas por coma)" data-nav>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="btnFormReset" data-nav>Limpiar</button>
+        <button type="submit" class="btn" data-nav>Guardar y abrir</button>
+      </div>
+      <p class="error" id="formError" hidden></p>
+    </form>
+  </div>
+
+  <div class="sheet wide" id="subsSheet" hidden>
+    <h2>Subtítulos</h2>
+    <div class="chips" id="subsTracks"></div>
+    <h3>Buscar en OpenSubtitles, SubDL y Podnapisi</h3>
+    <div class="row2">
+      <input class="field" id="subsQuery" placeholder="Título" data-nav>
+      <button class="btn" id="subsSearch" data-nav>Buscar</button>
+    </div>
+    <div class="sub-results" id="subsResults"></div>
+    <label class="file-btn" data-nav tabindex="0">Cargar archivo .srt / .vtt<input type="file" id="subsFile" accept=".srt,.vtt" hidden></label>
+  </div>
+
+  <!-- ===== AJUSTES ===== -->
+  <section id="settingsView" class="settings" hidden aria-label="Ajustes">
+    <header class="settings-head">
+      <button class="pill" id="setBack" data-nav>‹ Volver</button>
+      <h1><span class="gear"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Ajustes</h1>
+      <label class="search-pill"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="setSearch" type="search" placeholder="Buscar ajuste" data-nav autocomplete="off"></label>
+    </header>
+    <div class="settings-body">
+      <nav class="settings-nav" id="setNav" aria-label="Secciones"></nav>
+      <div class="settings-panel" id="setPanel"></div>
+    </div>
+  </section>
+  <div class="sheet-backdrop pick-backdrop" id="pickBackdrop" hidden></div>
+  <div class="sheet pick-sheet" id="pickSheet" hidden>
+    <h2 id="pickTitle"></h2>
+    <p class="hint" id="pickHint"></p>
+    <div id="pickBody"></div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

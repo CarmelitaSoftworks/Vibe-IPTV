@@ -1,0 +1,137 @@
+# Guía de uso — Vibe IPTV
+
+> Volver al [README](../README.md)
+
+Dos apps nativas que comparten el mismo diseño de menú (cuadrícula de mosaicos redondeados con paginación lateral y barra inferior con categoría y fecha/hora):
+
+| | Web (navegador) | Android / Android TV |
+|---|---|---|
+| Tecnología | HTML/CSS/JS sin framework + hls.js + mpegts.js | Kotlin + Jetpack Compose + Media3 (ExoPlayer) |
+| Listas M3U / M3U8 | URL o archivo | URL o archivo |
+| Xtream Codes | En vivo, películas y series (episodios) | En vivo, películas y series (episodios) |
+| Guía EPG XMLTV (.xml / .xml.gz) | Sí (ahora / luego + progreso) | Sí (ahora / luego + progreso) |
+| Favoritos, búsqueda, categorías, varias listas | Sí | Sí |
+| Control remoto / D-pad | Flechas, Enter, Atrás, RePág/AvPág | Lanzador de Android TV, banner, D-pad, CH+/CH−, MENÚ, INFO |
+| Subtítulos | Pistas internas, .srt/.vtt local, búsqueda en OpenSubtitles | Pistas internas (botón CC), .srt/.vtt local, OpenSubtitles, "Abrir en VLC" |
+
+> La app es sólo un **reproductor**: no incluye canales. Úsala con listas a las que tengas acceso legítimo.
+
+---
+
+## 1. App web
+
+**En Windows lo más fácil:** doble clic en `web/iniciar.bat` (abre el navegador solo) o en `web/iniciar-red-local.bat` para usarla también desde el TV o el celular de tu red (muestra la dirección a usar). Deja la ventana negra abierta mientras usas la app.
+
+```bash
+cd web
+node server/server.js          # http://localhost:8080
+# o accesible desde el TV / celular de tu red local:
+node server/server.js --lan
+```
+
+Requiere Node 18+ y **no tiene dependencias** (hls.js y mpegts.js ya están en `web/vendor/`).
+
+**¿Por qué un servidor?** Casi ningún proveedor IPTV permite que un navegador lea sus streams (CORS) y muchos usan `http://`. `server.js` sirve la app y hace de proxy: reescribe las listas HLS para que los segmentos también pasen por él, sigue redirecciones y envía un User-Agent de reproductor. La app primero intenta la conexión directa y, si falla, usa el proxy automáticamente (se puede cambiar en Ajustes). No expongas el servidor a Internet: es un proxy abierto pensado para tu PC o tu red local.
+
+También se puede instalar como app (PWA) desde Chrome en Android: menú ⋮ → "Instalar app".
+
+**Teclas:** flechas para moverse (← → al borde cambian de página), Enter para abrir, Esc/Atrás para volver, `F` marca favorito, `/` busca. En el reproductor: ▲/▼ cambia de canal, ◄/► avanza 10 s en películas, Enter muestra los controles.
+
+Pruebas: `npm test` (parsers M3U/XMLTV/SRT y reescritura del proxy).
+
+## 2. App Android / Android TV
+
+1. Abre la carpeta `android/` con **Android Studio** (Ladybug o más nuevo). Descargará Gradle 8.11.1 y las dependencias.
+2. Conecta un teléfono o un Android TV con depuración USB/ADB y pulsa ▶ *Run*.
+3. Para generar un APK: *Build → Build App Bundle(s) / APK(s) → Build APK(s)*, o en terminal `./gradlew assembleRelease`. Se generan APK por arquitectura (más livianos): la mayoría de los Android TV y TV box usan `armeabi-v7a` o `arm64-v8a`; si no sabes cuál, usa el `universal` (el release se firma con la clave de depuración para poder probarlo; cambia la firma antes de publicar).
+
+**Sin Android Studio (compilar en la nube):** sube la carpeta `iptv-app` a un repositorio de GitHub (puede ser privado). En la pestaña **Actions** se ejecuta "Compilar APK" (o pulsa *Run workflow*); al terminar (≈10 min), descarga **Vibe-IPTV-APK** en *Artifacts*. Usa el APK `universal` si no sabes la arquitectura de tu equipo.
+
+Instalar en el teléfono: copia el APK, ábrelo y permite "Instalar apps desconocidas" para el administrador de archivos o el navegador.
+
+Instalar en un Android TV sin Android Studio: activa *Opciones de desarrollador → Depuración por red* en el TV y ejecuta `adb connect IP_DEL_TV` y `adb install app-release.apk`. También sirve copiar el APK con una app como "Send Files to TV" o "Downloader".
+
+**Android TV:** aparece en el lanzador de TV (banner incluido), no requiere pantalla táctil y todo se maneja con el control: D-pad en la cuadrícula (al llegar al borde cambia de página), mantener pulsado OK o la tecla MENÚ marca favorito, CH+/CH− y ▲/▼ cambian de canal en el reproductor, MENÚ abre las opciones (favorito, subtítulos, Abrir en VLC), INFO muestra la guía.
+
+**Teléfono:** desliza la cuadrícula para cambiar de página, mantén pulsado un mosaico para marcarlo como favorito; el reproductor pasa a horizontal y admite imagen en imagen (PiP) al salir con Inicio.
+
+## 3. Secciones: TV en vivo, Películas y Series
+
+Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, Películas, Series) y la cantidad de contenido de cada uno; las mismas secciones están siempre en las pestañas de arriba. Atrás vuelve al Inicio.
+
+- **Xtream Codes** ya separa las tres secciones.
+- **Listas M3U** se clasifican solas: `/movie/` o `/series/` en la URL, extensiones de video (`.mp4`, `.mkv`…), nombres de grupo (`Películas`, `VOD`, `Cine`, `Series`, `Novelas`, `Temporada`…) y patrones de episodio (`S01E02`, `T1E2`, `1x02`). Los episodios sueltos se agrupan en su serie y se ordenan por temporada y capítulo.
+
+## 4. Guía de programación (EPG)
+
+- Se usa la guía que indique la lista (`x-tvg-url`), la de Xtream (`xmltv.php`) o la que escribas al editar la lista. Puedes poner **varias separadas por coma**: se combinan.
+- **Se actualiza sola**: al añadir una lista, cada vez que abres la app, al volver a la app tras 30 minutos y cada 4 horas con la app abierta. Mientras descarga se muestra la última guía guardada, y si falla la conexión se mantiene esa. En **Ajustes** ves cuándo se actualizó y tienes "Actualizar guía ahora".
+- Para generar tu propia guía con software libre: [iptv-org/epg](https://github.com/iptv-org/epg) (para Chile sirven `mi.tv`, `gatotv.com` y `directv.com`):
+
+  ```bash
+  git clone --depth 1 -b master https://github.com/iptv-org/epg.git
+  cd epg && npm install
+  npm run grab --- --sites=mi.tv --days=2      # genera guide.xml
+  ```
+
+  Copia `guide.xml` a `web/` y usa `guide.xml` como guía (web) o `http://IP-DE-TU-PC:8080/guide.xml` (Android/TV con el servidor corriendo en la red local).
+
+## 5. Pantalla de listas y Ajustes
+
+- **Pantalla de listas**: tres opciones grandes para añadir (lista M3U por enlace, archivo M3U, Xtream Codes) y tus listas guardadas para abrirlas con un clic. Se abre con el botón de la lista (arriba a la izquierda).
+- **Ajustes** (botón con engranaje), al estilo de OwnTV: secciones a la izquierda con su número de opciones y, a la derecha, cada ajuste con su valor; buscador arriba. Con el control: ▲▼ entre secciones, ► entra, ◄ vuelve.
+  - Rápido: números de canal, guía bajo los mosaicos, siguiente episodio automático, animaciones.
+  - Listas y guía · Apariencia (el menú es **blanco por defecto**; tema oscuro y color de acento opcionales; tamaño de mosaicos) · Reproducción · Subtítulos · Red (sólo web) · Inicio de la app (última lista, pantalla de listas o último canal) · Datos · Acerca de.
+
+## 6. Reproductor y canales de TV de cable (AC-3, MP2, MPEG-2)
+
+**Controles (web):** anterior/siguiente, ±10 s, volumen, lista lateral de canales con la guía (◄ en un canal en vivo), subtítulos, audio, calidad, formato de pantalla (ajustar, rellenar, estirar, zoom), velocidad, información técnica (motor, resolución, códecs, búfer), favorito, imagen en imagen, "Abrir en VLC" y pantalla completa. Teclas: M silencio, I información, L lista, +/− volumen.
+
+**Formatos de la TV de cable:** muchos canales en vivo traen audio **AC-3 / MP2** o video **MPEG-2 entrelazado**, que los navegadores no reproducen.
+- **Web:** el servidor local los convierte al vuelo con **ffmpeg** (sólo lo necesario: copia el video H.264 y convierte el audio a AAC; si el video es MPEG-2 lo desentrelaza y lo pasa a H.264 a 720p). `iniciar.bat` instala ffmpeg sola la primera vez (`npm install`, unos 70 MB). En Ajustes → Reproducción: *Automático* (cuando el canal falla o queda sin sonido), *Siempre en TV en vivo* o *Nunca*, y la calidad de conversión.
+- **Android / TV:** tres motores: **ExoPlayer**, **VLC (LibVLC)** y **MPV (libmpv, el mismo de OwnTV)**. En *Automático* prueba en ese orden: si ExoPlayer no puede, pasa a VLC y, si VLC tampoco, a MPV; los siguientes canales en vivo parten con el último motor que funcionó. En *Automático* empieza con ExoPlayer y, si el equipo no tiene decodificador para el audio o el video del canal, cambia solo a VLC (y los siguientes canales en vivo parten directo en VLC). En el menú del reproductor (tecla MENÚ) se puede cambiar de motor, el formato de pantalla y la pista de audio.
+
+## 7. Subtítulos de varias fuentes
+
+La búsqueda consulta **a la vez** varias fuentes y muestra de cuál viene cada resultado:
+
+| Fuente | Clave | Notas |
+|---|---|---|
+| OpenSubtitles | No necesita | Se usa el complemento abierto de Stremio y Cinemeta para encontrar el título. Con tu API key (opcional) también se consulta la API oficial, la misma base de VLSub de VLC. |
+| SubDL | Gratis en subdl.com | Mucho catálogo en español latino. |
+| Podnapisi | No necesita | |
+
+- Se descomprimen solos los `.zip`, se convierten `.ass`/`.ssa`, y se corrige la codificación: los `.srt` en español que vienen en Windows-1252 ya no muestran `Ã±`.
+- **Desfase:** si el subtítulo va adelantado o atrasado, en el menú de subtítulos usa "Aparecen antes / después" (pasos de 0,5 s).
+- También puedes cargar tu propio archivo y elegir las pistas que trae el video.
+- En la web la búsqueda la hace el servidor local (por eso necesita `iniciar.bat`); en la vista previa dentro de Claude sólo queda OpenSubtitles con clave.
+
+## 8. Categorías y subcategorías
+
+Dentro de TV en vivo, Películas y Series aparece una barra con las categorías de la lista y, si los grupos traen subniveles (`CHILE | DEPORTES`, `Series » Drama » Turcas`, `LATINO - Noticias`), una segunda barra con las subcategorías. Un prefijo que sólo repite la sección ("Películas | Acción") se omite.
+
+## Versión de vista previa (artefacto)
+
+Hay una vista previa publicada dentro de Claude con contenido de demostración (6 canales, 3 películas y 1 serie). Ese entorno bloquea las conexiones a servidores externos, así que sirve para probar el menú, la navegación y el reproductor, pero no listas reales.
+
+## Estructura
+
+```
+web/
+  index.html, css/styles.css, sw.js, manifest.webmanifest
+  js/app.js        interfaz, cuadrícula, paneles, reproductor, teclado/mando
+  js/m3u.js        parser M3U
+  js/xtream.js     cliente Xtream Codes
+  js/epg.js        parser XMLTV
+  js/player.js     hls.js / mpegts.js / nativo, reintento por proxy
+  js/subtitles.js  OpenSubtitles, SRT→VTT
+  js/nav.js        navegación espacial con flechas
+  server/server.js servidor + proxy (sin dependencias)
+android/
+  app/src/main/java/cl/iptv/player/
+    MainActivity.kt          teclas del mando, PiP, detección de TV
+    data/                    modelos, M3U, Xtream, EPG, OpenSubtitles, almacenamiento
+    ui/MenuScreen.kt         cuadrícula de mosaicos + barra inferior
+    ui/PlayerScreen.kt       ExoPlayer, guía, opciones, subtítulos, VLC
+    ui/Dialogs.kt            listas, ajustes, categorías, búsqueda
+```

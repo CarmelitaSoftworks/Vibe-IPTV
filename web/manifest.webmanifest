@@ -1,0 +1,12 @@
+{
+  "name": "Vibe IPTV",
+  "short_name": "Vibe IPTV",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#e8ecef",
+  "theme_color": "#e8ecef",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

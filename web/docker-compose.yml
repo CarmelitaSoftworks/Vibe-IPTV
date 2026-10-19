@@ -1,0 +1,12 @@
+# Uso:  docker compose up -d      →  http://IP-DEL-SERVIDOR:8080
+services:
+  vibe-iptv:
+    build: .
+    container_name: vibe-iptv
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=America/Santiago
+      # Recomendado si se puede entrar desde fuera de tu casa:
+      # - VIBE_PASSWORD=cambia-esta-clave
