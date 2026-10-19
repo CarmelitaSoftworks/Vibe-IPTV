@@ -60,6 +60,7 @@ class XtreamClient(server: String, private val user: String, private val pass: S
                 if (ui.optString("auth") != "1") throw SecurityException("Usuario o contraseña incorrectos")
                 val status = ui.optString("status")
                 if (status.isNotBlank() && !status.equals("Active", true)) throw SecurityException("La cuenta está ${status.lowercase()}")
+                serverTz = o.optJSONObject("server_info")?.optString("timezone").orEmpty()
                 workingBase = b
                 return
             } catch (e: SecurityException) {
@@ -81,7 +82,12 @@ class XtreamClient(server: String, private val user: String, private val pass: S
         else -> e.message ?: e.toString()
     }
 
+    /** Zona horaria del servidor (para TV en diferido). */
+    var serverTz: String = ""; private set
+
     fun liveUrl(id: Any) = "$base/live/$u/$p/$id.$liveFormat"
+    /** TV en diferido de Xtream: /timeshift/usuario/clave/minutos/AAAA-MM-DD:HH-MM/id.ts */
+    fun catchupUrl(id: Any) = "$base/timeshift/$u/$p/{dur}/{start}/$id.ts"
     fun movieUrl(id: Any, ext: String) = "$base/movie/$u/$p/$id.${ext.ifBlank { "mp4" }}"
     fun episodeUrl(id: Any, ext: String) = "$base/series/$u/$p/$id.${ext.ifBlank { "mp4" }}"
     fun epgUrl() = "$base/xmltv.php?username=$u&password=$p"
@@ -110,6 +116,9 @@ class XtreamClient(server: String, private val user: String, private val pass: S
                 logo = s.optString("stream_icon"), group = lcm[s.optString("category_id")] ?: "Sin categoría",
                 url = liveUrl(id), tvgId = s.optString("epg_channel_id").takeUnless { it == "null" }.orEmpty(),
                 tvgName = s.optString("name"), num = s.optInt("num").takeIf { it > 0 },
+                archiveDays = if (s.optString("tv_archive") == "1") s.optString("tv_archive_duration").toIntOrNull() ?: 0 else 0,
+                catchup = if (s.optString("tv_archive") == "1") catchupUrl(id) else "",
+                catchupTz = serverTz,
             )
         }
         vs.await().objects { s ->

@@ -81,6 +81,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var showWelcome by mutableStateOf(false)
     /** Pantalla de Ajustes (dos columnas). */
     var showSettings by mutableStateOf(false)
+    /** Guía de programación en grilla. */
+    var showGuide by mutableStateOf(false)
+
+    /** Canales de la guía: los de la categoría elegida en TV en vivo, o todos. */
+    fun guideChannels(): List<Item> =
+        if (!home && section == Kind.LIVE && series == null && query.isBlank()) view.filter { it.kind == Kind.LIVE }
+        else items.filter { it.kind == Kind.LIVE }
+
+    /** TV en diferido: reproduce un programa ya emitido desde su inicio. */
+    fun playCatchup(channel: Item, prog: Programme): Boolean {
+        val url = channel.catchupUrlFor(prog) ?: return false
+        val it = channel.copy(
+            id = "cu_${channel.id}_${prog.start}", kind = Kind.MOVIE, url = url,
+            name = "${prog.title} · ${channel.name}", num = null,
+        )
+        activate(it, listOf(it))
+        return true
+    }
     /** Motor con el que funcionó el último canal en vivo (VLC o MPV): los siguientes parten con él. */
     var preferLiveEngine by mutableStateOf<String?>(null)
 

@@ -27,6 +27,7 @@ fun App(vm: AppViewModel) {
                 BackHandler { vm.showSettings = false }
                 SettingsScreen(vm)
             }
+            vm.showGuide && vm.screen == Screen.MENU && vm.source != null -> GuideScreen(vm)
             vm.screen == Screen.MENU -> if (vm.showWelcome || vm.source == null) {
                 BackHandler(enabled = vm.source != null) { vm.showWelcome = false }
                 WelcomeScreen(vm)

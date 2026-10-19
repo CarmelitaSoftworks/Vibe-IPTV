@@ -29,6 +29,11 @@ data class Item(
     /** Categoría y subcategoría sacadas del grupo ("CHILE | DEPORTES" → CHILE / DEPORTES). */
     val cat: String = "",
     val sub: String = "",
+    /** TV en diferido (catch-up): días de archivo y plantilla de URL con {start} y {dur}. */
+    val archiveDays: Int = 0,
+    val catchup: String = "",
+    /** Zona horaria del servidor para el diferido (Xtream usa la hora local del servidor). */
+    val catchupTz: String = "",
 )
 
 private val GROUP_SPLIT = Regex("\\s*(?:\\||›|»|/|::|\\s-\\s)\\s*")
@@ -102,3 +107,14 @@ private val ADULT = Regex("""(?i)(^|[^a-z])(xxx|adult[oa]?s?|adults?|er[oó]tic[
 
 /** Contenido para adultos según el grupo / categoría de la lista. */
 fun Item.isAdult(): Boolean = ADULT.containsMatchIn(group) || ADULT.containsMatchIn(cat) || ADULT.containsMatchIn(sub)
+
+
+/** URL para ver en diferido un programa ya emitido (null si el canal no tiene archivo o ya expiró). */
+fun Item.catchupUrlFor(prog: Programme, now: Long = System.currentTimeMillis()): String? {
+    if (catchup.isBlank() || archiveDays <= 0) return null
+    if (prog.start >= now || prog.start < now - archiveDays * 86_400_000L) return null
+    val tz = runCatching { java.util.TimeZone.getTimeZone(catchupTz.ifBlank { java.util.TimeZone.getDefault().id }) }.getOrDefault(java.util.TimeZone.getDefault())
+    val fmt = java.text.SimpleDateFormat("yyyy-MM-dd:HH-mm", java.util.Locale.US).apply { timeZone = tz }
+    val minutes = ((minOf(prog.stop, now) - prog.start + 59_999) / 60_000).coerceAtLeast(1)
+    return catchup.replace("{start}", fmt.format(java.util.Date(prog.start))).replace("{dur}", minutes.toString())
+}

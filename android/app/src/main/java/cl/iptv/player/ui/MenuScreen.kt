@@ -133,6 +133,7 @@ private fun CategoryBar(vm: AppViewModel) {
     if (askPin) PinDialog(onDismiss = { askPin = false }) { pin -> if (vm.unlockAdult(pin)) { askPin = false; true } else false }
     Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(3.dp)) {
+            if (vm.section == Kind.LIVE) item { Pill("📅 Guía") { vm.showGuide = true } }
             item { Pill("Todos  $total", active = vm.category == CAT_ALL) { vm.selectCategory(CAT_ALL) } }
             if (nResume > 0) item { Pill("▶ Seguir viendo  $nResume", active = vm.category == CAT_RESUME) { vm.selectCategory(CAT_RESUME) } }
             if (nFav > 0) item { Pill("★ Favoritos  $nFav", active = vm.category == CAT_FAV) { vm.selectCategory(CAT_FAV) } }
