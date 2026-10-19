@@ -245,7 +245,7 @@ export class Player {
     }
     if (this.engine && window.mpegts && this.engine.statisticsInfo?.speed) out.Descarga = `${Math.round(this.engine.statisticsInfo.speed)} KB/s`;
     const q = v.getVideoPlaybackQuality?.();
-    if (q) out['Cuadros perdidos'] = `${q.droppedVideoFrames} de ${q.totalVideoFrames}`;
+    if (q) out['Cuadros perdidos'] = `${q.droppedVideoFrames} / ${q.totalVideoFrames}`;
     if (v.buffered.length) out.Búfer = `${Math.max(0, v.buffered.end(v.buffered.length - 1) - v.currentTime).toFixed(1)} s`;
     return out;
   }
