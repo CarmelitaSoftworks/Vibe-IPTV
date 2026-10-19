@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "cl.iptv.player"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "cl.iptv.player"
