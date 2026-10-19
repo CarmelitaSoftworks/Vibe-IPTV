@@ -51,7 +51,7 @@ private sealed class Row(val label: String, val desc: String = "") {
 private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
 private class Section(val id: String, val name: String, val icon: SecIcon, val rows: List<Row>)
 
-private fun sections(vm: AppViewModel): List<Section> {
+private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean): List<Section> {
     val offsets = (-3..3).map { h -> h.toString() to if (h == 0) "Sin desfase" else "${if (h > 0) "+" else ""}$h h" }
     return listOf(
         Section("quick", "Rápido", SecIcon.QUICK, listOf(
@@ -111,7 +111,17 @@ private fun sections(vm: AppViewModel): List<Section> {
             Row.Danger("Restablecer ajustes", "Vuelve a los valores de fábrica (no borra tus listas)") { vm.resetSettings() },
         )),
         Section("about", "Acerca de", SecIcon.ABOUT, listOf(
-            Row.Info("Vibe IPTV", "Versión 1.0"),
+            Row.Info("Vibe IPTV", "Versión ${vm.versionName}"),
+            Row.Action("Actualizaciones", vm.update?.let { "Descarga el APK y ábrelo para instalarlo encima: se conservan tus listas" }
+                ?: "Busca una versión más nueva en GitHub", value = { vm.updateStatus.ifBlank { "Buscar ahora" } }, arrow = true) {
+                val u = vm.update
+                if (u == null) vm.checkUpdate(isTv, silent = false)
+                else try {
+                    ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(u.url)))
+                } catch (e: android.content.ActivityNotFoundException) {
+                    vm.message = "Sin navegador: usa Downloader con el código 9370754"
+                }
+            },
             Row.Info("Desarrollado por", "Carmelita Softworks"),
             Row.Info("Licencia", "Código abierto · GPLv3"),
             Row.Info("Reproducción", "ExoPlayer · VLC · MPV"),
@@ -127,7 +137,8 @@ private var lastSection = "quick"
 @Composable
 fun SettingsScreen(vm: AppViewModel) {
     val c = LocalIptv.current
-    val all = sections(vm)
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val all = sections(vm, ctx, (ctx as? cl.iptv.player.MainActivity)?.isTv == true)
     var current by remember { mutableStateOf(lastSection) }
     var query by remember { mutableStateOf("") }
     var picking by remember { mutableStateOf<Row?>(null) }

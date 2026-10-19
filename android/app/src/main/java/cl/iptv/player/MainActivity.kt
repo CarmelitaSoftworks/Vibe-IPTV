@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         cl.iptv.player.ui.I18n.load(this)
+        if (savedInstanceState == null) vm.checkUpdate(isTv)   // aviso de versión nueva (sólo lee el número de versión)
         setContent {
             cl.iptv.player.ui.I18n.apply(vm.settings.lang)
             IptvTheme(vm.settings.theme, vm.settings.accent) { App(vm) }

@@ -115,6 +115,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         const val EPG_ON_RETURN_MS = 30 * 60_000L
     }
 
+    // ---------- Actualizaciones ----------
+    var update by mutableStateOf<Updates.Available?>(null); private set
+    var updateStatus by mutableStateOf(""); private set
+    val versionName: String get() = Updates.currentName(getApplication())
+    /** Revisa GitHub (al abrir la app, en silencio; o desde Ajustes → Acerca de). */
+    fun checkUpdate(isTv: Boolean, silent: Boolean = true) {
+        viewModelScope.launch {
+            if (!silent) updateStatus = "Buscando…"
+            runCatching { Updates.check(getApplication(), isTv) }
+                .onSuccess {
+                    update = it
+                    updateStatus = if (it != null) "Versión ${it.name} disponible" else "Tienes la última versión"
+                    if (it != null && silent) message = "Hay una versión nueva (${it.name}): Ajustes → Acerca de"
+                    if (it == null && !silent) message = "Tienes la última versión"
+                }
+                .onFailure { updateStatus = "No se pudo revisar (sin conexión)"; if (!silent) message = updateStatus }
+        }
+    }
+
     /** La app vuelve a primer plano: actualizar la guía si tiene más de 30 minutos. */
     fun onForeground() {
         if (source != null && epgUrls.isNotBlank() && epgJob?.isActive != true &&
