@@ -67,6 +67,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ### 💬 Subtitles
 - Searches **several sources at once**: OpenSubtitles (the same database as VLC's **VLSub** extension), SubDL and Podnapisi.
+- **SubDL built in through its official API**: searches by IMDb ID, downloads just the episode from season packs, flags SDH subtitles and lets you **test your key** in Settings.
 - Opens `.zip` files, fixes the encoding of Spanish `.srt` files (Windows-1252), converts `.ass` and lets you **shift the subtitle earlier or later**.
 
 ### 🎨 Appearance & settings
@@ -82,6 +83,12 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Info pages** for movies and series: synopsis, year, rating, genre and cast (from the Xtream server or TMDB with a free key).
 - **Recording** (Android): the ● button in the player saves a live channel to *Downloads/VibeIPTV*.
 - **Adjustable player controls size** (Settings → Playback).
+- **Full remote support**: number keys to jump to a channel, **previous channel**, and a sleep timer (15 to 120 min).
+- **Multiview**: up to 4 channels at once; the one you pick plays sound.
+- **Recently watched**, **search the guide by programme name** and **organize categories** (hide and reorder).
+- **Android TV / Google TV home screen row** with your favorites and recent channels.
+- **Double tap** left or right to skip back or forward 10 s (phones).
+- **Send log** (Settings → About) to report problems, without usernames or passwords.
 - **Backup**: export and import lists, favorites, "Continue watching" and settings in one file, e.g. when switching TVs.
 - Xtream passwords are hidden from error messages and logs.
 

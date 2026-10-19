@@ -67,6 +67,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ### 💬 Subtítulos
 - Búsqueda en **varias fuentes a la vez**: OpenSubtitles (la misma base que el complemento **VLSub** de VLC), SubDL y Podnapisi.
+- **SubDL integrado con su API oficial**: busca por código IMDb, baja sólo el episodio de los paquetes de temporada, marca los subtítulos SDH y permite **probar la clave** en Ajustes.
 - Abre archivos `.zip`, corrige acentos de los `.srt` en español (Windows-1252), convierte `.ass` y permite **adelantar o atrasar** el subtítulo.
 
 ### 🎨 Apariencia y ajustes
@@ -82,6 +83,12 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Fichas** de películas y series: sinopsis, año, puntuación, género y reparto (del servidor Xtream o de TMDB con una clave gratuita).
 - **Grabación** (Android): botón ● en el reproductor para guardar un canal en vivo en *Descargas/VibeIPTV*.
 - **Tamaño de los controles del reproductor** ajustable (Ajustes → Reproducción).
+- **Control remoto completo**: teclas numéricas para ir a un canal, **canal anterior**, y temporizador para dormir (15 a 120 min).
+- **Multivista**: hasta 4 canales a la vez; suena el que elijas.
+- **Vistos recientemente**, **buscar un programa en la guía** por su nombre y **organizar categorías** (ocultar y ordenar).
+- **Fila en el inicio de Android TV / Google TV** con tus favoritos y canales recientes.
+- **Doble toque** a la izquierda o derecha para retroceder o adelantar 10 s (celulares).
+- **Enviar registro** (Ajustes → Acerca de) para reportar problemas, sin usuarios ni contraseñas.
 - **Respaldo**: exporta e importa listas, favoritos, «Seguir viendo» y ajustes en un archivo, por ejemplo al cambiar de TV.
 - Las contraseñas de Xtream se ocultan en mensajes de error y registros.
 

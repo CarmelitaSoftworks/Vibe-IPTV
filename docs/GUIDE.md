@@ -154,6 +154,20 @@ In **Live TV**, the **📅 Guide** button on the category bar opens the grid: ch
 
 The app is available in **Spanish** and **English**. By default it follows the system language (Spanish if the device is in Spanish, otherwise English) and it can be set in **Settings → Appearance → Language**. Translations live in `i18n/en.json`, a single dictionary for both the web app and Android: to fix or add a text, edit it there and run `node i18n/build.mjs`.
 
+## 14. Remote control, multiview and more
+
+- **Number keys:** in the player, type the channel number (shown top right) and after 1.5 s it jumps there. If the list has no numbers, the position is used.
+- **Previous channel:** the remote's *LAST / Back channel* key, or the ↺ player button (on the web, the **P** key).
+- **Sleep timer:** the ☾ player button: 15, 30, 60, 90 or 120 min. It warns a minute before and closes the player.
+- **Double tap (phones):** left skips back 10 s, right skips forward 10 s in movies and series; the centre pauses.
+- **Recently watched:** the 🕘 pill in the category bar.
+- **Organize categories:** *Categories* button → ✎ *Organize categories*: ▲▼ to reorder and *Hide* to remove them from the bar (and from “All”). Saved per list and per profile.
+- **Search the guide:** in the grid guide, 🔍 *Search programme* searches every channel by name; OK opens it live, as catch-up, or shows when it starts.
+- **Multiview:** the ⊞ player button (live TV): up to 4 channels at once. OK picks which one plays sound, OK again opens it full screen, *Menu* (or long press) changes that tile's channel.
+- **Android TV / Google TV home screen:** the app publishes a “Vibe IPTV” row with your favorites and recent channels; picking one opens it directly. (Fire TV doesn't support this.)
+- **Send log:** Settings → About → *Send log* or *Save log to a file*. It includes recent errors and engine switches; addresses are stored without username or password.
+- **SubDL:** paste your free key in Settings → Subtitles and use *Test SubDL key*. Searches use the title's IMDb ID and, for series, download only the episode even when the subtitle comes in a season pack.
+
 ## Preview version (artifact)
 
 There's a preview published inside Claude with demo content (6 channels, 3 movies and 1 series). That environment blocks connections to external servers, so it's good for trying the menu, navigation and player, but not real lists.

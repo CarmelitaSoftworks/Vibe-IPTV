@@ -154,6 +154,20 @@ En **TV en vivo**, el botón **📅 Guía** de la barra de categorías abre la g
 
 La app está en **español** y en **inglés**. Por defecto sigue el idioma del sistema (español si el equipo está en español; si no, inglés) y se puede fijar en **Ajustes → Apariencia → Idioma**. Las traducciones están en `i18n/en.json`, un solo diccionario para la web y Android: para corregir o agregar un texto, edítalo ahí y ejecuta `node i18n/build.mjs`.
 
+## 14. Control remoto, multivista y más
+
+- **Teclas numéricas:** en el reproductor, escribe el número del canal (aparece arriba a la derecha) y en 1,5 s salta a él. Si la lista no trae números, se usa la posición.
+- **Canal anterior:** tecla *LAST / Anterior* del control, botón ↺ del reproductor (en la web, tecla **P**).
+- **Temporizador para dormir:** botón ☾ del reproductor: 15, 30, 60, 90 o 120 min. Avisa un minuto antes y cierra el reproductor.
+- **Doble toque (celulares):** a la izquierda retrocede 10 s y a la derecha adelanta 10 s en películas y series; al centro pausa.
+- **Vistos recientemente:** píldora 🕘 en la barra de categorías.
+- **Organizar categorías:** botón *Categorías* → ✎ *Organizar categorías*: ▲▼ para ordenarlas y *Ocultar* para sacarlas de la barra (y de «Todos»). Se guarda por lista y por perfil.
+- **Buscar en la guía:** en la guía en grilla, 🔍 *Buscar programa* busca por nombre en todos los canales; OK lo abre en vivo, en diferido o muestra cuándo empieza.
+- **Multivista:** botón ⊞ del reproductor (TV en vivo): hasta 4 canales a la vez. Con OK eliges cuál suena, OK otra vez lo abre en pantalla completa, *Menú* (o mantener presionado) cambia el canal de ese recuadro.
+- **Inicio de Android TV / Google TV:** la app publica una fila «Vibe IPTV» con tus favoritos y canales recientes; al elegir uno se abre directo. (Fire TV no tiene esta función.)
+- **Enviar registro:** Ajustes → Acerca de → *Enviar registro* o *Guardar registro en un archivo*. Incluye errores y cambios de motor recientes; las direcciones se guardan sin usuario ni contraseña.
+- **SubDL:** pega tu clave gratuita en Ajustes → Subtítulos y usa *Probar la clave de SubDL*. La búsqueda usa el código IMDb del título y, en series, baja sólo el episodio aunque el subtítulo venga en un paquete de temporada.
+
 ## Versión de vista previa (artefacto)
 
 Hay una vista previa publicada dentro de Claude con contenido de demostración (6 canales, 3 películas y 1 serie). Ese entorno bloquea las conexiones a servidores externos, así que sirve para probar el menú, la navegación y el reproductor, pero no listas reales.
