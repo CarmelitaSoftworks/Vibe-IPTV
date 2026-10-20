@@ -859,6 +859,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Sólo para las capturas automáticas de pantallas (pruebas): carga una lista sin red. */
+    internal fun loadPreview(src: Source, list: List<Item>, theme: String) {
+        loadJob?.cancel()
+        source = src; showWelcome = false
+        allItems = list.map { it.withCategory() }; applyParental()
+        updateSettings(settings.copy(theme = theme, lite = "off"))
+        selectSection(Kind.LIVE); goHome()
+    }
+
     // ---------- Menús de los temas Mosaicos y Ondas: dónde quedó el usuario (sobrevive al abrir el reproductor) ----------
     class ShellNav {
         var col by mutableStateOf(1)              // Ondas: columna (1 = TV en vivo)

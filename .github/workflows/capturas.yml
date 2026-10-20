@@ -1,0 +1,37 @@
+# Dibuja las pantallas de la app Android (temas) sin un equipo, con Robolectric, y las guarda en la rama "capturas".
+# Renders the Android app screens (themes) without a device and saves them to the "capturas" branch.
+name: Capturas
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capturas:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Dibujar pantallas
+        run: |
+          chmod +x gradlew
+          ./gradlew testEstandarDebugUnitTest --tests '*ThemeCapturesTest*' -Pcapturas=true --no-daemon 2>&1 | tail -60
+          ls -la app/build/capturas || true
+      - name: Guardar en la rama capturas
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/c" && cp app/build/capturas/*.png "$RUNNER_TEMP/c/" 2>/dev/null || true
+          cp -r app/build/reports/tests "$RUNNER_TEMP/c/reporte" 2>/dev/null || true
+          cd "$RUNNER_TEMP/c"
+          git init -q && git checkout -q -b capturas
+          git add . && git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "Capturas ${GITHUB_SHA::7}" || exit 0
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" capturas

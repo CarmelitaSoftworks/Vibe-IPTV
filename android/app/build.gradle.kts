@@ -43,6 +43,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all { t ->
+                t.systemProperty("roborazzi.test.record", "true")
+                t.systemProperty("vibe.capturas", System.getProperty("vibe.capturas") ?: (project.findProperty("capturas")?.toString() ?: "false"))
+                t.maxHeapSize = "3g"
+            }
+        }
+    }
     buildFeatures { compose = true; buildConfig = true }
 
     // Dos versiones: "estandar" (descarga el modelo de voz si se usan los subtítulos con IA)
@@ -104,5 +114,13 @@ dependencies {
     // Lectura de texto de capturas ("Desde una captura"): modelo incluido, sin Internet ni Google Play
     implementation("com.google.mlkit:text-recognition:16.0.1")
     testImplementation("junit:junit:4.13.2")
+    // Capturas automáticas de pantallas (Robolectric + Roborazzi): sólo en el flujo "Capturas" de GitHub Actions
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.40.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.40.1")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test:core:1.6.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }
