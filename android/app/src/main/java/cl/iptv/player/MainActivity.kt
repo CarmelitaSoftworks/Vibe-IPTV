@@ -42,7 +42,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Modo seguro y registro de cierres: antes de crear el ViewModel (que abre la última lista)
         cl.iptv.player.data.Arranque.iniciar(this, contar = savedInstanceState == null)
-        if (savedInstanceState == null) cl.iptv.player.data.Arranque.programarListo(this) { r, ms -> window.decorView.postDelayed(r, ms) }
+        // Sin lista que cargar (pantalla de bienvenida): el inicio se da por correcto a los 10 s
+        if (savedInstanceState == null) window.decorView.postDelayed({ if (vm.source == null) cl.iptv.player.data.Arranque.listo(this) }, 10_000)
         enableEdgeToEdge()
         cl.iptv.player.ui.I18n.load(this)
         vm.applyLite()

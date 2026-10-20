@@ -156,8 +156,9 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Danger("Olvidar búfer aprendido", "Vuelve al búfer elegido en todos los canales") { vm.forgetBufferBoosts() },
             Row.Danger("Restablecer ajustes", "Vuelve a los valores de fábrica (no borra tus listas)") { vm.resetSettings() },
         )),
-        Section("about", "Acerca de", SecIcon.ABOUT, listOf(
+        Section("about", "Acerca de", SecIcon.ABOUT, listOfNotNull(
             Row.Info("Vibe IPTV", "Versión ${vm.versionName}"),
+            cl.iptv.player.data.Arranque.resumen(ctx)?.let { Row.Info("Último cierre inesperado", it) },
             Row.Action("Actualizaciones", vm.update?.let { "Descarga el APK y ábrelo para instalarlo encima: se conservan tus listas" }
                 ?: "Busca una versión más nueva en GitHub", value = { vm.updateStatus.ifBlank { "Buscar ahora" } }, arrow = true) {
                 val u = vm.update

@@ -329,7 +329,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         loadJob?.cancel()
         source = src; allItems = emptyList(); items = emptyList(); epg = Epg.EMPTY; series = null; episodes = emptyList(); home = true
         epgJob?.cancel(); epgAt = 0; epgUrls = ""; epgStatus = ""
-        loadCachedEpg(src)   // la última guía guardada se muestra al instante
         showWelcome = false
         favorites = store.favorites(src.id)
         resume = store.resume(src.id)
@@ -375,12 +374,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     resumeLastChannel = false
                     items.firstOrNull { it.id == store.lastItemId }?.let { activate(it, items.filter { i -> i.kind == it.kind }) }
                 }
+                // La guía guardada se carga después de la lista, no en paralelo: juntar ambas cargas
+                // agotaba la memoria en TV boxes y la app se cerraba al volver a abrirla
+                loadCachedEpg(src)
                 refreshEpg(epgUrl)   // siempre al añadir la lista y al abrir la app
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                message = e.message ?: e.toString()
+                if (e is OutOfMemoryError) {
+                    allItems = emptyList(); items = emptyList(); epg = Epg.EMPTY
+                    logEvent("Sin memoria al cargar la lista")
+                    message = "La lista es demasiado grande para la memoria de este equipo. Activa el modo liviano o usa una lista más pequeña."
+                } else message = e.message ?: e.toString()
                 loading = null
             }
+            // La app siguió abierta tras cargar: el inicio fue correcto (se apaga el contador del modo seguro)
+            kotlinx.coroutines.delay(8_000)
+            Arranque.listo(getApplication())
         }
     }
 
@@ -394,11 +403,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return if (parsed.isEmpty()) null else runCatching { Epg.merge(parsed) }.getOrNull()
     }
 
-    private fun loadCachedEpg(src: Source) = viewModelScope.launch {
+    private suspend fun loadCachedEpg(src: Source) {
         val files = epgFiles(src.id)
-        if (files.isEmpty()) return@launch
-        val e = withContext(Dispatchers.IO) { parseFiles(files) } ?: return@launch
-        if (source?.id != src.id || epgAt > 0) return@launch     // ya llegó una más nueva
+        if (files.isEmpty()) return
+        val e = withContext(Dispatchers.IO) { parseFiles(files) } ?: return
+        if (source?.id != src.id || epgAt > 0) return     // ya llegó una más nueva
         epg = e
         epgAt = files.maxOf { it.lastModified() }
         epgStatus = "Guía guardada del ${java.text.SimpleDateFormat("dd/MM HH:mm", I18n.locale).format(java.util.Date(epgAt))} · actualizando…"
@@ -441,9 +450,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 var s = src
                 if (localUri != null) {
                     withContext(Dispatchers.IO) {
+                        // Se copia a un archivo temporal y se reemplaza al final: si la app se cierra a mitad
+                        // de la copia, la lista anterior queda intacta en vez de cortada
+                        val dest = store.localM3u(src.id)
+                        val tmp = File(dest.parentFile, dest.name + ".part")
                         getApplication<Application>().contentResolver.openInputStream(localUri)!!.use { input ->
-                            store.localM3u(src.id).outputStream().use { input.copyTo(it) }
+                            tmp.outputStream().use { input.copyTo(it) }
                         }
+                        if (!tmp.renameTo(dest)) { tmp.copyTo(dest, overwrite = true); tmp.delete() }
                     }
                     s = s.copy(localFile = true, url = "")
                 }
