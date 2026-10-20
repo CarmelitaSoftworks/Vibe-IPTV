@@ -804,6 +804,61 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun stopAiSubs() { captioner.stop(); aiSubs = null }
 
+    // ---------- Temas: imagen de fondo y temas del usuario (exportar / importar) ----------
+    // Un nombre nuevo por imagen: así la pantalla la vuelve a cargar al cambiarla
+    private fun themeFiles() = getApplication<Application>().filesDir.listFiles { f -> f.name.startsWith("tema_fondo") }.orEmpty().sortedBy { it.name }
+    private fun themeFile() = themeFiles().lastOrNull() ?: File(getApplication<Application>().filesDir, "tema_fondo_0.jpg")
+    private fun newThemeFile(): File { themeFiles().forEach { it.delete() }; return File(getApplication<Application>().filesDir, "tema_fondo_${System.currentTimeMillis()}.jpg") }
+    var themeImage by mutableStateOf(themeFiles().lastOrNull()?.absolutePath.orEmpty()); private set
+    private fun reloadThemeImage() { themeImage = themeFiles().lastOrNull()?.absolutePath.orEmpty() }
+    fun setThemeImage(uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val app = getApplication<Application>()
+                    // Se reduce a ~1920 px para no gastar memoria en TV boxes
+                    val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    app.contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) }
+                    var sample = 1; while (maxOf(opts.outWidth, opts.outHeight) / (sample * 2) >= 1920) sample *= 2
+                    val bmp = app.contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) }
+                        ?: throw java.io.IOException("No es una imagen")
+                    newThemeFile().outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+                }
+            }.onSuccess {
+                reloadThemeImage()
+                if (settings.theme != "custom") updateSettings(settings.copy(theme = "custom"))
+                message = "Imagen de fondo aplicada (tema Personalizado)"
+            }.onFailure { message = "No se pudo usar la imagen: ${it.message}" }
+        }
+    }
+    fun clearThemeImage() { themeFiles().forEach { it.delete() }; reloadThemeImage(); message = "Imagen de fondo quitada" }
+    fun exportTheme(uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val o = org.json.JSONObject().put("vibeTheme", 1)
+                        .put("theme", runCatching { org.json.JSONObject(settings.customTheme.ifBlank { "{}" }) }.getOrDefault(org.json.JSONObject()))
+                    themeFiles().lastOrNull()?.let { o.put("image", android.util.Base64.encodeToString(it.readBytes(), android.util.Base64.NO_WRAP)) }
+                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use { it.write(o.toString().toByteArray()) }
+                }
+            }.onSuccess { message = "Tema guardado" }.onFailure { message = "No se pudo guardar el tema: ${it.message}" }
+        }
+    }
+    fun importTheme(uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val o = org.json.JSONObject(getApplication<Application>().contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() })
+                    if (!o.has("vibeTheme")) throw java.io.IOException("No es un tema de Vibe IPTV")
+                    val img = o.optString("image").takeIf { it.isNotBlank() }
+                    if (img != null) newThemeFile().writeBytes(android.util.Base64.decode(img, android.util.Base64.DEFAULT)) else themeFiles().forEach { it.delete() }
+                    o.optJSONObject("theme")?.toString() ?: "{}"
+                }
+            }.onSuccess { t -> reloadThemeImage(); updateSettings(settings.copy(theme = "custom", customTheme = t)); message = "Tema importado" }
+                .onFailure { message = "No se pudo importar: ${it.message}" }
+        }
+    }
+
     // ---------- Mini reproductor (imagen en imagen dentro de la app, para TV y TV boxes) ----------
     /** El video sigue en una ventana chica en la esquina mientras se recorre el menú o la guía. */
     var mini by mutableStateOf(false); private set

@@ -52,7 +52,7 @@ fun Pill(
     val c = LocalIptv.current
     val src = remember { MutableInteractionSource() }
     val focused by src.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(50)
+    val shape = if (LocalIptv.current.radius < 18f) themeShape(2f) else RoundedCornerShape(50)
     Row(
         modifier
             .clip(shape)
@@ -65,7 +65,7 @@ fun Pill(
     ) {
         leading?.invoke()
         Text(
-            text, color = if (active) Color.White else c.ink, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+            if (c.lowercase) tr(text).lowercase() else text, color = if (active) Color.White else c.ink, fontWeight = FontWeight.Bold, fontSize = 15.sp,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }

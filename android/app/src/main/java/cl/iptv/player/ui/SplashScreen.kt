@@ -50,7 +50,7 @@ fun SplashScreen(onDone: () -> Unit) {
     val sweep = rememberInfiniteTransition(label = "sweep")
         .animateFloat(0f, 1f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "x")
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(c.bg).brushedLines(c.bgLines)) {
+    BoxWithConstraints(Modifier.fillMaxSize().themeBackground()) {
         val tileW = (maxWidth * 0.11f).coerceIn(64.dp, 150.dp)
         val tileH = tileW * 0.62f
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {

@@ -84,8 +84,7 @@ fun MenuScreen(vm: AppViewModel) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(c.bg)
-            .brushedLines(c.bgLines)
+            .themeBackground()
             .systemBarsPadding()
     ) {
         TopBar(vm, compact, onSources = { vm.showWelcome = true }, onSearch = { dialog = MenuDialog.SEARCH })
@@ -408,7 +407,7 @@ private fun HomeTile(
     val focused by src.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocused() }
     val scale by animateFloatAsState(if (focused && !cl.iptv.player.data.Perf.lite) 1.04f else 1f, label = "home")
-    val shape = RoundedCornerShape(22.dp)
+    val shape = themeShape(22f)
     val countText = if (count == 0) "Sin contenido en esta lista" else "$count ${if (count == 1) kind.one else kind.many}" + if (groups > 1) " · $groups categorías" else ""
     Box(
         modifier
@@ -437,7 +436,7 @@ private fun HomeTile(
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((6 * k).dp), modifier = Modifier.padding(horizontal = 12.dp)) {
                 SectionIcon(kind, c.accentDeep, Modifier.size((120 * k).dp))
                 Spacer(Modifier.height((8 * k).dp))
-                Text(kind.label, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = (32 * k).coerceAtLeast(20f).sp, maxLines = 1)
+                Text(if (c.lowercase) tr(kind.label).lowercase() else kind.label, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = (32 * k).coerceAtLeast(20f).sp, maxLines = 1)
                 Text(countText, color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = (15 * k).coerceAtLeast(12f).sp,
                     maxLines = 2, textAlign = TextAlign.Center)
             }
@@ -457,7 +456,7 @@ private fun Tile(
     val focused by src.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocused() }
     val scale by animateFloatAsState(if (focused && animate && !cl.iptv.player.data.Perf.lite) 1.05f else 1f, label = "tile")
-    val shape = RoundedCornerShape(18.dp)
+    val shape = themeShape(18f)
     var imgFailed by remember(item.logo) { mutableStateOf(item.logo.isBlank()) }
     val usePoster = poster && !imgFailed
 
@@ -517,7 +516,7 @@ private fun Tile(
 @Composable
 private fun EmptyTile(modifier: Modifier) {
     val c = LocalIptv.current
-    val shape = RoundedCornerShape(18.dp)
+    val shape = themeShape(18f)
     Box(modifier.clip(shape).background(Brush.verticalGradient(listOf(c.emptyA, c.emptyB))).border(1.dp, c.tileEdge.copy(alpha = 0.6f), shape))
 }
 

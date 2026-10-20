@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             cl.iptv.player.ui.I18n.apply(vm.settings.lang)
-            IptvTheme(vm.settings.theme, vm.settings.accent) { App(vm) }
+            IptvTheme(vm.settings.theme, vm.settings.accent, vm.settings.customTheme, vm.themeImage) { App(vm) }
         }
     }
 

@@ -690,3 +690,30 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 .g-search { display: flex; flex-direction: column; gap: 4px; padding: 6px 20px; max-height: 40vh; overflow: auto; }
 .g-search input { font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--tile-edge, #ccc); }
 .g-search button { text-align: left; }
+
+/* ===== Tema "Mosaicos": gris con degradado radial, verde intenso y esquinas rectas ===== */
+:root[data-app-theme="metro"] {
+  --bg: #e6e6e6; --bg-lines: transparent; --tile-a: #f5f5f5; --tile-b: #f5f5f5; --tile-edge: transparent;
+  --tile-empty-a: rgba(255,255,255,.2); --tile-empty-b: rgba(255,255,255,.2); --ink: #333; --ink-soft: #6e6e6e;
+  --accent: #3fa535; --accent-deep: #2b7f24; --focus: #63d457; --dock: rgba(240,240,240,.95); --dock-line: #3fa535;
+  --sheet: #f7f7f7; --tile-lines: transparent; --tile-hi: transparent; --radius: 2px;
+}
+:root[data-app-theme="metro"] body, :root[data-app-theme="metro"] .welcome, :root[data-app-theme="metro"] .settings, :root[data-app-theme="metro"] .splash {
+  background: radial-gradient(ellipse at 50% 35%, #e6e6e6 0%, #8f8f8f 100%);
+}
+:root[data-app-theme="metro"] .pill, :root[data-app-theme="metro"] .chip, :root[data-app-theme="metro"] .tab { border-radius: 2px; text-transform: lowercase; }
+:root[data-app-theme="metro"] .tile { box-shadow: none; }
+
+/* ===== Tema "Ondas": violeta degradado con ondas translúcidas y texto blanco ===== */
+:root[data-app-theme="wave"] {
+  color-scheme: dark;
+  --bg: #3b3470; --bg-lines: transparent; --tile-a: rgba(255,255,255,.22); --tile-b: rgba(255,255,255,.10); --tile-edge: rgba(255,255,255,.25);
+  --tile-empty-a: rgba(255,255,255,.08); --tile-empty-b: rgba(255,255,255,.04); --ink: #fff; --ink-soft: #e2dcf5;
+  --accent: #9d8bff; --accent-deep: #d9d1ff; --focus: #fff; --dock: rgba(20,15,46,.35); --dock-line: #cfc6ff;
+  --sheet: #2c2752; --tile-lines: transparent; --tile-hi: rgba(255,255,255,.15); --row-hover: rgba(255,255,255,.08);
+}
+:root[data-app-theme="wave"] body, :root[data-app-theme="wave"] .welcome, :root[data-app-theme="wave"] .settings, :root[data-app-theme="wave"] .splash {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 600' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='white'%3E%3Cpath d='M0 380 C300 300 600 460 1000 350' stroke-width='22' opacity='.06'/%3E%3Cpath d='M0 395 C300 320 620 470 1000 365' stroke-width='2' opacity='.18'/%3E%3Cpath d='M0 410 C320 330 600 480 1000 380' stroke-width='1.5' opacity='.14'/%3E%3Cpath d='M0 425 C300 350 640 490 1000 395' stroke-width='14' opacity='.05'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat,
+    linear-gradient(225deg, #8e6bae 0%, #3b3470 100%);
+}

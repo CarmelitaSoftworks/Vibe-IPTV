@@ -93,7 +93,9 @@ data class Settings(
     val animations: Boolean = true,
     // Apariencia: el menú es blanco por defecto
     val lang: String = "auto",            // auto (idioma del sistema) | es | en
-    val theme: String = "light",          // light | dark | system
+    val theme: String = "light",          // light | dark | system | metro | wave | custom
+    /** Tema personalizado (JSON: base, bg, bg2, accent, square, glass, bgStyle). */
+    val customTheme: String = "",
     val accent: String = "celeste",       // celeste | verde | naranja | rosa | violeta
     val tileSize: String = "normal",      // small | normal | large
     // Guía

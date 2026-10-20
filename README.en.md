@@ -70,6 +70,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ### 💬 Subtitles
 - Searches **several sources at once**: OpenSubtitles (the same database as VLC's **VLSub** extension), SubDL and Podnapisi.
+- **Offline AI subtitles** (Android): transcribes Spanish, English or Portuguese audio live with [Vosk](https://alphacephei.com/vosk) (open source). The **AI** build (`vibe-iptv-ia-*.apk`) includes the Spanish model; the regular one downloads it the first time (~40 MB).
 - **Automatic subtitles** (on by default): in movies and series, if the audio isn't in your language, it uses the built-in track or finds and loads one from OpenSubtitles and Podnapisi, **no key or account needed**.
 - **SubDL built in through its official API**: searches by IMDb ID, downloads just the episode from season packs, flags SDH subtitles and lets you **test your key** in Settings.
 - Opens `.zip` files, fixes the encoding of Spanish `.srt` files (Windows-1252), converts `.ass` and lets you **shift the subtitle earlier or later**.

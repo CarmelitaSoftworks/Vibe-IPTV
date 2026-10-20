@@ -70,6 +70,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ### 💬 Subtítulos
 - Búsqueda en **varias fuentes a la vez**: OpenSubtitles (la misma base que el complemento **VLSub** de VLC), SubDL y Podnapisi.
+- **Subtítulos con IA sin internet** (Android): transcribe en vivo el audio en español, inglés o portugués con [Vosk](https://alphacephei.com/vosk) (código abierto). La versión **IA** (`vibe-iptv-ia-*.apk`) trae el modelo de español incluido; la normal lo descarga la primera vez (~40 MB).
 - **Subtítulos automáticos** (activado por defecto): en películas y series, si el audio no está en tu idioma, usa la pista interna o busca y carga uno solo desde OpenSubtitles y Podnapisi, **sin clave ni cuenta**.
 - **SubDL integrado con su API oficial**: busca por código IMDb, baja sólo el episodio de los paquetes de temporada, marca los subtítulos SDH y permite **probar la clave** en Ajustes.
 - Abre archivos `.zip`, corrige acentos de los `.srt` en español (Windows-1252), convierte `.ass` y permite **adelantar o atrasar** el subtítulo.
@@ -78,6 +79,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - Ajustes por secciones (rápidos, listas y guía, apariencia, reproducción, subtítulos, red, inicio, datos).
 - Tema claro (predeterminado), oscuro o del sistema, con colores de acento.
 - Al abrir la app puede volver directamente al último canal visto.
+- **Temas**: Claro, Oscuro, **Mosaicos** (gris y verde, esquinas rectas), **Ondas** (violeta) y **Personalizado** (colores, imagen de fondo, mosaicos translúcidos), que se puede exportar e importar para compartirlo.
 - **En español y en inglés**: sigue el idioma del equipo o se elige en Ajustes → Apariencia → Idioma.
 
 ### 🔒 Privacidad

@@ -18,6 +18,17 @@ data class IptvColors(
     val accent: Color, val accentDeep: Color, val focus: Color,
     val dock: Color, val sheet: Color,
     val tileLines: Color = Color(0x59FFFFFF),
+    /** Estilo del fondo: "lines" (clásico), "metro" (degradado radial gris), "wave" (degradado con ondas), "flat". */
+    val bgStyle: String = "lines",
+    /** Segundo color del fondo (degradados). */
+    val bg2: Color = Color.Unspecified,
+    /** Redondeo de mosaicos y botones (0 = esquinas rectas). */
+    val radius: Float = 18f,
+    /** Textos de las pestañas en minúsculas (estilo "metro"). */
+    val lowercase: Boolean = false,
+    /** Imagen de fondo del tema personalizado (archivo interno), o "". */
+    val bgImage: String = "",
+    val dark: Boolean = false,
 )
 
 val Light = IptvColors(
@@ -35,10 +46,50 @@ val Dark = Light.copy(
     emptyA = Color(0xFF2A3035), emptyB = Color(0xFF252A2E),
     ink = Color(0xFFD5DBDF), inkSoft = Color(0xFF8D979E),
     dock = Color(0xFF262C30), sheet = Color(0xFF23292D),
-    tileLines = Color(0x06FFFFFF), accentDeep = Color(0xFF4CC3EA),
+    tileLines = Color(0x06FFFFFF), accentDeep = Color(0xFF4CC3EA), dark = true,
+)
+
+/** Inspirado en los menús de consola de mosaicos planos: gris claro con degradado radial, verde intenso, esquinas rectas. */
+val Metro = Light.copy(
+    bg = Color(0xFFE6E6E6), bg2 = Color(0xFF8F8F8F), bgLines = Color.Transparent, bgStyle = "metro",
+    tileA = Color(0xFFF5F5F5), tileB = Color(0xFFF5F5F5), tileEdge = Color(0x00000000), tileLines = Color.Transparent,
+    emptyA = Color(0x33FFFFFF), emptyB = Color(0x33FFFFFF),
+    ink = Color(0xFF333333), inkSoft = Color(0xFF6E6E6E),
+    accent = Color(0xFF3FA535), accentDeep = Color(0xFF2B7F24), focus = Color(0xFF63D457),
+    dock = Color(0xF2F0F0F0), sheet = Color(0xFFF7F7F7), radius = 2f, lowercase = true,
+)
+
+/** Inspirado en los menús de consola con fondo de ondas: violeta degradado, mosaicos translúcidos y texto blanco. */
+val Wave = Dark.copy(
+    bg = Color(0xFF3B3470), bg2 = Color(0xFF8E6BAE), bgLines = Color.Transparent, bgStyle = "wave",
+    tileA = Color(0x38FFFFFF), tileB = Color(0x1AFFFFFF), tileEdge = Color(0x40FFFFFF), tileLines = Color.Transparent,
+    emptyA = Color(0x14FFFFFF), emptyB = Color(0x0AFFFFFF),
+    ink = Color(0xFFFFFFFF), inkSoft = Color(0xCCE9E4F7),
+    accent = Color(0xFF9D8BFF), accentDeep = Color(0xFFD9D1FF), focus = Color(0xFFFFFFFF),
+    dock = Color(0x33140F2E), sheet = Color(0xFF2C2752), radius = 16f, dark = true,
 )
 
 val LocalIptv = staticCompositionLocalOf { Light }
+
+/** Tema personalizado guardado en Ajustes (JSON): base, colores, esquinas, transparencia e imagen de fondo. */
+fun customTheme(json: String, bgImage: String): IptvColors {
+    val o = runCatching { org.json.JSONObject(json) }.getOrDefault(org.json.JSONObject())
+    fun col(k: String): Color? = o.optString(k).takeIf { it.matches(Regex("#?[0-9a-fA-F]{6}")) }
+        ?.let { Color(0xFF000000 or it.removePrefix("#").toLong(16)) }
+    val dark = o.optString("base", "dark") == "dark"
+    var c = if (dark) Dark else Light
+    col("accent")?.let { a -> c = c.copy(accent = a, accentDeep = if (dark) lerp(a, Color.White, 0.35f) else lerp(a, Color.Black, 0.25f), focus = lerp(a, Color.White, 0.3f)) }
+    col("bg")?.let { b -> c = c.copy(bg = b, bg2 = col("bg2") ?: lerp(b, if (dark) Color.Black else Color.White, 0.35f), bgStyle = o.optString("bgStyle", "gradient"), bgLines = Color.Transparent) }
+    if (o.optBoolean("glass", false)) c = c.copy(
+        tileA = (if (dark) Color.White else Color.Black).copy(alpha = 0.16f), tileB = (if (dark) Color.White else Color.Black).copy(alpha = 0.08f),
+        tileEdge = Color.White.copy(alpha = 0.25f), tileLines = Color.Transparent,
+        dock = c.dock.copy(alpha = 0.75f), emptyA = Color.White.copy(alpha = 0.06f), emptyB = Color.White.copy(alpha = 0.03f),
+        ink = if (dark) Color.White else c.ink,
+    )
+    return c.copy(radius = if (o.optBoolean("square", false)) 2f else 18f, bgImage = bgImage, dark = dark)
+}
+
+private fun lerp(a: Color, b: Color, t: Float) = androidx.compose.ui.graphics.lerp(a, b, t)
 
 /** Colores de acento elegibles en Ajustes → Apariencia: (acento, acento oscuro, foco). */
 val ACCENTS = mapOf(
@@ -51,10 +102,18 @@ val ACCENTS = mapOf(
 
 /** El menú es blanco por defecto; "dark" u "system" sólo si se eligen en Ajustes. */
 @Composable
-fun IptvTheme(theme: String = "light", accent: String = "celeste", content: @Composable () -> Unit) {
-    val dark = when (theme) { "dark" -> true; "system" -> isSystemInDarkTheme(); else -> false }
-    val base = if (dark) Dark else Light
-    val c = ACCENTS[accent]?.takeIf { accent != "celeste" }?.let { (a, d, f) -> base.copy(accent = a, accentDeep = d, focus = f) } ?: base
+fun IptvTheme(theme: String = "light", accent: String = "celeste", custom: String = "", bgImage: String = "", content: @Composable () -> Unit) {
+    val base = when (theme) {
+        "dark" -> Dark
+        "system" -> if (isSystemInDarkTheme()) Dark else Light
+        "metro" -> Metro
+        "wave" -> Wave
+        "custom" -> customTheme(custom, bgImage)
+        else -> Light
+    }
+    val dark = base.dark
+    // El acento elegido se aplica encima (salvo en el personalizado, que trae el suyo)
+    val c = ACCENTS[accent]?.takeIf { accent != "celeste" && theme != "custom" }?.let { (a, d, f) -> base.copy(accent = a, accentDeep = d, focus = f) } ?: base
     val scheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
         primary = c.accent, onPrimary = Color.White, background = c.bg, surface = c.sheet,
         onBackground = c.ink, onSurface = c.ink, secondary = c.accentDeep,

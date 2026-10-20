@@ -53,7 +53,14 @@ private sealed class Row(val label: String, val desc: String = "") {
 private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
 private class Section(val id: String, val name: String, val icon: SecIcon, val rows: List<Row>)
 
-private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}, onProfiles: () -> Unit = {}, onSaveLog: () -> Unit = {}): List<Section> {
+private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}, onProfiles: () -> Unit = {}, onSaveLog: () -> Unit = {}, onTheme: (String) -> Unit = {}): List<Section> {
+    // Tema personalizado: cada opción se guarda en un JSON y cambia el tema a "Personalizado"
+    fun ctGet(s: Settings, k: String) = runCatching { org.json.JSONObject(s.customTheme.ifBlank { "{}" }) }.getOrDefault(org.json.JSONObject()).opt(k)
+    fun ctSet(s: Settings, k: String, v: Any): Settings {
+        val o = runCatching { org.json.JSONObject(s.customTheme.ifBlank { "{}" }) }.getOrDefault(org.json.JSONObject())
+        return s.copy(customTheme = o.put(k, v).toString(), theme = "custom")
+    }
+    fun hex(v: String) = v.trim().removePrefix("#").take(6).let { if (it.matches(Regex("[0-9a-fA-F]{6}"))) "#$it" else "" }
     val offsets = (-3..3).map { h -> h.toString() to if (h == 0) "Sin desfase" else "${if (h > 0) "+" else ""}$h h" }
     return listOf(
         Section("quick", "Rápido", SecIcon.QUICK, listOf(
@@ -75,7 +82,22 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
         )),
         Section("look", "Apariencia", SecIcon.LOOK, listOf(
             Row.Choice("Idioma", "Idioma de la app", listOf("auto" to "Automático (idioma del sistema)", "es" to "Español", "en" to "English"), get = { it.lang }, set = { s, v -> s.copy(lang = v) }),
-            Row.Choice("Tema", options = listOf("light" to "Claro", "dark" to "Oscuro", "system" to "Según el sistema"), get = { it.theme }, set = { s, v -> s.copy(theme = v) }),
+            Row.Choice("Tema", options = listOf("light" to "Claro", "dark" to "Oscuro", "system" to "Según el sistema",
+                "metro" to "Mosaicos (gris y verde, esquinas rectas)", "wave" to "Ondas (violeta)", "custom" to "Personalizado"),
+                get = { it.theme }, set = { s, v -> s.copy(theme = v) }),
+            Row.Choice("Personalizado: base", "Cualquier opción \"Personalizado\" activa ese tema", listOf("dark" to "Oscura", "light" to "Clara"),
+                get = { (ctGet(it, "base") as? String) ?: "dark" }, set = { s, v -> ctSet(s, "base", v) }),
+            Row.TextField("Personalizado: color de fondo", "En hexadecimal, ej: #1B2A49", get = { (ctGet(it, "bg") as? String).orEmpty() }, set = { s, v -> ctSet(s, "bg", hex(v)) }),
+            Row.TextField("Personalizado: segundo color del fondo", "Para el degradado, ej: #4B1D5C", get = { (ctGet(it, "bg2") as? String).orEmpty() }, set = { s, v -> ctSet(s, "bg2", hex(v)) }),
+            Row.Choice("Personalizado: estilo del fondo", options = listOf("gradient" to "Degradado", "metro" to "Degradado radial", "wave" to "Ondas", "flat" to "Liso"),
+                get = { (ctGet(it, "bgStyle") as? String) ?: "gradient" }, set = { s, v -> ctSet(s, "bgStyle", v) }),
+            Row.TextField("Personalizado: color de acento", "Botones y selección, ej: #FF8800", get = { (ctGet(it, "accent") as? String).orEmpty() }, set = { s, v -> ctSet(s, "accent", hex(v)) }),
+            Row.Toggle("Personalizado: mosaicos translúcidos", get = { ctGet(it, "glass") == true }, set = { s, v -> ctSet(s, "glass", v) }),
+            Row.Toggle("Personalizado: esquinas rectas", get = { ctGet(it, "square") == true }, set = { s, v -> ctSet(s, "square", v) }),
+            Row.Action("Personalizado: imagen de fondo", "Una foto o fondo de pantalla de este equipo", value = { if (vm.themeImage.isBlank()) "Sin imagen" else "Con imagen" }, arrow = true) { onTheme("image") },
+            Row.Danger("Quitar imagen de fondo") { vm.clearThemeImage() },
+            Row.Action("Exportar tema", "Guarda el tema personalizado (con su imagen) para usarlo en otro equipo o compartirlo", arrow = true) { onTheme("export") },
+            Row.Action("Importar tema", "Carga un tema .json exportado desde Vibe IPTV", arrow = true) { onTheme("import") },
             Row.Choice("Color de acento", options = listOf("celeste" to "Celeste", "verde" to "Verde", "naranja" to "Naranja", "rosa" to "Rosa", "violeta" to "Violeta"), get = { it.accent }, set = { s, v -> s.copy(accent = v) }),
             Row.Choice("Tamaño de los mosaicos", options = listOf("normal" to "Normal", "large" to "Grande", "small" to "Compacto"), get = { it.tileSize }, set = { s, v -> s.copy(tileSize = v) }),
             Row.Toggle("Animaciones", get = { it.animations }, set = { s, v -> s.copy(animations = v) }),
@@ -178,12 +200,27 @@ fun SettingsScreen(vm: AppViewModel) {
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")) { uri -> if (uri != null) vm.exportBackup(uri) }
     val importer = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importBackup(uri) }
+    val themeImagePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.setThemeImage(uri) }
+    val themeExporter = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")) { uri -> if (uri != null) vm.exportTheme(uri) }
+    val themeImporter = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importTheme(uri) }
     val logSaver = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain")) { uri -> if (uri != null) vm.exportLog(uri) }
     var showProfiles by remember { mutableStateOf(false) }
     if (showProfiles) ProfilesDialog(vm) { showProfiles = false }
     val all = sections(vm, ctx, (ctx as? cl.iptv.player.MainActivity)?.isTv == true,
         onProfiles = { showProfiles = true },
+        onTheme = { what ->
+            try {
+                when (what) {
+                    "image" -> themeImagePicker.launch(arrayOf("image/*"))
+                    "export" -> themeExporter.launch("vibe-iptv-tema.json")
+                    else -> themeImporter.launch(arrayOf("application/json", "text/plain", "*/*"))
+                }
+            } catch (e: android.content.ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }
+        },
         onSaveLog = {
             try { logSaver.launch("vibe-iptv-registro.txt") }
             catch (e: android.content.ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }
@@ -205,7 +242,7 @@ fun SettingsScreen(vm: AppViewModel) {
 
     fun save(s: Settings) = vm.updateSettings(s)
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(c.bg).brushedLines(c.bgLines).systemBarsPadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().themeBackground().systemBarsPadding()) {
         val narrow = maxWidth < 760.dp
         Column(Modifier.fillMaxSize().padding(horizontal = if (narrow) 16.dp else 36.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Encabezado: volver, título con engranaje y buscador

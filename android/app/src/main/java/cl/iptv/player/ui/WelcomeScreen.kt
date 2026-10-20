@@ -73,7 +73,7 @@ fun WelcomeScreen(vm: AppViewModel) {
     }
 
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(c.bg).brushedLines(c.bgLines).systemBarsPadding()
+        Modifier.fillMaxSize().themeBackground().systemBarsPadding()
     ) {
         val narrow = maxWidth < 640.dp
         Column(

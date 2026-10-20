@@ -78,7 +78,7 @@ fun GuideScreen(vm: AppViewModel) {
         if (playingNow) vm.activate(ch, listFor(ch)) else detail = ch to p!!
     }
 
-    Column(Modifier.fillMaxSize().background(c.bg).brushedLines(c.bgLines).systemBarsPadding()) {
+    Column(Modifier.fillMaxSize().themeBackground().systemBarsPadding()) {
         // Encabezado
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = if (compact) 6.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Pill("‹ Volver") { vm.showGuide = false }

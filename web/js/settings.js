@@ -47,7 +47,7 @@ function sections() {
     ] },
     { id: 'look', name: 'Apariencia', rows: [
       { type: 'choice', key: 'lang', label: 'Idioma', desc: 'Idioma de la app', options: [['auto', 'Automático (idioma del sistema)'], ['es', 'Español'], ['en', 'English']] },
-      { type: 'choice', key: 'theme', label: 'Tema', options: [['light', 'Claro'], ['dark', 'Oscuro'], ['system', 'Según el sistema']] },
+      { type: 'choice', key: 'theme', label: 'Tema', options: [['light', 'Claro'], ['dark', 'Oscuro'], ['system', 'Según el sistema'], ['metro', 'Mosaicos (gris y verde, esquinas rectas)'], ['wave', 'Ondas (violeta)']] },
       { type: 'choice', key: 'accent', label: 'Color de acento', options: ACCENTS },
       { type: 'choice', key: 'tileSize', label: 'Tamaño de los mosaicos', options: [['normal', 'Normal'], ['large', 'Grande'], ['small', 'Compacto']] },
       { type: 'toggle', key: 'animations', label: 'Animaciones' },
