@@ -230,6 +230,8 @@ run `node i18n/build.mjs` to update both the web app and Android.
 
 **Vibe IPTV** is developed and maintained by **[Carmelita Softworks](https://github.com/CarmelitaSoftworks)**. 🇨🇱
 
+It's a ***vibe coded*** project: the code was written with the help of artificial intelligence, with the idea, direction and testing on real devices by Carmelita Softworks.
+
 It also exists thanks to other open-source projects:
 
 - [AndroidX Media3 / ExoPlayer](https://github.com/androidx/media) — Apache 2.0

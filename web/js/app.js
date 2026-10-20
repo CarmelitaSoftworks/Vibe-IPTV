@@ -12,7 +12,7 @@ import { demoM3U, demoEpg, DEMO_SOURCE } from './demo.js';
 import { readScreenshot } from './ocr.js';
 import { openGuide, openDetails, catchupUrl, exportBackup, importBackup } from './extras.js';
 
-// En la versión artefacto (vista previa dentro de Claude) se define __ARTIFACT__ al empaquetar
+// En la versión artefacto (vista previa en línea) se define __ARTIFACT__ al empaquetar
 const IS_ARTIFACT = typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__;
 window.__IPTV_ARTIFACT__ = IS_ARTIFACT;
 

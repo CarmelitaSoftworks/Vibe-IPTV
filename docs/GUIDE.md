@@ -109,7 +109,7 @@ The search queries several sources **at once** and shows where each result comes
 - `.zip` files are extracted automatically, `.ass`/`.ssa` are converted and the encoding is fixed: Spanish `.srt` files in Windows-1252 no longer show `Ã±`.
 - **Delay:** if the subtitle is early or late, use "Show earlier / later" in the subtitles menu (0.5 s steps).
 - You can also load your own file and choose the tracks embedded in the video.
-- On the web the search is done by the local server (that's why it needs `iniciar.bat` or the server); in the preview inside Claude only OpenSubtitles with a key is left.
+- On the web the search is done by the local server (that's why it needs `iniciar.bat` or the server); in the online preview only OpenSubtitles with a key is left.
 
 ## 8. Categories and subcategories
 
@@ -177,7 +177,7 @@ The app is available in **Spanish** and **English**. By default it follows the s
 
 ## Preview version (artifact)
 
-There's a preview published inside Claude with demo content (6 channels, 3 movies and 1 series). That environment blocks connections to external servers, so it's good for trying the menu, navigation and player, but not real lists.
+There's an online preview with demo content (6 channels, 3 movies and 1 series). That environment blocks connections to external servers, so it's good for trying the menu, navigation and player, but not real lists.
 
 ## Layout
 

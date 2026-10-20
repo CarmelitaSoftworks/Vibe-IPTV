@@ -109,7 +109,7 @@ La búsqueda consulta **a la vez** varias fuentes y muestra de cuál viene cada 
 - Se descomprimen solos los `.zip`, se convierten `.ass`/`.ssa`, y se corrige la codificación: los `.srt` en español que vienen en Windows-1252 ya no muestran `Ã±`.
 - **Desfase:** si el subtítulo va adelantado o atrasado, en el menú de subtítulos usa "Aparecen antes / después" (pasos de 0,5 s).
 - También puedes cargar tu propio archivo y elegir las pistas que trae el video.
-- En la web la búsqueda la hace el servidor local (por eso necesita `iniciar.bat` o el servidor); en la vista previa dentro de Claude sólo queda OpenSubtitles con clave.
+- En la web la búsqueda la hace el servidor local (por eso necesita `iniciar.bat` o el servidor); en la vista previa en línea sólo queda OpenSubtitles con clave.
 
 ## 8. Categorías y subcategorías
 
@@ -177,7 +177,7 @@ La app está en **español** y en **inglés**. Por defecto sigue el idioma del s
 
 ## Versión de vista previa (artefacto)
 
-Hay una vista previa publicada dentro de Claude con contenido de demostración (6 canales, 3 películas y 1 serie). Ese entorno bloquea las conexiones a servidores externos, así que sirve para probar el menú, la navegación y el reproductor, pero no listas reales.
+Hay una vista previa en línea con contenido de demostración (6 canales, 3 películas y 1 serie). Ese entorno bloquea las conexiones a servidores externos, así que sirve para probar el menú, la navegación y el reproductor, pero no listas reales.
 
 ## Estructura
 
