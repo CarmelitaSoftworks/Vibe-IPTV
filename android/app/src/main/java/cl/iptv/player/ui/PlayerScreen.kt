@@ -184,7 +184,8 @@ fun PlayerScreen(vm: AppViewModel) {
             if (vm.bumpBuffer(it0)) bumpTick.value++
         }
     }
-    val player = remember(bufLevel, live) {
+    val aiOn = vm.aiSubs != null
+    val player = remember(bufLevel, live, aiOn) {
         // Búfer medido en segundos (no en megas: con canales 1080p pesados el límite en megas lo dejaba en pocos
         // segundos) y velocidad fija en directo: evita cortes y saltos hacia adelante
         val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -196,7 +197,16 @@ fun PlayerScreen(vm: AppViewModel) {
             .setFallbackMinPlaybackSpeed(1f).setFallbackMaxPlaybackSpeed(1f)
             .build()
         // Decodificador FFmpeg incluido: audio AC-3 / E-AC-3 / DTS aunque el equipo no lo traiga
-        val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(ctx)
+        // El audio pasa por el generador de subtítulos IA (sólo lo usa si están activados).
+        // Con los subtítulos IA se evita el paso directo de AC-3 al equipo de sonido, para tener el audio decodificado.
+        val renderers = object : androidx.media3.exoplayer.DefaultRenderersFactory(ctx) {
+            override fun buildAudioSink(context: android.content.Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): androidx.media3.exoplayer.audio.AudioSink =
+                androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(androidx.media3.exoplayer.audio.TeeAudioProcessor(vm.captioner.sink)))
+                    .apply { if (aiOn) @Suppress("DEPRECATION") setAudioCapabilities(androidx.media3.exoplayer.audio.AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES) }
+                    .build()
+        }
             .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
         ExoPlayer.Builder(ctx, renderers).setLoadControl(load).setLivePlaybackSpeedControl(liveSpeed).build().apply {
@@ -322,6 +332,12 @@ fun PlayerScreen(vm: AppViewModel) {
             }
         }
     }
+
+    // Subtítulos IA: necesitan ExoPlayer (es el motor que entrega el audio decodificado); se apagan al salir
+    LaunchedEffect(vm.aiSubs, engine) {
+        if (vm.aiSubs != null && engine != "exo") { engineFor = item.id to "exo"; vm.message = "Subtítulos IA: usando el motor ExoPlayer" }
+    }
+    DisposableEffect(Unit) { onDispose { vm.stopAiSubs() } }
 
     // Subtítulos automáticos: si el audio no está en el idioma preferido, usar la pista interna en ese idioma
     // o buscar en las fuentes sin clave (OpenSubtitles vía Stremio y Podnapisi; SubDL si hay clave) y cargar el mejor
@@ -673,6 +689,17 @@ fun PlayerScreen(vm: AppViewModel) {
                     }
                 },
         )
+        // Subtítulos IA en vivo (últimas dos frases + lo que se está oyendo)
+        if (vm.aiSubs != null && !vm.mini) {
+            val cap = vm.captioner
+            val textNow = (cap.lines + listOfNotNull(cap.partial.takeIf { it.isNotBlank() })).takeLast(2).joinToString("\n")
+            if (textNow.isNotBlank() && now - cap.lastAt < 6000) Text(
+                textNow, color = Color.White, fontSize = (22 * subtitleScale(vm.settings.subSize)).sp, fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = (28 * subtitleScale(vm.settings.subSize)).sp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (controls) 150.dp else 40.dp, start = 40.dp, end = 40.dp)
+                    .clip(RoundedCornerShape(10.dp)).background(Color(0xA6000000)).padding(horizontal = 14.dp, vertical = 6.dp),
+            )
+        }
         // Doble toque: indicador ±10 s
         if (seekFlash.first != 0 && System.currentTimeMillis() - seekFlash.second < 700) {
             LaunchedEffect(seekFlash) { delay(720); seekFlash = 0 to 0L }
@@ -801,6 +828,14 @@ fun PlayerScreen(vm: AppViewModel) {
                     add(PanelRow("Desactivados", tracks.none { it.selected } && subtitle == null) { k?.selectSubtitle(null); subtitle = null; panel = null })
                     tracks.forEach { t -> add(PanelRow(t.label, t.selected) { k?.selectSubtitle(t.id); panel = null }) }
                     add(PanelRow("Buscar subtítulos…", detail = "OpenSubtitles · SubDL · Podnapisi") { panel = null; showSubs = true })
+                    // Generados con IA en el equipo (Vosk): transcribe el audio en su idioma, sin internet
+                    if (vm.aiSubs != null) add(PanelRow("✨ Desactivar subtítulos IA", true, "Generando en ${cl.iptv.player.data.VoskModels.names[vm.aiSubs] ?: ""}") { vm.stopAiSubs(); panel = null })
+                    else listOf("es", "en", "pt").forEach { l ->
+                        add(PanelRow("✨ Generar con IA · audio en ${cl.iptv.player.data.VoskModels.names[l]}", false,
+                            if (vm.aiBundled(l)) "Sin internet · modelo incluido" else "Sin internet · descarga el modelo la 1.ª vez (~40 MB)") {
+                            panel = null; vm.startAiSubs(l)
+                        })
+                    }
                     add(PanelRow("Cargar archivo .srt / .vtt / .ass") {
                         panel = null
                         try { subsPicker.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { vm.message = "Este dispositivo no tiene selector de archivos" }

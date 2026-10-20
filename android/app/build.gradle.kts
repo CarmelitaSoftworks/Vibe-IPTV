@@ -43,7 +43,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
+
+    // Dos versiones: "estandar" (descarga el modelo de voz si se usan los subtítulos con IA)
+    // e "ia" (trae incluido el modelo de español: GitHub Actions lo descarga en src/ia/assets/vosk/es).
+    flavorDimensions += "modelo"
+    productFlavors {
+        create("estandar") { dimension = "modelo"; isDefault = true }
+        create("ia") { dimension = "modelo"; versionNameSuffix = "-ia" }
+    }
 
     // VLC y MPV traen la misma librería de C++: se usa una sola copia
     packaging {
@@ -90,6 +98,9 @@ dependencies {
     implementation("dev.jdtech.mpv:libmpv:1.0.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.tvprovider:tvprovider:1.0.0")
+    // Subtítulos con IA en el equipo: Vosk (reconocimiento de voz sin internet, Apache 2.0)
+    implementation("com.alphacephei:vosk-android:0.3.75@aar")
+    implementation("net.java.dev.jna:jna:5.18.1@aar")
     // Lectura de texto de capturas ("Desde una captura"): modelo incluido, sin Internet ni Google Play
     implementation("com.google.mlkit:text-recognition:16.0.1")
     testImplementation("junit:junit:4.13.2")

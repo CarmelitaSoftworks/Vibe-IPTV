@@ -37,6 +37,8 @@ object Updates {
         val name = json.optString("name")
         val build = Regex("""0\.1\.(\d+)""").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: return null
         if (build <= currentBuild(ctx)) return null
-        return Available(build, "0.1.$build", DOWNLOAD + apkFor(isTv))
+        // La versión con el modelo de voz incluido se actualiza con su propio APK
+        val file = apkFor(isTv).let { if (cl.iptv.player.BuildConfig.FLAVOR == "ia") it.replace("vibe-iptv-", "vibe-iptv-ia-") else it }
+        return Available(build, "0.1.$build", DOWNLOAD + file)
     }
 }

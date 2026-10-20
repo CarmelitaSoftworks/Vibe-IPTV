@@ -63,3 +63,19 @@ test('Captura: viñetas leídas como » o • antes de cada dato', () => {
   assert.equal(r.username, 'carlos2026');
   assert.equal(r.password, 'Tq7Lm2xP');
 });
+
+test('Correo con etiquetas bilingües y enlace cortado en varias líneas', () => {
+  const r = p(`Datos de acceso\nUsuario / Username\n11112222\nContraseña / Password\n33334444\nURL\nhttp://tv.ejemplo.pro:8080\nImportante: El usuario y contraseña debe ser ingresado tal como aparece\nM3u Plus Playlist URL: http://tv.ejemplo.pro:8\n080/get.php?username=11112222&pass\nword=33334444&type=m3u_plus&output\n=mpegts`);
+  assert.equal(r.type, 'xtream');
+  assert.equal(r.server, 'http://tv.ejemplo.pro:8080');
+  assert.equal(r.username, '11112222');
+  assert.equal(r.password, '33334444');
+  assert.match(r.url, /get\.php\?username=11112222&password=33334444&type=m3u_plus&output=mpegts$/);
+});
+
+test('Etiqueta bilingüe con el valor en la misma línea', () => {
+  const r = p('Usuario / Username: pepe\nContraseña / Password: Xy12\nURL: http://srv.ejemplo.net:2095');
+  assert.equal(r.username, 'pepe');
+  assert.equal(r.password, 'Xy12');
+  assert.equal(r.server, 'http://srv.ejemplo.net:2095');
+});

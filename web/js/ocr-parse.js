@@ -6,7 +6,7 @@
 //   { type: 'xtream' | 'm3u' | null, server, username, password, url, epgUrl, name, found: [...] }
 
 const LABELS = {
-  server: /^(?:url\s+(?:del\s+)?servidor|server\s*url|xtream\s*(?:url|server)|portal(?:\s*url)?|servidor|server|host(?:name)?|dns|direcci[oó0]n|address|dominio|domain)\b/i,
+  server: /^(?:url\s+(?:del\s+)?servidor|url(?=\s*(?:[:：=]|$))|server\s*url|xtream\s*(?:url|server)|portal(?:\s*url)?|servidor|server|host(?:name)?|dns|direcci[oó0]n|address|dominio|domain)\b/i,
   username: /^(?:nombre\s+de\s+usuario|user\s*name|username|usuario|user|login|usr|id\s+de\s+usuario)\b/i,
   password: /^(?:contrase\S{0,3}a|password|passw(?:or)?d|pass|clave|pwd|senha|pin)\b/i,
   port: /^(?:puerto|port|porta)\b/i,
@@ -29,6 +29,32 @@ export function cleanOcrText(text) {
     .replace(/\r/g, '');
 }
 
+/**
+ * Une enlaces que el correo o el chat cortó en varias líneas
+ * ("http://tv.ejemplo.cl:8" + "080/get.php?username=…&pass" + "word=…").
+ */
+export function joinWrappedUrls(text) {
+  const lines = text.split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    while (/https?:\/\/\S*$/i.test(line.trimEnd()) && line.trim().length >= 24 && i + 1 < lines.length) {
+      const next = lines[i + 1].trim();
+      if (!next || /\s/.test(next) || /^https?:/i.test(next) || !/[\/?&=:%.]/.test(next)) break;
+      line = line.trimEnd() + next; i++;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+/** Lo que queda después de la etiqueta, sin separadores ni la traducción ("Usuario / Username: x" → "x"). */
+function afterLabel(line, m) {
+  let v = line.slice(m[0].length).replace(SEP, '');
+  if (/^[\/|]/.test(v)) v = v.replace(/^[\/|]\s*[^\s:：=]+/, '').replace(SEP, '');
+  return v.trim();
+}
+
 function stripValue(v) {
   return v.replace(/^[\s"'`([{<•·*]+/, '').replace(/[\s"'`)\]}>.,;•·*]+$/, '');
 }
@@ -49,7 +75,7 @@ const firstToken = (v) => stripValue(v).split(/\s+/)[0] || '';
 
 /** Busca los datos en el texto. */
 export function parseListDetails(rawText) {
-  const text = cleanOcrText(rawText);
+  const text = joinWrappedUrls(cleanOcrText(rawText));
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const out = { type: null, server: '', username: '', password: '', url: '', epgUrl: '', name: '', found: [] };
   let port = '';
@@ -70,13 +96,13 @@ export function parseListDetails(rawText) {
   }
 
   // 2. Campos con etiqueta: "Usuario: juan" o la etiqueta en una línea y el valor en la siguiente
-  const isLabelOnly = (l) => Object.values(LABELS).some((re) => { const m = re.exec(l); return m && !stripValue(l.slice(m[0].length).replace(SEP, '')); });
+  const isLabelOnly = (l) => Object.values(LABELS).some((re) => { const m = re.exec(l.replace(BULLETS, '')); return m && !stripValue(afterLabel(l.replace(BULLETS, ''), m)); });
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].replace(BULLETS, '');
     for (const [key, re] of Object.entries(LABELS)) {
       const m = re.exec(line);
       if (!m) continue;
-      let value = line.slice(m[0].length).replace(SEP, '').trim();
+      let value = afterLabel(line, m);
       if (!stripValue(value) && lines[i + 1] && !isLabelOnly(lines[i + 1])) value = lines[i + 1];
       if (!stripValue(value)) continue;
       if (key === 'server' && !out.server) out.server = asServer(value);

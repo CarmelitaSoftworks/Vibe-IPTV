@@ -12,3 +12,5 @@ captures/
 .DS_Store
 Thumbs.db
 *.jks
+# Modelo de voz de la versión IA (lo descarga GitHub Actions)
+android/app/src/ia/assets/vosk/

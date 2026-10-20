@@ -58,4 +58,22 @@ class ScreenshotParserTest {
         assertEquals("carlos2026", r.username)
         assertEquals("Tq7Lm2xP", r.password)
     }
+
+    @Test fun correoBilingueConEnlaceCortado() {
+        val r = p("Datos de acceso\nUsuario / Username\n11112222\nContraseña / Password\n33334444\nURL\nhttp://tv.ejemplo.pro:8080\n" +
+            "Importante: El usuario y contraseña debe ser ingresado tal como aparece\nM3u Plus Playlist URL: http://tv.ejemplo.pro:8\n" +
+            "080/get.php?username=11112222&pass\nword=33334444&type=m3u_plus&output\n=mpegts")
+        assertEquals(SourceType.XTREAM, r.type)
+        assertEquals("http://tv.ejemplo.pro:8080", r.server)
+        assertEquals("11112222", r.username)
+        assertEquals("33334444", r.password)
+        assertTrue(r.url.endsWith("get.php?username=11112222&password=33334444&type=m3u_plus&output=mpegts"))
+    }
+
+    @Test fun etiquetaBilingueEnLaMismaLinea() {
+        val r = p("Usuario / Username: pepe\nContraseña / Password: Xy12\nURL: http://srv.ejemplo.net:2095")
+        assertEquals("pepe", r.username)
+        assertEquals("Xy12", r.password)
+        assertEquals("http://srv.ejemplo.net:2095", r.server)
+    }
 }

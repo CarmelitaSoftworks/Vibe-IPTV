@@ -780,6 +780,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (item != null) { val i = playList.indexOfFirst { it.id == item.id }; if (i >= 0) playAt(i) }
     }
 
+    // ---------- Subtítulos con IA (Vosk, en el equipo y sin internet) ----------
+    val captioner = LiveCaptioner()
+    /** Idioma del audio que se está transcribiendo (null = apagado). */
+    var aiSubs by mutableStateOf<String?>(null); private set
+    var aiPreparing by mutableStateOf(false); private set
+    fun aiBundled(lang: String) = VoskModels.bundled(getApplication(), lang)
+    fun startAiSubs(lang: String) {
+        if (aiPreparing) return
+        aiPreparing = true
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            runCatching { VoskModels.prepare(app, lang) { msg -> viewModelScope.launch { message = msg } } }
+                .onSuccess { dir ->
+                    aiSubs = lang
+                    captioner.start(dir) { err -> viewModelScope.launch { aiSubs = null; message = "Subtítulos IA: $err" } }
+                    message = "Subtítulos IA en ${VoskModels.names[lang] ?: lang}: se generan en el equipo, sin internet"
+                    logEvent("Subtítulos IA activados ($lang)")
+                }
+                .onFailure { message = "No se pudo preparar el modelo de voz: ${it.message}" }
+            aiPreparing = false
+        }
+    }
+    fun stopAiSubs() { captioner.stop(); aiSubs = null }
+
     // ---------- Mini reproductor (imagen en imagen dentro de la app, para TV y TV boxes) ----------
     /** El video sigue en una ventana chica en la esquina mientras se recorre el menú o la guía. */
     var mini by mutableStateOf(false); private set

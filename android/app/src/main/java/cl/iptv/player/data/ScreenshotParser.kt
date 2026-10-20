@@ -23,7 +23,7 @@ data class ShotDetails(
 object ScreenshotParser {
     private val I = RegexOption.IGNORE_CASE
     private val LABELS: List<Pair<String, Regex>> = listOf(
-        "server" to Regex("""^(?:url\s+(?:del\s+)?servidor|server\s*url|xtream\s*(?:url|server)|portal(?:\s*url)?|servidor|server|host(?:name)?|dns|direcci[oó0]n|address|dominio|domain)\b""", I),
+        "server" to Regex("""^(?:url\s+(?:del\s+)?servidor|url(?=\s*(?:[:：=]|$))|server\s*url|xtream\s*(?:url|server)|portal(?:\s*url)?|servidor|server|host(?:name)?|dns|direcci[oó0]n|address|dominio|domain)\b""", I),
         "username" to Regex("""^(?:nombre\s+de\s+usuario|user\s*name|username|usuario|user|login|usr|id\s+de\s+usuario)\b""", I),
         "password" to Regex("""^(?:contrase\S{0,3}a|password|passw(?:or)?d|pass|clave|pwd|senha|pin)\b""", I),
         "port" to Regex("""^(?:puerto|port|porta)\b""", I),
@@ -43,6 +43,30 @@ object ScreenshotParser {
         .replace(Regex("""\bh\s*t\s*t\s*p\s*(s?)\s*[:;.,]?\s*[/\\|l]\s*[/\\|l]\s*""", I)) { "http${it.groupValues[1].lowercase()}://" }
         .replace(Regex("""(https?://\S*?)\s+([.:/])\s*(?=\w)""", I), "$1$2")
         .replace("\r", "")
+
+    /** Une enlaces que el correo o el chat cortó en varias líneas. */
+    fun joinWrappedUrls(text: String): String {
+        val lines = text.split('\n')
+        val out = ArrayList<String>()
+        var i = 0
+        while (i < lines.size) {
+            var line = lines[i]
+            while (Regex("""https?://\S*$""", I).containsMatchIn(line.trimEnd()) && line.trim().length >= 24 && i + 1 < lines.size) {
+                val next = lines[i + 1].trim()
+                if (next.isEmpty() || Regex("""\s""").containsMatchIn(next) || Regex("^https?:", I).containsMatchIn(next) || !Regex("""[/?&=:%.]""").containsMatchIn(next)) break
+                line = line.trimEnd() + next; i++
+            }
+            out += line; i++
+        }
+        return out.joinToString("\n")
+    }
+
+    /** Lo que queda después de la etiqueta, sin separadores ni la traducción ("Usuario / Username: x" → "x"). */
+    private fun afterLabel(line: String, m: MatchResult): String {
+        var v = line.substring(m.value.length).replace(SEP, "")
+        if (v.startsWith("/") || v.startsWith("|")) v = v.replace(Regex("""^[/|]\s*[^\s:：=]+"""), "").replace(SEP, "")
+        return v.trim()
+    }
 
     private fun strip(v: String) = v.replace(Regex("""^[\s"'`(\[{<•·*]+"""), "").replace(Regex("""[\s"'`)\]}>.,;•·*]+$"""), "")
     private fun firstToken(v: String) = strip(v).split(Regex("""\s+""")).firstOrNull().orEmpty()
@@ -67,7 +91,7 @@ object ScreenshotParser {
     }
 
     fun parse(raw: String): ShotDetails {
-        val text = clean(raw)
+        val text = joinWrappedUrls(clean(raw))
         val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
         var server = ""; var username = ""; var password = ""; var url = ""; var epg = ""; var name = ""; var port = ""
 
@@ -87,12 +111,12 @@ object ScreenshotParser {
         }
 
         // 2. Campos con etiqueta: "Usuario: juan" o la etiqueta en una línea y el valor en la siguiente
-        fun labelOnly(l: String) = LABELS.any { (_, re) -> re.find(l)?.let { strip(l.substring(it.value.length).replace(SEP, "")).isEmpty() } ?: false }
+        fun labelOnly(l: String) = l.replace(BULLETS, "").let { b -> LABELS.any { (_, re) -> re.find(b)?.let { strip(afterLabel(b, it)).isEmpty() } ?: false } }
         for (i in lines.indices) {
             val line = lines[i].replace(BULLETS, "")
             for ((key, re) in LABELS) {
                 val m = re.find(line) ?: continue
-                var value = line.substring(m.value.length).replace(SEP, "").trim()
+                var value = afterLabel(line, m)
                 if (strip(value).isEmpty() && i + 1 < lines.size && !labelOnly(lines[i + 1])) value = lines[i + 1]
                 if (strip(value).isEmpty()) continue
                 val isUrl = Regex("^https?://", I).containsMatchIn(strip(value))
