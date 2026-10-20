@@ -9,6 +9,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,21 +23,34 @@ import kotlinx.coroutines.delay
 fun App(vm: AppViewModel) {
     var splash by rememberSaveable { mutableStateOf(true) }
     Box(Modifier.fillMaxSize()) {
-        when {
-            vm.showSettings && vm.screen == Screen.MENU -> {
+        // Mini reproductor: Atrás en la raíz del menú vuelve a pantalla completa
+        // (va antes que los BackHandler del menú: ésos tienen prioridad cuando están activos)
+        BackHandler(enabled = vm.mini && vm.multiview == null) { vm.expandMini() }
+        if (vm.menuVisible && vm.multiview == null) when {
+            vm.showSettings -> {
                 BackHandler { vm.showSettings = false }
                 SettingsScreen(vm)
             }
-            vm.showGuide && vm.screen == Screen.MENU && vm.source != null -> GuideScreen(vm)
-            vm.screen == Screen.MENU -> if (vm.showWelcome || vm.source == null) {
+            vm.showGuide && vm.source != null -> GuideScreen(vm)
+            vm.showWelcome || vm.source == null -> {
                 BackHandler(enabled = vm.source != null) { vm.showWelcome = false }
                 WelcomeScreen(vm)
-            } else {
+            }
+            else -> {
                 BackHandler(enabled = !vm.home || vm.series != null || vm.query.isNotBlank()) { vm.back() }
                 MenuScreen(vm)
             }
-            vm.multiview != null -> MultiviewScreen(vm)
-            else -> PlayerScreen(vm)
+        }
+        // El reproductor queda en el mismo lugar del árbol al pasar a mini: el video no se corta
+        if (vm.multiview != null) MultiviewScreen(vm)
+        else if (vm.screen == Screen.PLAYER) {
+            val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+            Box(
+                if (vm.mini) Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 20.dp)
+                    .width((cfg.screenWidthDp * 0.30f).dp).aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(12.dp)).border(2.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                else Modifier.fillMaxSize()
+            ) { PlayerScreen(vm) }
         }
 
         // Mensajes breves (equivalente a un toast)

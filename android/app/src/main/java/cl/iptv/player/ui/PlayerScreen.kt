@@ -445,10 +445,21 @@ fun PlayerScreen(vm: AppViewModel) {
 
     // Mando a distancia. Con los controles a la vista, ▲▼◄► y OK se mueven entre los botones;
     // ocultos: ▲▼ cambia de canal (en vivo), ◄► avanza o retrocede, OK muestra los controles.
-    DisposableEffect(item.id, engine, player) {
+    DisposableEffect(item.id, engine, player, vm.mini) {
         activity.keyInterceptor = handler@{ ev ->
             val code = ev.keyCode
             val down = ev.action == KeyEvent.ACTION_DOWN
+            if (vm.mini) {
+                // Mini reproductor: el control maneja el menú; sólo las teclas de medios y canal van al video
+                return@handler when (code) {
+                    KeyEvent.KEYCODE_CHANNEL_UP -> { if (down) vm.zap(1); true }
+                    KeyEvent.KEYCODE_CHANNEL_DOWN -> { if (down) vm.zap(-1); true }
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                        if (down) ctlOf(useAlt, alt, exo)?.togglePause(); true
+                    }
+                    else -> false
+                }
+            }
             when (code) {
                 KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> { if (down) vm.zap(1); return@handler true }
                 KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> { if (down) vm.zap(-1); return@handler true }
@@ -489,7 +500,8 @@ fun PlayerScreen(vm: AppViewModel) {
         onDispose { activity.keyInterceptor = null }
     }
 
-    BackHandler {
+    LaunchedEffect(vm.mini) { if (vm.mini) { controls = false; panel = null } }
+    BackHandler(enabled = !vm.mini) {
         when {
             panel != null -> panel = null
             controls && error == null -> controls = false
@@ -543,7 +555,8 @@ fun PlayerScreen(vm: AppViewModel) {
                 vm.toggleFavorite(item)
                 vm.message = if (wasFav) "${item.name} quitado de favoritos" else "★ ${item.name} añadido a favoritos"
             }
-            PAction.PIP -> { if (!activity.enterPip()) vm.message = "Este equipo no permite imagen en imagen" }
+            // En TV: mini reproductor dentro de la app para recorrer el menú y la guía; en celulares, el PiP del sistema
+            PAction.PIP -> if (activity.isTv || !activity.enterPip()) vm.enterMini()
             PAction.EXTERNAL -> openInVlc()
             PAction.RECORD -> if (vm.recording?.item?.id == item.id) vm.stopRecording() else vm.startRecording(item)
             PAction.LASTCH -> vm.previousChannel()
@@ -556,7 +569,7 @@ fun PlayerScreen(vm: AppViewModel) {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
     LaunchedEffect(error) { error?.let { vm.logEvent("Error [$engine] ${item.name}: $it · ${playUrl}") } }
-    val showBanner = !activity.inPip && (controls || now < bannerUntil || error != null || vm.recording != null)
+    val showBanner = !activity.inPip && !vm.mini && (controls || now < bannerUntil || error != null || vm.recording != null)
     val resize = when (vm.settings.aspect) {
         "fill", "zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -735,7 +748,14 @@ fun PlayerScreen(vm: AppViewModel) {
         }
 
         // Error: qué pasó y qué se puede hacer, sin salir del reproductor
-        error?.let { msg ->
+        if (vm.mini) {
+            // Mini reproductor: tocarlo vuelve a pantalla completa
+            Box(Modifier.fillMaxSize().clickable { vm.expandMini() }) {
+                Text("⤢", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x99000000)).padding(horizontal = 6.dp))
+            }
+        }
+        if (!vm.mini) error?.let { msg ->
             Column(
                 Modifier.align(Alignment.Center).widthIn(max = 520.dp).padding(24.dp).clip(RoundedCornerShape(18.dp))
                     .background(Color(0xF0161A1D)).padding(20.dp),
@@ -752,7 +772,7 @@ fun PlayerScreen(vm: AppViewModel) {
             }
         }
 
-        AnimatedVisibility(controls && panel == null && !activity.inPip, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+        AnimatedVisibility(controls && panel == null && !activity.inPip && !vm.mini, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
             PlayerControlsBar(
                 ctl = ctl, live = live, hasList = vm.playList.size > 1, fav = item.id in vm.favorites,
                 showQuality = !useAlt && exo.qualities().isNotEmpty(),
@@ -762,7 +782,7 @@ fun PlayerScreen(vm: AppViewModel) {
         }
 
         // Paneles laterales de opciones
-        panel?.let { p ->
+        if (!vm.mini) panel?.let { p ->
             val k = ctl
             val rows: List<PanelRow> = when (p) {
                 PAction.LIST -> vm.playList.mapIndexed { i, it ->

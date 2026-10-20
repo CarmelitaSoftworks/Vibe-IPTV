@@ -88,6 +88,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Recording** (Android): the ● button in the player saves a live channel to *Downloads/VibeIPTV*.
 - **Adjustable player controls size** (Settings → Playback).
 - **Full remote support**: number keys to jump to a channel, **previous channel**, and a sleep timer (15 to 120 min).
+- **Mini player on TV**: the video keeps playing in a corner while you browse the menu or the guide.
 - **Multiview**: up to 4 channels at once; the one you pick plays sound.
 - **Recently watched**, **search the guide by programme name** and **organize categories** (hide and reorder).
 - **Android TV / Google TV home screen row** with your favorites and recent channels.

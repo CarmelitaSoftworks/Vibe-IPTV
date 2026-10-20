@@ -163,6 +163,7 @@ La app está en **español** y en **inglés**. Por defecto sigue el idioma del s
 - **Vistos recientemente:** píldora 🕘 en la barra de categorías.
 - **Organizar categorías:** botón *Categorías* → ✎ *Organizar categorías*: ▲▼ para ordenarlas y *Ocultar* para sacarlas de la barra (y de «Todos»). Se guarda por lista y por perfil.
 - **Buscar en la guía:** en la guía en grilla, 🔍 *Buscar programa* busca por nombre en todos los canales; OK lo abre en vivo, en diferido o muestra cuándo empieza.
+- **Mini reproductor (TV y TV boxes):** el botón *Imagen en imagen* del reproductor deja el video en una ventana chica en la esquina y vuelve al menú para mirar otra programación o la guía. El video sigue sonando; *Canal +/−* y *Play/Pausa* del control siguen funcionando. Para volver a pantalla completa: *Atrás* en el Inicio, o toca la ventana. Si eliges otro canal, se abre ese en pantalla completa. En celulares el botón usa el PiP del sistema.
 - **Multivista:** botón ⊞ del reproductor (TV en vivo): hasta 4 canales a la vez. Con OK eliges cuál suena, OK otra vez lo abre en pantalla completa, *Menú* (o mantener presionado) cambia el canal de ese recuadro.
 - **Inicio de Android TV / Google TV:** la app publica una fila «Vibe IPTV» con tus favoritos y canales recientes; al elegir uno se abre directo. (Fire TV no tiene esta función.)
 - **Enviar registro:** Ajustes → Acerca de → *Enviar registro* o *Guardar registro en un archivo*. Incluye errores y cambios de motor recientes; las direcciones se guardan sin usuario ni contraseña.

@@ -163,6 +163,7 @@ The app is available in **Spanish** and **English**. By default it follows the s
 - **Recently watched:** the 🕘 pill in the category bar.
 - **Organize categories:** *Categories* button → ✎ *Organize categories*: ▲▼ to reorder and *Hide* to remove them from the bar (and from “All”). Saved per list and per profile.
 - **Search the guide:** in the grid guide, 🔍 *Search programme* searches every channel by name; OK opens it live, as catch-up, or shows when it starts.
+- **Mini player (TV and TV boxes):** the player's *Picture in picture* button leaves the video in a small corner window and returns to the menu so you can browse other listings or the guide. The video keeps playing; the remote's *Channel +/−* and *Play/Pause* still work. To go back to full screen: *Back* on Home, or tap the window. Picking another channel opens it full screen. On phones the button uses the system PiP.
 - **Multiview:** the ⊞ player button (live TV): up to 4 channels at once. OK picks which one plays sound, OK again opens it full screen, *Menu* (or long press) changes that tile's channel.
 - **Android TV / Google TV home screen:** the app publishes a “Vibe IPTV” row with your favorites and recent channels; picking one opens it directly. (Fire TV doesn't support this.)
 - **Send log:** Settings → About → *Send log* or *Save log to a file*. It includes recent errors and engine switches; addresses are stored without username or password.

@@ -646,6 +646,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         previousIndex = null
         addRecent(item)
         screen = Screen.PLAYER
+        mini = false
     }
 
     /** Canal visto antes del actual (botón "Canal anterior" / tecla LAST del control). */
@@ -779,7 +780,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (item != null) { val i = playList.indexOfFirst { it.id == item.id }; if (i >= 0) playAt(i) }
     }
 
+    // ---------- Mini reproductor (imagen en imagen dentro de la app, para TV y TV boxes) ----------
+    /** El video sigue en una ventana chica en la esquina mientras se recorre el menú o la guía. */
+    var mini by mutableStateOf(false); private set
+    fun enterMini() { mini = true; showSettings = false; returnFocusId = playing?.id; message = "Mini reproductor: Atrás en el Inicio vuelve a pantalla completa" }
+    fun expandMini() { mini = false; showSettings = false; showGuide = false; details = null }
+    val menuVisible: Boolean get() = screen == Screen.MENU || mini
+
     fun closePlayer() {
+        mini = false
         returnFocusId = playing?.id
         screen = Screen.MENU
         publishTvHome()   // vistos recientemente → fila de la TV

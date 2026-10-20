@@ -88,6 +88,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Grabación** (Android): botón ● en el reproductor para guardar un canal en vivo en *Descargas/VibeIPTV*.
 - **Tamaño de los controles del reproductor** ajustable (Ajustes → Reproducción).
 - **Control remoto completo**: teclas numéricas para ir a un canal, **canal anterior**, y temporizador para dormir (15 a 120 min).
+- **Mini reproductor en TV**: el video sigue en una esquina mientras recorres el menú o la guía.
 - **Multivista**: hasta 4 canales a la vez; suena el que elijas.
 - **Vistos recientemente**, **buscar un programa en la guía** por su nombre y **organizar categorías** (ocultar y ordenar).
 - **Fila en el inicio de Android TV / Google TV** con tus favoritos y canales recientes.

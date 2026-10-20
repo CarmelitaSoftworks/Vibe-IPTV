@@ -421,6 +421,7 @@ export default {
   "Mejor calidad": "Better quality",
   "Menos efectos y memoria: más fluido en Xiaomi Mi Box / Mi TV Stick y equipos de 1–2 GB · {}": "Fewer effects and less memory: smoother on Xiaomi Mi Box / Mi TV Stick and 1–2 GB devices · {}",
   "Mi lista": "My list",
+  "Mini reproductor: Atrás en el Inicio vuelve a pantalla completa": "Mini player: Back on Home returns to full screen",
   "Mis listas": "My lists",
   "Modo liviano (TV boxes)": "Lite mode (TV boxes)",
   "modo liviano activado": "lite mode on",
