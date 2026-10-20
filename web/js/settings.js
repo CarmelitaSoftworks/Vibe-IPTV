@@ -66,6 +66,7 @@ function sections() {
       { type: 'text', key: 'subLangs', label: 'Idiomas preferidos', desc: 'Códigos separados por coma, ej: es,en' },
       { type: 'info', label: 'Fuentes', value: () => 'OpenSubtitles · SubDL · Podnapisi' },
       { type: 'text', key: 'osApiKey', label: 'API key de OpenSubtitles (opcional)', desc: 'Sin clave igual se busca en OpenSubtitles; con clave hay más resultados', secret: true },
+      { type: 'toggle', key: 'autoSubs', label: 'Subtítulos automáticos', desc: 'En películas y series: usa la pista en tu idioma o busca y carga una sola (sin clave ni cuenta)' },
       { type: 'text', key: 'subdlKey', label: 'API key de SubDL', desc: 'Gratis en subdl.com: mucho catálogo en español latino', secret: true },
       { type: 'action', label: 'Probar la clave de SubDL', desc: 'Comprueba la clave y muestra tu plan · consíguela gratis en subdl.com/panel/api',
         value: () => subdlStatus || (store.getSettings().subdlKey ? 'Probar' : 'Sin clave'),

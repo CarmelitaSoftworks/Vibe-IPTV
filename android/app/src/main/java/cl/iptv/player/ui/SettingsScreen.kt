@@ -98,6 +98,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Choice("Tamaño del texto", options = listOf("small" to "Pequeño", "normal" to "Normal", "large" to "Grande", "xlarge" to "Muy grande"), get = { it.subSize }, set = { s, v -> s.copy(subSize = v) }),
             Row.TextField("Idiomas preferidos", "Códigos separados por coma, ej: es,en", get = { it.subLangs }, set = { s, v -> s.copy(subLangs = v.ifBlank { "es,en" }) }),
             Row.Info("Fuentes", "OpenSubtitles · SubDL · Podnapisi"),
+            Row.Toggle("Subtítulos automáticos", "En películas y series, si el audio no está en tu idioma: usa la pista interna o busca y carga uno solo (sin clave ni cuenta)",
+                get = { it.autoSubs }, set = { s, v -> s.copy(autoSubs = v) }),
             Row.TextField("API key de SubDL", "Gratis en subdl.com: mucho catálogo en español latino", secret = true, get = { it.subdlKey }, set = { s, v -> s.copy(subdlKey = v) }),
             Row.Action("Probar la clave de SubDL", "Comprueba la clave y muestra tu plan · consíguela gratis en subdl.com/panel/api",
                 value = { vm.subdlStatus.ifBlank { if (vm.settings.subdlKey.isBlank()) "Sin clave" else "Probar" } }) { vm.checkSubdl() },

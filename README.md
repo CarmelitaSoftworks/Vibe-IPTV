@@ -70,6 +70,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ### 💬 Subtítulos
 - Búsqueda en **varias fuentes a la vez**: OpenSubtitles (la misma base que el complemento **VLSub** de VLC), SubDL y Podnapisi.
+- **Subtítulos automáticos** (activado por defecto): en películas y series, si el audio no está en tu idioma, usa la pista interna o busca y carga uno solo desde OpenSubtitles y Podnapisi, **sin clave ni cuenta**.
 - **SubDL integrado con su API oficial**: busca por código IMDb, baja sólo el episodio de los paquetes de temporada, marca los subtítulos SDH y permite **probar la clave** en Ajustes.
 - Abre archivos `.zip`, corrige acentos de los `.srt` en español (Windows-1252), convierte `.ass` y permite **adelantar o atrasar** el subtítulo.
 

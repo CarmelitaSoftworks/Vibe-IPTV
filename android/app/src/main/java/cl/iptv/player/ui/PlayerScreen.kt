@@ -323,6 +323,37 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
 
+    // Subtítulos automáticos: si el audio no está en el idioma preferido, usar la pista interna en ese idioma
+    // o buscar en las fuentes sin clave (OpenSubtitles vía Stremio y Podnapisi; SubDL si hay clave) y cargar el mejor
+    var autoSubsDone by remember(item.id) { mutableStateOf(false) }
+    LaunchedEffect(item.id, started, engine) {
+        if (live || !started || autoSubsDone || !vm.settings.autoSubs || subtitle != null || item.id.startsWith("cu_")) return@LaunchedEffect
+        delay(2500)                                            // dar tiempo a que el motor publique sus pistas
+        autoSubsDone = true
+        val want = vm.settings.subLangs.lowercase().split(Regex("[\\s,]+")).firstOrNull { it.isNotBlank() } ?: "es"
+        fun isLang(label: String): Boolean {
+            val l = label.lowercase()
+            val names = listOf(java.util.Locale(want).getDisplayLanguage(java.util.Locale("es")), java.util.Locale(want).getDisplayLanguage(java.util.Locale.ENGLISH))
+                .map { it.lowercase() }.filter { it.isNotBlank() } + (if (want == "es") listOf("latino", "castellano", "spa") else emptyList())
+            return names.any { it in l } || Regex("""(^|[^a-z])$want([^a-z]|$)""").containsMatchIn(l)
+        }
+        val k = ctlOf(useAlt, alt, exo) ?: return@LaunchedEffect
+        val audio = k.audioTracks()
+        if (audio.isNotEmpty() && audio.firstOrNull { it.selected }?.let { isLang(it.label) } == true) return@LaunchedEffect   // ya se oye en tu idioma
+        k.subtitleTracks().firstOrNull { isLang(it.label) }?.let { t ->
+            if (!t.selected) { k.selectSubtitle(t.id); vm.message = "Subtítulos: ${t.label}" }
+            return@LaunchedEffect
+        }
+        val year = Regex("\\b(19[3-9]\\d|20[0-4]\\d)\\b").find(item.name)?.value.orEmpty()
+        val q = SubtitleSources.Query(cleanTitle(item.seriesName.ifBlank { item.name }), item.seriesName.isNotBlank() || item.season > 0, item.season, item.episode, year)
+        val found = runCatching { vm.subtitleSources.search(q) }.getOrNull() ?: return@LaunchedEffect
+        val best = found.results.firstOrNull { it.lang == want } ?: run { vm.logEvent("Subtítulos automáticos: sin resultados en '$want' para ${q.title}"); return@LaunchedEffect }
+        if (vm.playing?.id != item.id) return@LaunchedEffect
+        runCatching { vm.subtitleSources.download(best, vm.subtitleDir()) }
+            .onSuccess { f -> if (vm.playing?.id == item.id && subtitle == null) { subtitle = f; vm.message = "Subtítulo cargado solo (${best.source}) · cámbialo en Subtítulos" } }
+            .onFailure { vm.logEvent("Subtítulos automáticos: ${best.source}: ${it.message}") }
+    }
+
     // Subtítulo externo en VLC / MPV
     LaunchedEffect(subtitle, alt) { val f = subtitle; if (useAlt && f != null) runCatching { alt?.addExternalSubtitle(f) } }
 

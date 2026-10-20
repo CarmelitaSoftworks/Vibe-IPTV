@@ -888,6 +888,7 @@ function playCurrent() {
   }
   if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: item.name, artist: item.group, artwork: item.logo ? [{ src: item.logo }] : [] });
   player.play(item);
+  autoSubtitles(item);
   // Seguir viendo: continuar donde quedó
   const saved = item.kind !== 'live' ? state.resume?.[item.id] : null;
   if (saved) video.addEventListener('loadedmetadata', function seek() {
@@ -896,6 +897,30 @@ function playCurrent() {
     }
   }, { once: true });
   showOsd();
+}
+
+/* ---------- subtítulos automáticos (OpenSubtitles vía Stremio y Podnapisi: sin clave) ---------- */
+async function autoSubtitles(item) {
+  if (item.kind === 'live' || !cfg().autoSubs || String(item.id).startsWith('cu_') || !proxyBase()) return;
+  await new Promise((r) => video.addEventListener('playing', r, { once: true }));
+  await new Promise((r) => setTimeout(r, 2000));
+  if (state.playing !== item) return;
+  const want = (cfg().subLangs || 'es').split(/[\s,]+/).filter(Boolean)[0] || 'es';
+  // Si el audio ya está en tu idioma, no hace falta
+  const names = ['es', 'en'].map((l) => { try { return new Intl.DisplayNames([l], { type: 'language' }).of(want); } catch { return ''; } }).filter(Boolean);
+  const audio = player.audioTracks().find((x) => x.active);
+  if (audio && new RegExp(`(^|[^a-z])(${want}|${names.join('|')}${want === 'es' ? '|spa|latino|castellano' : ''})`, 'i').test(audio.label || '')) return;
+  const tracks = subs.listTracks(video);
+  const own = tracks.find((t) => (t.language || '').toLowerCase().startsWith(want));
+  if (own) { if (own.mode !== 'showing') subs.selectTrack(video, own); return; }
+  if (tracks.some((t) => t.mode === 'showing')) return;
+  try {
+    const { results } = await subs.searchSubtitles(item);
+    const best = results.find((r) => r.lang === want);
+    if (!best || state.playing !== item) return;
+    subs.attachVtt(video, await subs.downloadSubtitle(best), `${best.source}: ${best.label}`.slice(0, 48), best.lang);
+    toast(t(`Subtítulo cargado solo (${best.source}) · cámbialo en Subtítulos`));
+  } catch (e) { logEvent(`Subtítulos automáticos: ${e.message}`); }
 }
 
 /* ---------- diagnóstico cuando un canal no se reproduce ---------- */

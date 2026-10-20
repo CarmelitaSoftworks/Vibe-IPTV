@@ -169,6 +169,7 @@ The app is available in **Spanish** and **English**. By default it follows the s
 - **Detected device and lite mode:** the first time the app opens it detects the device (memory, 32/64-bit, MPEG-2 / HEVC / AC-3 decoders) and sets lite mode, buffer and animations. If the device can't decode MPEG-2, live TV starts straight with VLC. See it and run it again in Settings → About → *Detect again and configure*; lite mode can also be forced in Settings → Appearance.
 - **Continue watching:** a row on Home with what you left half-watched; also in the *Categories* button and as a pill in Movies and Series.
 - **Buffer:** Settings → Playback → *Buffer*. *Fast* changes channels quicker, *Balanced* is recommended and *Stable* keeps more video ahead for providers that drop out. If a live channel stalls 3 times, the app raises its buffer (up to two levels) and remembers it; clear it with Settings → Data → *Forget learned buffer*.
+- **Automatic subtitles:** Settings → Subtitles (on by default). When a movie or episode starts, if the audio isn't in your first preferred language, it uses the built-in track in that language or searches OpenSubtitles and Podnapisi (no key) and loads the best result. Change or remove it from the player's Subtitles button.
 - **SubDL:** paste your free key in Settings → Subtitles and use *Test SubDL key*. Searches use the title's IMDb ID and, for series, download only the episode even when the subtitle comes in a season pack.
 
 ## Preview version (artifact)

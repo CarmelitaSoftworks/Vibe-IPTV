@@ -35,6 +35,8 @@ export const DEFAULT_SETTINGS = {
   hudScale: '1',
   // Búfer: fast | balanced | stable
   buffer: 'balanced',
+  // Subtítulos automáticos en películas y series
+  autoSubs: true,
   // Fichas: mostrar antes de reproducir películas; clave opcional de TMDB
   showDetails: true, tmdbKey: '',
 };

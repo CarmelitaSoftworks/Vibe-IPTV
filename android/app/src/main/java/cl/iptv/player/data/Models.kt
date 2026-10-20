@@ -81,6 +81,8 @@ data class Settings(
     val hudScale: Float = 1f,
     /** Búfer: fast (cambia de canal antes) | balanced | stable (aguanta mejor los cortes). */
     val buffer: String = "balanced",
+    /** Buscar y cargar subtítulos solos en películas y series (fuentes sin clave: OpenSubtitles y Podnapisi). */
+    val autoSubs: Boolean = true,
     /** Modo liviano para TV boxes modestos (Xiaomi Mi Box / Mi TV Stick): auto | on | off. */
     val lite: String = "auto",
     val tmdbKey: String = "",
