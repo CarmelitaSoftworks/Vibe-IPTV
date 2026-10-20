@@ -27,7 +27,18 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w960dp-h540dp-land-xhdpi")
 class ThemeCapturesTest {
-    @get:Rule val compose = createComposeRule()
+    // La regla de Compose abre una Activity; en las pruebas normales (release) no existe, así que
+    // primero se comprueba si es el flujo de capturas y, si no, la prueba se salta antes de abrirla
+    private val soloCapturas = org.junit.rules.TestRule { base, _ ->
+        object : org.junit.runners.model.Statement() {
+            override fun evaluate() {
+                Assume.assumeTrue(System.getProperty("vibe.capturas") == "true")
+                base.evaluate()
+            }
+        }
+    }
+    val compose = createComposeRule()
+    @get:Rule val reglas: org.junit.rules.RuleChain = org.junit.rules.RuleChain.outerRule(soloCapturas).around(compose)
 
     @Before fun soloEnCapturas() { Assume.assumeTrue(System.getProperty("vibe.capturas") == "true") }
 
