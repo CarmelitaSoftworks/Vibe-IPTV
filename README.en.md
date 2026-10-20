@@ -228,23 +228,7 @@ run `node i18n/build.mjs` to update both the web app and Android.
 
 ## 🙏 Credits
 
-**Vibe IPTV** is developed and maintained by **[Carmelita Softworks](https://github.com/CarmelitaSoftworks)**. 🇨🇱
-
-It's a ***vibe coded*** project: the code was written with the help of artificial intelligence, with the idea, direction and testing on real devices by Carmelita Softworks.
-
-It also exists thanks to other open-source projects:
-
-- [AndroidX Media3 / ExoPlayer](https://github.com/androidx/media) — Apache 2.0
-- [LibVLC](https://code.videolan.org/videolan/vlc) by VideoLAN — LGPL 2.1+
-- [mpv](https://mpv.io) / [libmpv for Android](https://github.com/jarnedemeulemeester/libmpv-android)
-- [hls.js](https://github.com/video-dev/hls.js) — Apache 2.0 · [mpegts.js](https://github.com/xqq/mpegts.js) — Apache 2.0
-- [Tesseract.js](https://github.com/naptha/tesseract.js) — Apache 2.0 · [ML Kit](https://developers.google.com/ml-kit) by Google
-- [FFmpeg](https://ffmpeg.org) · [OkHttp](https://github.com/square/okhttp) · [Coil](https://github.com/coil-kt/coil)
-- [iptv-org/epg](https://github.com/iptv-org/epg) for generating XMLTV guides
-- Subtitles from [OpenSubtitles](https://www.opensubtitles.org), [SubDL](https://subdl.com) and [Podnapisi](https://www.podnapisi.net)
-- Settings design inspired by [OwnTV](https://github.com/ahXN00/OwnTV)
-
-Names and trademarks mentioned belong to their respective owners; this project is not affiliated with them.
+**Vibe IPTV** is developed and maintained by **[Carmelita Softworks](https://github.com/CarmelitaSoftworks)**. 🇨🇱 It's a *vibe coded* project and exists thanks to many open-source projects: **[see all credits](CREDITS.md)**.
 
 ---
 
