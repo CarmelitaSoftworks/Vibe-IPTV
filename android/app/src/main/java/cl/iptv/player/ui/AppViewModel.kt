@@ -859,6 +859,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------- Menús de los temas Mosaicos y Ondas: dónde quedó el usuario (sobrevive al abrir el reproductor) ----------
+    class ShellNav {
+        var col by mutableStateOf(1)              // Ondas: columna (1 = TV en vivo)
+        var level by mutableStateOf(0)            // Ondas: 0 = categorías, 1 = contenido
+        val idx0 = androidx.compose.runtime.mutableStateMapOf<Int, Int>()
+        var idx1 by mutableStateOf(0)
+        var title by mutableStateOf("")
+        var tab by mutableStateOf(0)              // Mosaicos: pestaña
+        fun enter(t: String) { title = t; level = 1; idx1 = 0 }
+    }
+    val shell = ShellNav()
+
     // ---------- Mini reproductor (imagen en imagen dentro de la app, para TV y TV boxes) ----------
     /** El video sigue en una ventana chica en la esquina mientras se recorre el menú o la guía. */
     var mini by mutableStateOf(false); private set

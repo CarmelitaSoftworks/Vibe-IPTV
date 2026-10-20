@@ -36,6 +36,9 @@ fun App(vm: AppViewModel) {
                 BackHandler(enabled = vm.source != null) { vm.showWelcome = false }
                 WelcomeScreen(vm)
             }
+            // Los temas Mosaicos y Ondas traen su propio menú (distribución y navegación propias)
+            vm.settings.theme == "metro" -> MetroScreen(vm)
+            vm.settings.theme == "wave" -> WaveScreen(vm)
             else -> {
                 BackHandler(enabled = !vm.home || vm.series != null || vm.query.isNotBlank()) { vm.back() }
                 MenuScreen(vm)

@@ -382,7 +382,7 @@ private fun ContinueRow(vm: AppViewModel, cont: List<Triple<Item, cl.iptv.player
 }
 
 @Composable
-private fun SectionIcon(kind: Kind, color: Color, modifier: Modifier) {
+internal fun SectionIcon(kind: Kind, color: Color, modifier: Modifier) {
     Canvas(modifier) {
         val s = size.minDimension / 48f
         val st = Stroke(width = 2.4f * s, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
