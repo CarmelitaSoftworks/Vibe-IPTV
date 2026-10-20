@@ -702,7 +702,7 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
   background: radial-gradient(ellipse at 50% 35%, #e6e6e6 0%, #8f8f8f 100%);
 }
 :root[data-app-theme="metro"] .pill, :root[data-app-theme="metro"] .chip, :root[data-app-theme="metro"] .tab { border-radius: 2px; text-transform: lowercase; }
-:root[data-app-theme="metro"] .tile { box-shadow: none; }
+:root[data-app-theme="metro"] .tile:not(:focus):not(:hover) { box-shadow: none; }
 
 /* ===== Tema "Ondas": violeta degradado con ondas translúcidas y texto blanco ===== */
 :root[data-app-theme="wave"] {

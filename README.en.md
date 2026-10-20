@@ -103,7 +103,15 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ## 🖼️ Screenshots
 
-> _Coming soon: home, channel menu, player and settings._
+### Themes
+
+| Light | Dark |
+|---|---|
+| ![Light theme](docs/img/tema-light.jpg) | ![Dark theme](docs/img/tema-dark.jpg) |
+| **Tiles** | **Waves** |
+| ![Tiles theme](docs/img/tema-metro.jpg) | ![Waves theme](docs/img/tema-wave.jpg) |
+
+<sub>Web app screenshots with the demo list. On Android there is also the **Custom** theme (colours, background image and translucent tiles).</sub>
 
 ---
 

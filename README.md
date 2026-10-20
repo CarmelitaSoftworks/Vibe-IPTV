@@ -103,7 +103,15 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ## 🖼️ Capturas
 
-> _Próximamente: inicio, menú de canales, reproductor y ajustes._
+### Temas
+
+| Claro | Oscuro |
+|---|---|
+| ![Tema Claro](docs/img/tema-light.jpg) | ![Tema Oscuro](docs/img/tema-dark.jpg) |
+| **Mosaicos** | **Ondas** |
+| ![Tema Mosaicos](docs/img/tema-metro.jpg) | ![Tema Ondas](docs/img/tema-wave.jpg) |
+
+<sub>Capturas de la versión web con la lista de demostración. En Android además está el tema **Personalizado** (colores, imagen de fondo y mosaicos translúcidos).</sub>
 
 ---
 
