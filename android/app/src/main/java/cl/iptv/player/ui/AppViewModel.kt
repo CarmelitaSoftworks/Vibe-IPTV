@@ -172,7 +172,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         hw.liveEngine?.let { preferLiveEngine = it }   // sin MPEG-2 por hardware: la TV de cable arranca directo con VLC
         autoConfigure()
         val last = sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull()
-        if (last != null && settings.startup != "welcome") open(last) else showWelcome = true
+        if (Arranque.seguro) {
+            // Se cerró dos veces seguidas al abrir: no cargar la última lista ni la guía guardada
+            showWelcome = true
+            logEvent("Inicio en modo seguro (cierres seguidos al abrir)")
+            message = "La app se cerró al abrir: se inició sin cargar la última lista. Si se repite: Ajustes → Acerca de → Enviar registro"
+        } else if (last != null && settings.startup != "welcome") open(last) else showWelcome = true
         // Renovación periódica de la guía mientras la app está abierta
         viewModelScope.launch {
             while (true) {
@@ -386,7 +391,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun parseFiles(files: List<File>): Epg? {
         val parsed = files.mapNotNull { f -> runCatching { f.inputStream().use { EpgParser.parse(it) } }.getOrNull() }
-        return if (parsed.isEmpty()) null else Epg.merge(parsed)
+        return if (parsed.isEmpty()) null else runCatching { Epg.merge(parsed) }.getOrNull()
     }
 
     private fun loadCachedEpg(src: Source) = viewModelScope.launch {
@@ -706,6 +711,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         appendLine("Vibe IPTV ${Updates.currentName(ctx)} · Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
         appendLine("Equipo: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · ABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}")
         appendLine("Motor: ${settings.engine} · Formato en vivo: ${settings.liveFormat} · Lista: ${source?.type ?: "-"} · Canales: ${items.size}")
+        Arranque.ultimoError(ctx)?.let {
+            appendLine("--- Último cierre inesperado ---")
+            appendLine(redact(it))
+        }
         appendLine("---")
         synchronized(log) { log.forEach { appendLine(it) } }
         if (log.isEmpty()) appendLine("(sin eventos todavía)")

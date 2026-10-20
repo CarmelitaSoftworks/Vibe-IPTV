@@ -11,15 +11,16 @@ class Storage(private val ctx: Context) {
 
     fun sources(): List<Source> {
         val arr = runCatching { JSONArray(prefs.getString("sources", "[]")) }.getOrDefault(JSONArray())
-        return (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map {
+        // Tolerante: una lista guardada con datos dañados se omite en vez de cerrar la app
+        return (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.mapNotNull { runCatching {
             Source(
-                id = it.getString("id"), name = it.optString("name"),
+                id = it.optString("id"), name = it.optString("name"),
                 type = runCatching { SourceType.valueOf(it.optString("type")) }.getOrDefault(SourceType.M3U),
                 url = it.optString("url"), server = it.optString("server"),
                 username = it.optString("username"), password = it.optString("password"),
                 epgUrl = it.optString("epgUrl"), localFile = it.optBoolean("localFile"),
             )
-        }
+        }.getOrNull() }.filter { it.id.isNotBlank() }
     }
 
     fun saveSources(list: List<Source>) {
@@ -52,7 +53,7 @@ class Storage(private val ctx: Context) {
     // ---------- Perfiles ----------
     /** Perfil activo ("" = Principal). Favoritos y "Seguir viendo" se guardan por perfil. */
     var profileId: String
-        get() = prefs.getString("profile", "") ?: ""
+        get() = runCatching { prefs.getString("profile", "") }.getOrNull() ?: ""
         set(v) = prefs.edit().putString("profile", v).apply()
     private fun suffix() = profileId.takeIf { it.isNotBlank() }?.let { "@$it" } ?: ""
     private fun fk(sourceId: String) = "favs_$sourceId${suffix()}"
@@ -62,7 +63,7 @@ class Storage(private val ctx: Context) {
     fun recent(sourceId: String): List<String> = runCatching {
         val a = JSONArray(prefs.getString(rk(sourceId), "[]")); (0 until a.length()).map { a.getString(it) }
     }.getOrDefault(emptyList())
-    fun hiddenCats(sourceId: String): Set<String> = prefs.getStringSet("hidcat_$sourceId${suffix()}", emptySet())!!.toSet()
+    fun hiddenCats(sourceId: String): Set<String> = runCatching { prefs.getStringSet("hidcat_$sourceId${suffix()}", emptySet())?.toSet() }.getOrNull() ?: emptySet()
     fun saveHiddenCats(sourceId: String, s: Set<String>) = prefs.edit().putStringSet("hidcat_$sourceId${suffix()}", s).apply()
     fun catOrder(sourceId: String): Map<String, List<String>> = runCatching {
         val o = org.json.JSONObject(prefs.getString("catord_$sourceId${suffix()}", "{}")!!)
@@ -77,7 +78,7 @@ class Storage(private val ctx: Context) {
     fun saveBufferBoosts(m: Map<String, Int>) =
         prefs.edit().putString("bufboost", org.json.JSONObject(m.entries.toList().takeLast(300).associate { it.key to it.value }).toString()).apply()
     var hwConfigured: String
-        get() = prefs.getString("hwConfigured", "") ?: ""
+        get() = runCatching { prefs.getString("hwConfigured", "") }.getOrNull() ?: ""
         set(v) { prefs.edit().putString("hwConfigured", v).apply() }
     fun saveRecent(sourceId: String, ids: List<String>) = prefs.edit().putString(rk(sourceId), JSONArray(ids).toString()).apply()
 
@@ -97,14 +98,17 @@ class Storage(private val ctx: Context) {
         e.apply()
     }
 
-    fun favorites(sourceId: String): Set<String> = prefs.getStringSet(fk(sourceId), emptySet())!!.toSet()
+    fun favorites(sourceId: String): Set<String> = runCatching { prefs.getStringSet(fk(sourceId), emptySet())?.toSet() }.getOrNull() ?: emptySet()
     fun saveFavorites(sourceId: String, set: Set<String>) = prefs.edit().putStringSet(fk(sourceId), set).apply()
 
     var lastSourceId: String?
-        get() = prefs.getString("last_source", null)
+        get() = runCatching { prefs.getString("last_source", null) }.getOrNull()
         set(v) = prefs.edit().putString("last_source", v).apply()
 
-    fun settings(): Settings {
+    /** Si algún ajuste guardado está dañado (o con otro tipo, p. ej. de un respaldo antiguo) se usan los de fábrica. */
+    fun settings(): Settings = runCatching { readSettings() }.getOrElse { Settings() }
+
+    private fun readSettings(): Settings {
         val d = Settings()
         fun str(k: String, def: String) = prefs.getString(k, def) ?: def
         return Settings(
@@ -134,7 +138,7 @@ class Storage(private val ctx: Context) {
         .apply()
 
     var lastItemId: String?
-        get() = prefs.getString("last_item", null)
+        get() = runCatching { prefs.getString("last_item", null) }.getOrNull()
         set(v) = prefs.edit().putString("last_item", v).apply()
 
     fun clearFavorites(sourceId: String) = prefs.edit().remove(fk(sourceId)).apply()
