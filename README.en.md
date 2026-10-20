@@ -79,6 +79,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - Settings by section (quick, lists & guide, appearance, playback, subtitles, network, startup, data).
 - Light theme (default), dark or system, with accent colors.
 - It can jump straight back to the last watched channel when the app opens.
+- **Themes**: Light, Dark, **Tiles** (grey and green, square corners), **Waves** (purple) and **Custom** (colours, background image, translucent tiles), which can be exported and imported to share it.
 - **In Spanish and English**: follows the device language or can be set in Settings → Appearance → Language.
 
 ### 🔒 Privacy
