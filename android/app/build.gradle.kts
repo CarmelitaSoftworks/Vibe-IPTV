@@ -11,7 +11,7 @@ android {
     defaultConfig {
         applicationId = "cl.iptv.player"
         minSdk = 24          // Android 7.0 / Android TV 7+
-        targetSdk = 35
+        targetSdk = 36
         // Número de versión automático en GitHub Actions (número de compilación); 1 en local
         val build = (System.getenv("VIBE_BUILD") ?: "1").toIntOrNull() ?: 1
         versionCode = build
