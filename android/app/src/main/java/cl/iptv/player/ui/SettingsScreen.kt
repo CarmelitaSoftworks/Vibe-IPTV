@@ -187,6 +187,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Info("Reproducción", "ExoPlayer · VLC · MPV"),
             Row.Info("Guía", "XMLTV (compatible con iptv-org/epg)"),
             Row.Info("Subtítulos", "OpenSubtitles · SubDL · Podnapisi"),
+            Row.Info("Subtítulos con IA", "Vosk · Whisper (whisper.cpp)"),
+            Row.Info("Créditos completos", "github.com/CarmelitaSoftworks/Vibe-IPTV · CREDITOS.md"),
         )),
     )
 }
