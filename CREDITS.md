@@ -21,6 +21,6 @@ It also exists thanks to other open-source projects:
 - [Vosk](https://alphacephei.com/vosk) by Alpha Cephei — Apache 2.0 (offline AI subtitles)
 - [iptv-org/epg](https://github.com/iptv-org/epg) for generating XMLTV guides
 - Subtitles from [OpenSubtitles](https://www.opensubtitles.org), [SubDL](https://subdl.com) and [Podnapisi](https://www.podnapisi.net)
-- Settings design inspired by [OwnTV](https://github.com/ahXN00/OwnTV)
+- Settings and first-run wizard design inspired by [OwnTV](https://github.com/ahXN00/OwnTV) — GPLv3
 
 Names and trademarks mentioned belong to their respective owners; this project is not affiliated with them.

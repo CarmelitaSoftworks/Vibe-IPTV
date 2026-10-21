@@ -31,6 +31,7 @@ fun App(vm: AppViewModel) {
                 BackHandler { vm.showSettings = false }
                 SettingsScreen(vm)
             }
+            vm.showSetup -> SetupWizard(vm)
             vm.showGuide && vm.source != null -> GuideScreen(vm)
             vm.showWelcome || vm.source == null -> {
                 BackHandler(enabled = vm.source != null) { vm.showWelcome = false }

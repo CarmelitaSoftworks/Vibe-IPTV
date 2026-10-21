@@ -108,6 +108,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var screen by mutableStateOf(Screen.MENU); private set
     /** Pantalla de inicio para añadir / elegir listas. */
     var showWelcome by mutableStateOf(false)
+    /** Asistente del primer inicio: sólo la primera vez y si todavía no hay listas. */
+    var showSetup by mutableStateOf(!store.setupDone && sources.isEmpty()); private set
+    fun finishSetup() { store.setupDone = true; showSetup = false }
     /** Pantalla de Ajustes (dos columnas). */
     var showSettings by mutableStateOf(false)
     /** Guía de programación en grilla. */

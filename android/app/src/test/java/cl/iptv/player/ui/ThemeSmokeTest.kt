@@ -63,4 +63,6 @@ class ThemeSmokeTest {
     @Test fun ondas() = abrir("wave", ligero = true, recorrer = { vm -> for (c in 0..5) { vm.shell.col = c; vm.shell.level = 0; idle() } }) { WaveScreen(it) }
 
     @Test fun guia() = abrir("light") { GuideScreen(it) }
+
+    @Test fun asistenteDePrimerInicio() = abrir("light") { SetupWizard(it) }
 }

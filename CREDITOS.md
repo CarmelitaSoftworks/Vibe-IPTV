@@ -21,6 +21,6 @@ También existe gracias a otros proyectos de código abierto:
 - [Vosk](https://alphacephei.com/vosk) de Alpha Cephei — Apache 2.0 (subtítulos con IA sin internet)
 - [iptv-org/epg](https://github.com/iptv-org/epg) para generar guías XMLTV
 - Subtítulos de [OpenSubtitles](https://www.opensubtitles.org), [SubDL](https://subdl.com) y [Podnapisi](https://www.podnapisi.net)
-- Inspirado en el diseño de ajustes de [OwnTV](https://github.com/ahXN00/OwnTV)
+- Inspirado en el diseño de ajustes y del asistente de primer inicio de [OwnTV](https://github.com/ahXN00/OwnTV) — GPLv3
 
 Los nombres y marcas mencionados pertenecen a sus respectivos dueños; este proyecto no está afiliado a ellos.

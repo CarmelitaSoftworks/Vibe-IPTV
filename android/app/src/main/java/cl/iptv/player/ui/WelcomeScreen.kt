@@ -40,7 +40,7 @@ import cl.iptv.player.data.SourceType
 import cl.iptv.player.ui.theme.LocalIptv
 import kotlinx.coroutines.delay
 
-private enum class AddOption(val title: String, val desc: String) {
+internal enum class AddOption(val title: String, val desc: String) {
     URL("Lista M3U por enlace", "Pega la URL .m3u o .m3u8 que te dio tu proveedor"),
     FILE("Archivo M3U", "Carga una lista guardada en este dispositivo"),
     XTREAM("Xtream Codes", "Servidor, usuario y contraseña de tu cuenta"),
@@ -149,7 +149,15 @@ fun WelcomeScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun OptionTile(option: AddOption, horizontal: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun OptionTile(option: AddOption, horizontal: Boolean, modifier: Modifier, onClick: () -> Unit) =
+    OptionTile(option.title, option.desc, horizontal, modifier, { col, m -> OptionIcon(option, col, m) }, onClick)
+
+/** Tarjeta de opción (pantalla de inicio y asistente del primer inicio). */
+@Composable
+internal fun OptionTile(
+    title: String, desc: String, horizontal: Boolean, modifier: Modifier,
+    icon: @Composable (Color, Modifier) -> Unit, onClick: () -> Unit,
+) {
     val c = LocalIptv.current
     val src = remember { MutableInteractionSource() }
     val focused by src.collectIsFocusedAsState()
@@ -169,19 +177,19 @@ private fun OptionTile(option: AddOption, horizontal: Boolean, modifier: Modifie
     ) {
         if (horizontal) {
             Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                OptionIcon(option, c.accentDeep, Modifier.size(48.dp))
+                icon(c.accentDeep, Modifier.size(48.dp))
                 Spacer(Modifier.width(16.dp))
                 Column {
-                    Text(option.title, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-                    Text(option.desc, color = c.inkSoft, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text(title, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                    Text(desc, color = c.inkSoft, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
             }
         } else {
             Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OptionIcon(option, c.accentDeep, Modifier.size(88.dp))
+                icon(c.accentDeep, Modifier.size(88.dp))
                 Spacer(Modifier.height(6.dp))
-                Text(option.title, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, textAlign = TextAlign.Center)
-                Text(option.desc, color = c.inkSoft, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 260.dp))
+                Text(title, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, textAlign = TextAlign.Center)
+                Text(desc, color = c.inkSoft, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 260.dp))
             }
         }
     }
@@ -227,7 +235,7 @@ private fun AppLogo(modifier: Modifier) {
 }
 
 @Composable
-private fun OptionIcon(option: AddOption, color: Color, modifier: Modifier) {
+internal fun OptionIcon(option: AddOption, color: Color, modifier: Modifier) {
     Canvas(modifier) {
         val s = size.minDimension / 48f
         val w = 2.6f * s

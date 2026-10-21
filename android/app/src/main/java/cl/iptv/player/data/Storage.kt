@@ -106,6 +106,11 @@ class Storage(private val ctx: Context) {
     fun favorites(sourceId: String): Set<String> = runCatching { prefs.getStringSet(fk(sourceId), emptySet())?.toSet() }.getOrNull() ?: emptySet()
     fun saveFavorites(sourceId: String, set: Set<String>) = prefs.edit().putStringSet(fk(sourceId), set).apply()
 
+    /** El asistente del primer inicio ya se completó (o se saltó). */
+    var setupDone: Boolean
+        get() = runCatching { prefs.getBoolean("setup_done", false) }.getOrDefault(false)
+        set(v) = prefs.edit().putBoolean("setup_done", v).apply()
+
     var lastSourceId: String?
         get() = runCatching { prefs.getString("last_source", null) }.getOrNull()
         set(v) = prefs.edit().putString("last_source", v).apply()
