@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -51,7 +53,7 @@ android {
                 t.maxHeapSize = "3g"
                 // Si una prueba se queda colgada, la compilación falla a los 12 min (en vez de esperar horas)
                 // y el registro muestra cuál fue la última que empezó
-                t.timeout.set(java.time.Duration.ofMinutes(12))
+                t.timeout.set(Duration.ofMinutes(12))
                 t.testLogging {
                     events("started", "passed", "failed", "skipped")
                     exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
