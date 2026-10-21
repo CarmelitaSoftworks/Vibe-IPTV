@@ -230,7 +230,18 @@ run `node i18n/build.mjs` to update both the web app and Android.
 
 ## 🙏 Credits
 
-**Vibe IPTV** is developed and maintained by **[Carmelita Softworks](https://github.com/CarmelitaSoftworks)**. 🇨🇱 It's a *vibe coded* project and exists thanks to many open-source projects: **[see all credits](CREDITS.md)**.
+**Vibe IPTV** is developed and maintained by **[Carmelita Softworks](https://github.com/CarmelitaSoftworks)**. 🇨🇱
+It's a *vibe coded* project: the code was written in conversation with 🤖 **Claude**, by **[Anthropic](https://www.anthropic.com)**.
+
+It exists thanks to these open-source projects and services:
+
+- **🎬 Playback:** ▶️ [ExoPlayer (Media3)](https://github.com/androidx/media) · 🔶 [LibVLC](https://code.videolan.org/videolan/vlc) · 🎞️ [mpv / libmpv](https://github.com/jarnedemeulemeester/libmpv-android) · 🧩 [FFmpeg](https://ffmpeg.org) · 🔊 [Jellyfin FFmpeg decoder](https://github.com/jellyfin/jellyfin-androidx-media) · 🌐 [hls.js](https://github.com/video-dev/hls.js) · 📡 [mpegts.js](https://github.com/xqq/mpegts.js)
+- **💬 Subtitles and AI:** 🎙️ [Vosk](https://alphacephei.com/vosk) · 🔗 [JNA](https://github.com/java-native-access/jna) · 🧠 [whisper.cpp](https://github.com/ggml-org/whisper.cpp) · ⚙️ [ggml](https://github.com/ggml-org/ggml) · 🗣️ [Whisper model (OpenAI)](https://github.com/openai/whisper) · 📷 [ML Kit](https://developers.google.com/ml-kit) · 🔍 [Tesseract.js](https://github.com/naptha/tesseract.js) · 📝 [OpenSubtitles](https://www.opensubtitles.org) · 📝 [SubDL](https://subdl.com) · 📝 [Podnapisi](https://www.podnapisi.net)
+- **📺 Guide and playlists:** 🗓️ [iptv-org/epg](https://github.com/iptv-org/epg) · 📥 [OkHttp](https://github.com/square/okhttp)
+- **🎨 Interface:** 🟣 [Kotlin](https://kotlinlang.org) · 🧱 [Jetpack Compose](https://developer.android.com/compose) · 🔄 [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) · 🖼️ [Coil](https://github.com/coil-kt/coil) · 💡 [OwnTV (design inspiration)](https://github.com/ahXN00/OwnTV)
+- **🧪 Testing:** 🤖 [Robolectric](https://github.com/robolectric/robolectric) · 📸 [Roborazzi](https://github.com/takahirom/roborazzi)
+
+Licenses and what each one is used for: [CREDITS.md](CREDITS.md). Names and trademarks belong to their owners; this project is not affiliated with them.
 
 ---
 
