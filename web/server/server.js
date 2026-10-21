@@ -18,6 +18,8 @@ const net = require('net');
 const tls = require('tls');
 const { Transform, PassThrough } = require('stream');
 const { spawn, spawnSync } = require('child_process');
+const os = require('os');
+const crypto = require('crypto');
 const subtitles = require('./subtitles.js');
 
 // ---- ffmpeg (opcional): convierte al vuelo formatos que el navegador no reproduce ----
@@ -309,20 +311,12 @@ async function probe(target, extra, depth = 0) {
 
 const leafProbe = (r) => { while (r && r.next) r = r.next; return r; };
 
-async function handleTranscode(req, res, reqUrl) {
-  if (!FFMPEG) {
-    res.writeHead(501, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8', 'X-Proxy-Error': encodeURIComponent('ffmpeg no está instalado') });
-    return res.end('ffmpeg no está instalado');
-  }
-  const target = reqUrl.searchParams.get('url');
-  if (!target) { res.writeHead(400, CORS); return res.end('Falta ?url='); }
+/** Argumentos de entrada y códecs de ffmpeg: copia lo que el navegador ya soporta y convierte sólo lo necesario. */
+async function ffmpegArgs(target, reqUrl) {
   const ua = reqUrl.searchParams.get('ua') || DEFAULT_UA;
   const ref = reqUrl.searchParams.get('ref') || '';
   const full = reqUrl.searchParams.get('mode') === 'full';
   const quality = reqUrl.searchParams.get('q') === 'balanced' ? 'veryfast' : 'ultrafast';
-  if (currentFfmpeg) { try { currentFfmpeg.kill('SIGKILL'); } catch {} currentFfmpeg = null; }
-
-  // Copiar lo que el navegador ya soporta y convertir sólo lo necesario
   let vcopy = false, acopy = false, codecs = null;
   if (!full) {
     const info = leafProbe(await probe(target, { ua: reqUrl.searchParams.get('ua') || '', ref }));
@@ -341,10 +335,23 @@ async function handleTranscode(req, res, reqUrl) {
     '-vf', 'yadif=mode=0:deint=1,scale=-2:min(720\\,ih)',          // desentrelaza (TV de cable) y limita a 720p
   ]));
   args.push(...(acopy ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '160k', '-ac', '2']));
+  const what = codecs ? `${[...codecs.video, ...codecs.audio].join('+')} → ${vcopy ? 'video copiado' : 'H.264'} / ${acopy ? 'audio copiado' : 'AAC'}` : 'conversión completa';
+  return { args, what };
+}
+
+async function handleTranscode(req, res, reqUrl) {
+  if (!FFMPEG) {
+    res.writeHead(501, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8', 'X-Proxy-Error': encodeURIComponent('ffmpeg no está instalado') });
+    return res.end('ffmpeg no está instalado');
+  }
+  const target = reqUrl.searchParams.get('url');
+  if (!target) { res.writeHead(400, CORS); return res.end('Falta ?url='); }
+  if (currentFfmpeg) { try { currentFfmpeg.kill('SIGKILL'); } catch {} currentFfmpeg = null; }
+  stopHls();
+  const { args, what } = await ffmpegArgs(target, reqUrl);
   args.push('-f', 'mpegts', '-muxdelay', '0', 'pipe:1');
 
   let host = ''; try { host = new URL(target).host; } catch {}
-  const what = codecs ? `${[...codecs.video, ...codecs.audio].join('+')} → ${vcopy ? 'video copiado' : 'H.264'} / ${acopy ? 'audio copiado' : 'AAC'}` : 'conversión completa';
   console.log(`[ffmpeg] ${host}: ${what}`);
   const ff = spawn(FFMPEG, args, { stdio: ['ignore', 'pipe', 'pipe'] });
   currentFfmpeg = ff;
@@ -361,12 +368,88 @@ async function handleTranscode(req, res, reqUrl) {
   });
 }
 
+// ---- Conversión a HLS para iPhone y iPad ----
+// Safari en iOS no reproduce MPEG-TS directo (no tiene MediaSource en iPhone): ffmpeg lo pasa a HLS en
+// trozos de 2 s, que Safari reproduce de forma nativa. Una sesión a la vez; se apaga sola si nadie la pide.
+let hlsSession = null;   // { id, dir, ff, last }
+const HLS_ROOT = path.join(os.tmpdir(), 'vibe-hls');
+function stopHls() {
+  if (!hlsSession) return;
+  const s = hlsSession; hlsSession = null;
+  try { s.ff.kill('SIGKILL'); } catch {}
+  fs.rm(s.dir, { recursive: true, force: true }, () => {});
+}
+setInterval(() => { if (hlsSession && Date.now() - hlsSession.last > 45000) stopHls(); }, 10000).unref();
+
+function countSegments(file) {
+  try { return (fs.readFileSync(file, 'utf8').match(/\.ts\s*$/gm) || []).length; } catch { return 0; }
+}
+
+async function handleHlsStart(req, res, reqUrl) {
+  if (!FFMPEG) {
+    res.writeHead(501, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8', 'X-Proxy-Error': encodeURIComponent('ffmpeg no está instalado') });
+    return res.end('ffmpeg no está instalado');
+  }
+  const target = reqUrl.searchParams.get('url');
+  if (!target) { res.writeHead(400, CORS); return res.end('Falta ?url='); }
+  const live = reqUrl.searchParams.get('live') !== '0';
+  stopHls();
+  if (currentFfmpeg) { try { currentFfmpeg.kill('SIGKILL'); } catch {} currentFfmpeg = null; }
+  const { args, what } = await ffmpegArgs(target, reqUrl);
+  const id = crypto.randomBytes(8).toString('hex');
+  const dir = path.join(HLS_ROOT, id);
+  fs.mkdirSync(dir, { recursive: true });
+  const index = path.join(dir, 'index.m3u8');
+  args.push('-f', 'hls', '-hls_time', '2', '-hls_segment_filename', path.join(dir, 's%05d.ts'));
+  if (live) args.push('-hls_list_size', '8', '-hls_flags', 'delete_segments+independent_segments');
+  else args.push('-hls_list_size', '0', '-hls_playlist_type', 'event', '-hls_flags', 'independent_segments');
+  args.push(index);
+  let host = ''; try { host = new URL(target).host; } catch {}
+  console.log(`[ffmpeg → HLS] ${host}: ${what}`);
+  const ff = spawn(FFMPEG, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  let errText = '', exited = false;
+  ff.stderr.on('data', (d) => { errText = (errText + d).slice(-600); });
+  ff.on('close', () => { exited = true; });
+  hlsSession = { id, dir, ff, last: Date.now() };
+  // Esperar a que haya al menos 2 trozos listos (o el primero, si ffmpeg ya terminó: archivo corto)
+  const t0 = Date.now();
+  while (Date.now() - t0 < 25000) {
+    const n = countSegments(index);
+    if (n >= 2 || (exited && n >= 1)) break;
+    if (exited || !hlsSession || hlsSession.id !== id) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  if (!countSegments(index)) {
+    if (hlsSession && hlsSession.id === id) stopHls();
+    const why = errText.trim().split('\n').pop() || 'ffmpeg no entregó video';
+    res.writeHead(502, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8', 'X-Proxy-Error': encodeURIComponent(why) });
+    return res.end(why);
+  }
+  res.writeHead(302, { ...CORS, Location: `/proxy/hls/${id}/index.m3u8`, 'Cache-Control': 'no-store', 'X-Transcode': encodeURIComponent(what) });
+  res.end();
+}
+
+function handleHlsFile(req, res, reqUrl) {
+  const m = /^\/proxy\/hls\/([a-f0-9]{16})\/(index\.m3u8|s\d{5}\.ts)$/.exec(reqUrl.pathname);
+  if (!m || !hlsSession || hlsSession.id !== m[1]) { res.writeHead(404, CORS); return res.end(); }
+  hlsSession.last = Date.now();
+  const file = path.join(hlsSession.dir, m[2]);
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404, CORS); return res.end(); }
+    const playlist = m[2].endsWith('.m3u8');
+    res.writeHead(200, { ...CORS, 'Content-Type': playlist ? 'application/vnd.apple.mpegurl' : 'video/mp2t', 'Cache-Control': playlist ? 'no-store' : 'max-age=60' });
+    res.end(data);
+  });
+}
+
 async function handleProxy(req, res, reqUrl) {
   if (reqUrl.pathname === '/proxy/caps') {
     res.writeHead(200, { ...CORS, 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ffmpeg: !!FFMPEG, ocr: OCR_LOCAL }));
+    return res.end(JSON.stringify({ ffmpeg: !!FFMPEG, hls: !!FFMPEG, ocr: OCR_LOCAL }));
   }
   if (reqUrl.pathname === '/proxy/transcode') return handleTranscode(req, res, reqUrl);
+  if (reqUrl.pathname === '/proxy/hls/start') return handleHlsStart(req, res, reqUrl);
+  if (reqUrl.pathname.startsWith('/proxy/hls/')) return handleHlsFile(req, res, reqUrl);
   if (reqUrl.pathname === '/proxy/subs/subdl-account') {
     try {
       const msg = await subtitles.subdlAccount(reqUrl.searchParams.get('key') || '');

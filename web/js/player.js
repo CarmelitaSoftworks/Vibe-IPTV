@@ -4,6 +4,10 @@
 import { candidates, markNeedsProxy, proxyBase } from './net.js';
 import { getSettings } from './storage.js';
 
+/** iPhone o iPad (el iPad moderno se presenta como Mac con pantalla táctil). */
+export const IOS = typeof navigator !== 'undefined' &&
+  (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
 function streamType(url) {
   const path = url.split('?')[0].toLowerCase();
   if (path.includes('.m3u8') || path.endsWith('.hls.txt') || /[?&](type|output)=(m3u8|hls)/i.test(url)) return 'hls';
@@ -37,6 +41,15 @@ export function getCaps() {
   if (!proxyBase()) return Promise.resolve({ ffmpeg: false });
   capsPromise ||= fetch(`${proxyBase()}/proxy/caps`).then((r) => r.json()).catch(() => ({ ffmpeg: false }));
   return capsPromise;
+}
+
+/** iPhone/iPad: el servidor convierte a HLS (trozos de 2 s) y Safari lo reproduce de forma nativa. */
+function hlsConvertUrl(url, item, live) {
+  const p = new URLSearchParams({ url, live: live ? '1' : '0' });
+  if (item.userAgent) p.set('ua', item.userAgent);
+  if (item.referrer) p.set('ref', item.referrer);
+  if (getSettings().convertQuality === 'balanced') p.set('q', 'balanced');
+  return `${proxyBase()}/proxy/hls/start?${p}`;
 }
 
 function transcodeUrl(url, item, full = false) {
@@ -91,6 +104,11 @@ export class Player {
     const variants = [item.url];
     const alt = altFormat(item.url);
     if (alt) variants.push(alt);
+    // iPhone/iPad: Safari no reproduce MPEG-TS directo; primero el .m3u8 del canal y, si no hay, la conversión a HLS
+    if (IOS) {
+      if (alt && streamType(item.url) === 'ts') variants.reverse();
+      if (!alt && streamType(item.url) === 'ts' && canConvert) { if (await this.tryConvert(item, token, live)) return; }
+    }
     let lastErr = null;
     for (const src of variants) {
       const urls = candidates(src, item);
@@ -119,9 +137,10 @@ export class Player {
 
   async tryConvert(item, token, live) {
     if (token !== this.token) return false;
-    this.onStatus('Convirtiendo el formato del canal…');
+    this.onStatus(IOS ? 'Preparando el canal para iPhone…' : 'Convirtiendo el formato del canal…');
     try {
-      await this.tryUrl(transcodeUrl(item.url, item), 'ts', live, 'Convertido (ffmpeg)');
+      if (IOS) await this.tryUrl(hlsConvertUrl(item.url, item, live), 'hls', live, 'Convertido para iPhone (ffmpeg → HLS)');
+      else await this.tryUrl(transcodeUrl(item.url, item), 'ts', live, 'Convertido (ffmpeg)');
       if (token === this.token) this.onStatus('');
       return true;
     } catch { return false; }
@@ -154,10 +173,15 @@ export class Player {
       v.addEventListener('playing', onPlaying);
       v.addEventListener('error', onErr);
 
-      const start = () => v.play().catch(() => { /* autoplay bloqueado: el usuario pulsa play */ ok(); });
+      const start = () => v.play().catch(() => {
+        // iPhone bloquea el sonido sin un toque: se intenta en silencio y se avisa; si tampoco, el usuario pulsa play
+        if (IOS && !v.muted) { v.muted = true; v.dataset.autoMuted = '1'; v.play().then(() => this.onStatus('Toca el video para activar el sonido 🔊')).catch(() => ok()); return; }
+        ok();
+      });
 
       if (type === 'hls') {
-        if (window.Hls && Hls.isSupported()) {
+        // En iPhone/iPad, HLS nativo de Safari (más estable que hls.js allí, y con imagen en imagen y AirPlay)
+        if (window.Hls && Hls.isSupported() && !(IOS && v.canPlayType('application/vnd.apple.mpegurl'))) {
           const B = BUFFER[getSettings().buffer] || BUFFER.balanced;
           const hls = new Hls({
             enableWorker: true, lowLatencyMode: false, renderTextTracksNatively: true, backBufferLength: 30,
@@ -181,6 +205,7 @@ export class Player {
           this.kind = kindOverride || 'HLS'; v.src = url; start();
         } else fail('HLS no soportado en este navegador');
       } else if (type === 'ts') {
+        if (IOS && !(window.mpegts && mpegts.getFeatureList().mseLivePlayback)) { fail('Safari en iPhone no reproduce MPEG-TS directo'); return; }
         if (window.mpegts && mpegts.getFeatureList().mseLivePlayback) {
           const p = mpegts.createPlayer({ type: 'mpegts', isLive: live, url }, {
             // Búfer antes de empezar y SIN "persecución de latencia": era lo que hacía saltar la imagen hacia adelante

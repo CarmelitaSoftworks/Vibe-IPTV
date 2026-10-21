@@ -8,6 +8,11 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <!-- iPhone / iPad: app de pantalla completa al agregarla a la pantalla de inicio -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vibe IPTV">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
@@ -124,7 +129,7 @@
 
   <!-- ===== REPRODUCTOR ===== -->
   <section id="playerView" class="player" hidden>
-    <video id="video" playsinline crossorigin="anonymous"></video>
+    <video id="video" playsinline webkit-playsinline x-webkit-airplay="allow" autopictureinpicture crossorigin="anonymous"></video>
     <div class="status" id="pStatus" hidden></div>
     <div class="pdigits" id="pDigits" hidden></div>
     <div class="seek-flash" id="pSeekFlash" hidden></div>

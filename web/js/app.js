@@ -2,7 +2,7 @@ import { t, setLang, resolveLang, locale } from './i18n.js';
 import { parseM3U, splitGroup } from './m3u.js';
 import { XtreamClient, normalizeServer } from './xtream.js';
 import { Epg, loadEpg } from './epg.js';
-import { Player, altFormat, getCaps } from './player.js';
+import { Player, altFormat, getCaps, IOS } from './player.js';
 import { fetchSmart, redact, proxify, proxyBase } from './net.js';
 import { initSettings, openSettings, refreshSettings, handleSettingsKey } from './settings.js';
 import { moveFocus, keyDir, isBack, isOk } from './nav.js';
@@ -847,6 +847,8 @@ function closeSheets(restore = true) {
 
 /* ---------- reproductor ---------- */
 const video = $('video');
+// iPhone: si el video empezó en silencio (Safari bloquea el sonido sin un toque), un toque lo activa
+if (IOS) document.addEventListener('pointerup', () => { if (video.dataset.autoMuted === '1') { delete video.dataset.autoMuted; video.muted = false; } }, { capture: true });
 const player = new Player(video, {
   onError: (m) => showPlayError(m),
   onStatus: (m) => { $('pStatus').hidden = !m; $('pStatus').textContent = m; },
@@ -1284,7 +1286,9 @@ $('pSeek').addEventListener('input', (e) => { if (isFinite(video.duration)) vide
 
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  else $('playerView').requestFullscreen?.().then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+  else if ($('playerView').requestFullscreen) $('playerView').requestFullscreen().then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+  // iPhone: sólo el video puede ir a pantalla completa
+  else video.webkitEnterFullscreen?.();
 }
 
 /* ---------- subtítulos ---------- */
@@ -1495,6 +1499,11 @@ $('pAspect').onclick = menuAspect;
 $('pSpeed').onclick = menuSpeed;
 $('pInfoBtn').onclick = toggleInfo;
 $('pPip').onclick = async () => {
+  // iPhone/iPad sin la API estándar: modo de presentación de WebKit
+  if (!document.pictureInPictureEnabled && video.webkitSetPresentationMode) {
+    video.webkitSetPresentationMode(video.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
+    return;
+  }
   try { document.pictureInPictureElement ? await document.exitPictureInPicture() : await video.requestPictureInPicture(); }
   catch { toast('Este navegador no permite imagen en imagen aquí'); }
 };

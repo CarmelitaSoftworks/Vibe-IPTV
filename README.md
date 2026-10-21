@@ -10,7 +10,7 @@ Listas M3U/M3U8 · Xtream Codes · Guía XMLTV · Pensado para el control remoto
 
 🇨🇱 **Español** · 🇬🇧 [English](README.en.md)
 
-![Plataformas](https://img.shields.io/badge/plataformas-Web%20%7C%20Android%20%7C%20Android%20TV-3ddc84)
+![Plataformas](https://img.shields.io/badge/plataformas-Web%20%7C%20iPhone%20%7C%20Android%20%7C%20Android%20TV-3ddc84)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7f52ff?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-4285f4?logo=jetpackcompose&logoColor=white)
 ![Motores](https://img.shields.io/badge/motores-ExoPlayer%20%7C%20VLC%20%7C%20MPV-ff7a00)
@@ -153,6 +153,18 @@ Para actualizar, instala la nueva versión encima: se conservan tus listas y aju
 3. En Windows, haz doble clic en `web/iniciar.bat`. En otros sistemas: `cd web && npm install && node server/server.js --open`.
 4. Para usarlo desde el celular o el TV de tu casa, usa `web/iniciar-red-local.bat` (o `--lan`).
 5. Desde el navegador puedes **instalarla como app (PWA)**.
+
+### 📱 iPhone y iPad
+
+La versión web funciona en Safari y se puede **agregar a la pantalla de inicio** como una app:
+
+1. En un PC, Mac, NAS o Raspberry Pi de tu casa, inicia el servidor para la red local: `web/iniciar-red-local.bat` en Windows, o `HOST=0.0.0.0 node server/server.js` (también con Docker).
+2. En el iPhone, abre en Safari la dirección que muestra el servidor (por ejemplo `http://192.168.1.20:8080`).
+3. Toca **Compartir → Agregar a inicio**. Se abre a pantalla completa, con su ícono.
+
+En iPhone, Safari no reproduce canales MPEG-TS directamente: la app usa primero la versión HLS del canal (`.m3u8`) y, si no existe, el servidor lo convierte a HLS con **ffmpeg** (incluido con `npm install`). Funcionan la imagen en imagen y AirPlay. Si el video empieza en silencio, toca la pantalla una vez para activar el sonido (es una regla de iOS).
+
+Para usarla fuera de casa, publica el servidor con HTTPS (por ejemplo, un túnel de Cloudflare) y **siempre con contraseña** (`VIBE_PASSWORD`). Ver [Instalar en tu propio servidor](docs/SERVIDOR-PROPIO.md).
 
 ### Servidor propio (Docker, Linux, Raspberry Pi, NAS)
 ```bash

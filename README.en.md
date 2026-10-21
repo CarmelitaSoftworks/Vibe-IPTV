@@ -10,7 +10,7 @@ M3U/M3U8 playlists · Xtream Codes · XMLTV guide · Built for the remote contro
 
 🇨🇱 [Español](README.md) · 🇬🇧 **English**
 
-![Platforms](https://img.shields.io/badge/platforms-Web%20%7C%20Android%20%7C%20Android%20TV-3ddc84)
+![Platforms](https://img.shields.io/badge/platforms-Web%20%7C%20iPhone%20%7C%20Android%20%7C%20Android%20TV-3ddc84)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7f52ff?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-4285f4?logo=jetpackcompose&logoColor=white)
 ![Engines](https://img.shields.io/badge/engines-ExoPlayer%20%7C%20VLC%20%7C%20MPV-ff7a00)
@@ -153,6 +153,18 @@ To update, install the new version on top: your lists and settings are kept.
 3. On Windows, double-click `web/iniciar.bat`. On other systems: `cd web && npm install && node server/server.js --open`.
 4. To use it from your phone or TV at home, use `web/iniciar-red-local.bat` (or `--lan`).
 5. From the browser you can **install it as an app (PWA)**.
+
+### 📱 iPhone and iPad
+
+The web version works in Safari and can be **added to the Home Screen** like an app:
+
+1. On a PC, Mac, NAS or Raspberry Pi at home, start the server for your local network: `web/iniciar-red-local.bat` on Windows, or `HOST=0.0.0.0 node server/server.js` (Docker works too).
+2. On the iPhone, open the address the server shows in Safari (for example `http://192.168.1.20:8080`).
+3. Tap **Share → Add to Home Screen**. It opens full screen, with its own icon.
+
+On iPhone, Safari can't play MPEG-TS channels directly: the app first uses the channel's HLS version (`.m3u8`) and, if there isn't one, the server converts it to HLS with **ffmpeg** (included with `npm install`). Picture-in-picture and AirPlay work. If the video starts muted, tap the screen once to turn the sound on (an iOS rule).
+
+To use it away from home, publish the server over HTTPS (for example, a Cloudflare tunnel) and **always with a password** (`VIBE_PASSWORD`). See [Self-hosting](docs/SELF-HOSTING.md).
 
 ### Your own server (Docker, Linux, Raspberry Pi, NAS)
 ```bash
