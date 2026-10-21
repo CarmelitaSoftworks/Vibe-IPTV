@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import cl.iptv.player.data.Settings
 import cl.iptv.player.data.Source
 import cl.iptv.player.data.SourceType
 import cl.iptv.player.data.ScreenshotReader

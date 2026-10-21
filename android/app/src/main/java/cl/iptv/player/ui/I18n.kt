@@ -54,7 +54,7 @@ object I18n {
         if (l != lang) { cache.clear(); lang = l }
     }
 
-    val locale: Locale get() = if (lang == "en") Locale.US else Locale("es", "CL")
+    val locale: Locale get() = if (lang == "en") Locale.US else localeOf("es", "CL")
 
     private fun one(s: String): String? {
         exact[s]?.let { return it }
@@ -118,3 +118,8 @@ fun Text(
         minLines = minLines, onTextLayout = onTextLayout, style = style,
     )
 }
+
+/** Locale a partir de un código de idioma (y región). Reemplaza el constructor Locale(...) obsoleto. */
+fun localeOf(lang: String, region: String = ""): java.util.Locale =
+    runCatching { java.util.Locale.Builder().setLanguage(lang).setRegion(region).build() }
+        .getOrElse { java.util.Locale.forLanguageTag(if (region.isEmpty()) lang else "$lang-$region") }

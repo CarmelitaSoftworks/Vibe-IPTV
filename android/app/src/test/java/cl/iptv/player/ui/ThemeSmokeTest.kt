@@ -37,9 +37,10 @@ class ThemeSmokeTest {
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
-    private fun abrir(theme: String, recorrer: (AppViewModel) -> Unit = {}, screen: @Composable (AppViewModel) -> Unit) {
+    private fun abrir(theme: String, ligero: Boolean = false, recorrer: (AppViewModel) -> Unit = {}, screen: @Composable (AppViewModel) -> Unit) {
         val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
         vm.loadPreview(Source("demo", "Demostración", SourceType.M3U, "demo://"), lista(), theme)
+        cl.iptv.player.data.Perf.lite = ligero
         assertEquals("ids únicos", vm.items.size, vm.items.map { it.id }.toSet().size)
         val act = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
         act.setContent { IptvTheme(theme) { screen(vm) } }
@@ -57,7 +58,9 @@ class ThemeSmokeTest {
 
     @Test fun mosaicos() = abrir("metro", recorrer = { vm -> for (t in 0..5) { vm.shell.tab = t; idle() } }) { MetroScreen(it) }
 
-    @Test fun ondas() = abrir("wave", recorrer = { vm -> for (c in 0..5) { vm.shell.col = c; vm.shell.level = 0; idle() } }) { WaveScreen(it) }
+    // Modo liviano: la animación infinita de las ondas no deja que el reloj simulado de Robolectric termine
+    // (en un equipo real no pasa nada; sólo cuelga la prueba)
+    @Test fun ondas() = abrir("wave", ligero = true, recorrer = { vm -> for (c in 0..5) { vm.shell.col = c; vm.shell.level = 0; idle() } }) { WaveScreen(it) }
 
     @Test fun guia() = abrir("light") { GuideScreen(it) }
 }

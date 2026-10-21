@@ -1,6 +1,5 @@
 package cl.iptv.player.ui
 
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -202,7 +201,7 @@ fun PlayerScreen(vm: AppViewModel) {
         val renderers = object : androidx.media3.exoplayer.DefaultRenderersFactory(ctx) {
             override fun buildAudioSink(context: android.content.Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): androidx.media3.exoplayer.audio.AudioSink =
                 androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
-                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .apply { @Suppress("DEPRECATION") setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams) }
                     .setAudioProcessors(arrayOf(androidx.media3.exoplayer.audio.TeeAudioProcessor(vm.captioner.sink)))
                     .apply { if (aiOn) @Suppress("DEPRECATION") setAudioCapabilities(androidx.media3.exoplayer.audio.AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES) }
                     .build()
@@ -349,7 +348,7 @@ fun PlayerScreen(vm: AppViewModel) {
         val want = vm.settings.subLangs.lowercase().split(Regex("[\\s,]+")).firstOrNull { it.isNotBlank() } ?: "es"
         fun isLang(label: String): Boolean {
             val l = label.lowercase()
-            val names = listOf(java.util.Locale(want).getDisplayLanguage(java.util.Locale("es")), java.util.Locale(want).getDisplayLanguage(java.util.Locale.ENGLISH))
+            val names = listOf(localeOf(want).getDisplayLanguage(localeOf("es")), localeOf(want).getDisplayLanguage(java.util.Locale.ENGLISH))
                 .map { it.lowercase() }.filter { it.isNotBlank() } + (if (want == "es") listOf("latino", "castellano", "spa") else emptyList())
             return names.any { it in l } || Regex("""(^|[^a-z])$want([^a-z]|$)""").containsMatchIn(l)
         }

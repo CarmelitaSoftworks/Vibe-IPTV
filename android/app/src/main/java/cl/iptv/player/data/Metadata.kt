@@ -61,7 +61,7 @@ object Metadata {
         if (cache.containsKey(k)) return cache[k]
         var m = xtream?.info(item)?.let(::fromXtream)?.takeUnless { it.isEmpty }
         if (m == null || m.plot.isBlank()) runCatching { tmdb(item, tmdbKey, lang) }.getOrNull()?.let { t ->
-            m = if (m == null) t else m!!.copy(plot = t.plot, rating = m!!.rating.ifBlank { t.rating }, backdrop = m!!.backdrop.ifBlank { t.backdrop }, source = "Servidor · TMDB")
+            m = if (m == null) t else m.copy(plot = t.plot, rating = m.rating.ifBlank { t.rating }, backdrop = m.backdrop.ifBlank { t.backdrop }, source = "Servidor · TMDB")
         }
         cache[k] = m
         return m

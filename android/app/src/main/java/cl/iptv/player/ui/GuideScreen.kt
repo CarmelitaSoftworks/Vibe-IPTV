@@ -75,7 +75,7 @@ fun GuideScreen(vm: AppViewModel) {
     fun listFor(ch: Item) = if (channels.any { it.id == ch.id }) channels else listOf(ch)
     fun open(ch: Item, p: Programme?) {
         val playingNow = p == null || (p.start + sh <= now && p.stop + sh > now)
-        if (playingNow) vm.activate(ch, listFor(ch)) else detail = ch to p!!
+        if (playingNow) vm.activate(ch, listFor(ch)) else detail = ch to p
     }
 
     Column(Modifier.fillMaxSize().themeBackground().systemBarsPadding()) {

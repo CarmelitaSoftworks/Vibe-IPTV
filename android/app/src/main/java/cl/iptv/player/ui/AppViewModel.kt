@@ -841,7 +841,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Temas: imagen de fondo y temas del usuario (exportar / importar) ----------
     // Un nombre nuevo por imagen: así la pantalla la vuelve a cargar al cambiarla
     private fun themeFiles() = getApplication<Application>().filesDir.listFiles { f -> f.name.startsWith("tema_fondo") }.orEmpty().sortedBy { it.name }
-    private fun themeFile() = themeFiles().lastOrNull() ?: File(getApplication<Application>().filesDir, "tema_fondo_0.jpg")
     private fun newThemeFile(): File { themeFiles().forEach { it.delete() }; return File(getApplication<Application>().filesDir, "tema_fondo_${System.currentTimeMillis()}.jpg") }
     var themeImage by mutableStateOf(themeFiles().lastOrNull()?.absolutePath.orEmpty()); private set
     private fun reloadThemeImage() { themeImage = themeFiles().lastOrNull()?.absolutePath.orEmpty() }

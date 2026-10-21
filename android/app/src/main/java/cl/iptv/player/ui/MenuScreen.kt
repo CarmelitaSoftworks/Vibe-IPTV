@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -27,10 +27,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -54,11 +52,10 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 enum class MenuDialog { NONE, SOURCES, CATEGORIES, SEARCH }
 
-private val ES = Locale("es", "CL")
+private val ES = localeOf("es", "CL")
 private val hhmm = SimpleDateFormat("HH:mm", ES)
 fun fmtTime(ms: Long): String = hhmm.format(Date(ms))
 
@@ -582,7 +579,7 @@ private fun Dock(compact: Boolean = false, title: String, pageText: String, onCa
         }
         val btn = if (compact) 46 else 76
         val btnTop = if (compact) 10.dp else 22.dp
-        RoundButton(Icons.Filled.List, "Categorías", Modifier.align(Alignment.CenterStart).padding(start = 28.dp, top = btnTop), size = btn, onClick = onCategories)
+        RoundButton(Icons.AutoMirrored.Filled.List, "Categorías", Modifier.align(Alignment.CenterStart).padding(start = 28.dp, top = btnTop), size = btn, onClick = onCategories)
         if (compact) {
             Row(Modifier.align(Alignment.Center).padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 300.dp))

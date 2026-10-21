@@ -7,7 +7,6 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import java.io.File
-import java.util.Locale
 
 /** Una opción de pista (audio, subtítulo o calidad) para los menús del reproductor. */
 data class TrackOpt(val id: String, val label: String, val selected: Boolean)
@@ -42,7 +41,7 @@ interface PlaybackControl {
 }
 
 private fun lang(code: String?): String? = code?.takeIf { it.isNotBlank() && it != "und" }?.let {
-    val name = Locale(it).getDisplayLanguage(Locale(I18n.lang))
+    val name = localeOf(it).getDisplayLanguage(localeOf(I18n.lang))
     if (name.isNotBlank() && name != it) name.replaceFirstChar { c -> c.uppercase() } else it.uppercase()
 }
 

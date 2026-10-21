@@ -259,7 +259,7 @@ class SubtitleSources(private val settings: () -> Settings) {
         ZipInputStream(ByteArrayInputStream(zip)).use { z ->
             while (true) {
                 val e = z.nextEntry ?: break
-                if (!e.isDirectory && rank(e.name) < 9 && (best == null || rank(e.name) < rank(best!!.first))) best = e.name to z.readBytes()
+                if (!e.isDirectory && rank(e.name) < 9 && (best == null || rank(e.name) < rank(best.first))) best = e.name to z.readBytes()
             }
         }
         return best ?: throw IOException("el zip no trae subtítulos .srt/.vtt/.ass")
