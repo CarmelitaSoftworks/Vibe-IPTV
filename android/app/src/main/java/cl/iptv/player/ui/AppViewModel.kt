@@ -617,19 +617,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val list = (favorites.mapNotNull { byId[it] }.filter { it.kind == Kind.LIVE } + recent.mapNotNull { byId[it] })
             .distinctBy { it.id }
         viewModelScope.launch(Dispatchers.IO) { TvHome.publish(app, src.id, list) }
+        // "Seguir viendo" del inicio de Google TV: películas y episodios a medias (y el último canal en vivo).
+        // Con una pausa breve: el reproductor guarda la posición final justo después de cerrarse.
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(1_500)
+            if (source?.id != src.id) return@launch
+            val now = items.associateBy { it.id }
+            val watched = continueWatching().map { (it0, r, ep) ->
+                val e = ep?.let { id -> episodes.firstOrNull { x -> x.id == id } }
+                TvHome.Watched(it0, ep, e?.name, e?.season ?: 0, e?.episode ?: 0, r.pos, r.dur, r.at)
+            }.toMutableList()
+            recent.firstNotNullOfOrNull { now[it]?.takeIf { i -> i.kind == Kind.LIVE } }?.let { ch ->
+                watched += TvHome.Watched(ch, null, null, 0, 0, 0, 0, System.currentTimeMillis() - 60_000)
+            }
+            withContext(Dispatchers.IO) { TvHome.publishWatchNext(app, src.id, watched) }
+        }
     }
     /** Enlace vibeiptv://play?src=…&id=… (desde la fila de Vibe IPTV en el inicio de la TV). */
     fun openLink(uri: Uri) {
         if (uri.scheme != "vibeiptv" || uri.host != "play") return
         val sid = uri.getQueryParameter("src") ?: return
         val id = uri.getQueryParameter("id") ?: return
+        // Episodio desde "Seguir viendo": abre la serie con el foco en ese episodio
+        val ep = uri.getQueryParameter("ep")
+        if (ep != null) pendingEpisode = ep
         if (source?.id == sid && items.isNotEmpty()) { playLinked(id); return }
         pendingLink = sid to id
         if (source?.id != sid) sources.firstOrNull { it.id == sid }?.let { open(it) }
     }
+    private var pendingEpisode: String? = null
     private fun playLinked(id: String) {
         val it0 = items.firstOrNull { it.id == id } ?: run { message = "Ese canal ya no está en la lista"; return }
-        showSettings = false; showGuide = false; multiview = null
+        showSettings = false; showGuide = false; multiview = null; mini = false
+        val ep = pendingEpisode; pendingEpisode = null
+        if (ep != null && it0.kind == Kind.SERIES) { openContinue(it0, ep); return }
+        // Películas: el reproductor sigue solo desde donde quedó
         activate(it0, items.filter { it.kind == it0.kind })
     }
 
