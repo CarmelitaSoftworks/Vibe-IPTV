@@ -287,6 +287,8 @@ fun PlayerScreen(vm: AppViewModel) {
     // Vigilante de congelamiento: el canal ya andaba pero la imagen se detuvo (sin error).
     // 1.º recarga, 2.º otro motor (en automático) y si no queda otro, avisa con "Reintentar".
     var userPaused by remember(item.id) { mutableStateOf(false) }
+    // Imagen en imagen del sistema al salir de la app: sólo mientras algo se reproduce (no si se dejó en pausa)
+    LaunchedEffect(userPaused) { activity.pipEnabled = !userPaused }
     // Gesto de brillo / volumen en curso (para el indicador)
     var gesture by remember { mutableStateOf<Pair<String, Float>?>(null) }
     var seekFlash by remember { mutableStateOf(0 to 0L) }        // doble toque: -1 / +1 y cuándo
@@ -915,7 +917,7 @@ fun PlayerScreen(vm: AppViewModel) {
                 }
                 PAction.MORE -> moreActions(live, vm.playList.size > 1, !useAlt && exo.qualities().isNotEmpty()).map { a ->
                     val rec = a == PAction.RECORD && vm.recording?.item?.id == item.id
-                    PanelRow(if (rec) "Detener grabación" else a.label, selected = rec) { panel = null; onAction(a) }
+                    PanelRow(if (rec) "Detener grabación" else a.label, selected = rec, icon = a) { panel = null; onAction(a) }
                 }
                 PAction.INFO -> (listOf("Motor" to engineName[engine].orEmpty()) + k?.info().orEmpty() +
                     listOfNotNull(Uri.parse(playUrl).host?.let { "Servidor del canal" to it })).map { (l, v) -> PanelRow(l, detail = v) {} }

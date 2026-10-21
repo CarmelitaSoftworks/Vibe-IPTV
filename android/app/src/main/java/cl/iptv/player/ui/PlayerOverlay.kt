@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -207,6 +208,8 @@ data class PanelRow(
     val label: String, val selected: Boolean = false, val detail: String = "",
     /** Lista de canales: logo y avance del programa actual (0..1, o -1 si no hay guía). */
     val logo: String = "", val progress: Float = -1f,
+    /** Ícono de la opción (panel "Más opciones"). */
+    val icon: PAction? = null,
     val onClick: () -> Unit,
 )
 
@@ -218,47 +221,72 @@ fun PlayerSidePanel(title: String, rows: List<PanelRow>, onClose: () -> Unit, mo
     val start = rows.indexOfFirst { it.selected }.coerceAtLeast(0)
     val state = rememberLazyListState(initialFirstVisibleItemIndex = (start - 2).coerceAtLeast(0))
     LaunchedEffect(title) { delay(60); runCatching { first.requestFocus() } }
+    // Tarjeta flotante a la derecha, con esquinas redondeadas y fondo de vidrio oscuro
+    val shape = RoundedCornerShape(24.dp)
     Column(
-        modifier.fillMaxHeight().then(if (wide) Modifier.widthIn(min = 300.dp, max = 620.dp).fillMaxWidth(0.62f) else Modifier.widthIn(min = 300.dp, max = 480.dp).fillMaxWidth(0.5f))   // más ancho: el texto completo se lee
-            .background(Color(0xF2161A1D)).padding(vertical = 18.dp),
+        modifier.fillMaxHeight().padding(10.dp)
+            .then(if (wide) Modifier.widthIn(min = 300.dp, max = 620.dp).fillMaxWidth(0.62f) else Modifier.widthIn(min = 300.dp, max = 480.dp).fillMaxWidth(0.5f))
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xF5232A2F), Color(0xF514181B))))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .padding(top = 16.dp, bottom = 10.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 24.sp, modifier = Modifier.weight(1f))
-            Text("✕", color = Color.White.copy(alpha = 0.7f), fontSize = 20.sp, modifier = Modifier.clip(CircleShape).clickable { onClose() }.padding(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 18.dp, end = 10.dp)) {
+            Box(Modifier.size(width = 4.dp, height = 22.dp).clip(RoundedCornerShape(2.dp)).background(c.accent))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 24.sp)
+                if (rows.size > 6) Text("${rows.size} opciones", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+            }
+            Box(Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)).clickable { onClose() }, contentAlignment = Alignment.Center) {
+                Text("✕", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
         }
-        Spacer(Modifier.height(10.dp))
-        if (rows.isEmpty()) Text("No hay opciones para este canal.", color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = 20.dp))
+        Box(Modifier.padding(top = 12.dp, bottom = 6.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.07f)))
+        if (rows.isEmpty()) Text("No hay opciones para este canal.", color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
         LazyColumn(state = state) {
             itemsIndexed(rows) { i, r ->
                 val src = remember { MutableInteractionSource() }
                 val f by src.collectIsFocusedAsState()
+                val pressed by src.collectIsPressedAsState()
+                val on = f || pressed
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp).clip(RoundedCornerShape(12.dp))
-                        .background(if (f) Color.White else Color.Transparent)
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp).clip(RoundedCornerShape(14.dp))
+                        .background(when { on -> Color.White; r.selected -> c.accent.copy(alpha = 0.16f); else -> Color.Transparent })
                         .then(if (i == start) Modifier.focusRequester(first) else Modifier)
                         .clickable(interactionSource = src, indication = null, onClick = r.onClick)
                         .padding(horizontal = 12.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                        if (r.selected) Box(Modifier.size(10.dp).clip(CircleShape).background(if (f) c.accentDeep else c.accent))
+                    if (r.icon != null) {
+                        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(if (on) c.accent.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.07f)),
+                            contentAlignment = Alignment.Center) {
+                            PlayerIcon(r.icon, if (on) c.accentDeep else Color.White, Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
                     }
-                    Spacer(Modifier.width(10.dp))
                     if (wide) {
-                        Box(Modifier.size(width = 52.dp, height = 36.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = if (f) 0f else 0.08f)), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(width = 52.dp, height = 36.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = if (on) 0f else 0.08f)), contentAlignment = Alignment.Center) {
                             if (r.logo.isNotBlank()) coil.compose.AsyncImage(r.logo, null, contentScale = androidx.compose.ui.layout.ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(3.dp))
-                            else Text(initials(r.label), color = if (f) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                            else Text(initials(r.label), color = if (on) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                         }
                         Spacer(Modifier.width(12.dp))
                     }
                     Column(Modifier.weight(1f)) {
-                        Text(r.label, color = if (f) Color(0xFF1A1F23) else Color.White, fontWeight = if (r.selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        Text(r.label, color = if (on) Color(0xFF1A1F23) else Color.White, fontWeight = if (r.selected) FontWeight.ExtraBold else FontWeight.SemiBold,
                             // Texto completo en todos los paneles (también la lista de canales): sin "…"
                             fontSize = 15.sp, lineHeight = 19.sp)
-                        if (r.detail.isNotBlank()) Text(r.detail, color = if (f) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontSize = 12.sp,
+                        if (r.detail.isNotBlank()) Text(r.detail, color = if (on) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontSize = 12.sp,
                             lineHeight = 16.sp)
                         if (r.progress >= 0f) Box(Modifier.padding(top = 4.dp).fillMaxWidth(0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.2f))) {
                             Box(Modifier.fillMaxWidth(r.progress).fillMaxHeight().background(c.accent))
+                        }
+                    }
+                    // La opción elegida: marca a la derecha
+                    if (r.selected) {
+                        Spacer(Modifier.width(10.dp))
+                        Box(Modifier.size(24.dp).clip(CircleShape).background(if (on) c.accentDeep else c.accent), contentAlignment = Alignment.Center) {
+                            Text("✓", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
                         }
                     }
                 }
