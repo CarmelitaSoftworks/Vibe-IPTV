@@ -978,7 +978,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Mini reproductor (imagen en imagen dentro de la app, para TV y TV boxes) ----------
     /** El video sigue en una ventana chica en la esquina mientras se recorre el menú o la guía. */
     var mini by mutableStateOf(false); private set
-    fun enterMini() { mini = true; showSettings = false; returnFocusId = playing?.id; message = "Mini reproductor: Atrás en el Inicio vuelve a pantalla completa" }
+    fun enterMini(quiet: Boolean = false) {
+        mini = true; showSettings = false; returnFocusId = playing?.id
+        if (!quiet) message = "Mini reproductor: tócalo (o Atrás en el Inicio) para volver a pantalla completa"
+    }
     fun expandMini() { mini = false; showSettings = false; showGuide = false; details = null }
     val menuVisible: Boolean get() = screen == Screen.MENU || mini
 

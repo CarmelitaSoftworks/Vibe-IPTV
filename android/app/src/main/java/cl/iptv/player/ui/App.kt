@@ -50,8 +50,9 @@ fun App(vm: AppViewModel) {
         else if (vm.screen == Screen.PLAYER) {
             val cfg = androidx.compose.ui.platform.LocalConfiguration.current
             Box(
-                if (vm.mini) Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 20.dp)
-                    .width((cfg.screenWidthDp * 0.30f).dp).aspectRatio(16f / 9f)
+                // Teléfono: ventanita más grande (55 % del ancho en vertical) y sobre la barra de navegación
+                if (vm.mini) Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 16.dp, bottom = 16.dp)
+                    .width((cfg.screenWidthDp * (if (cfg.screenWidthDp < 600) 0.55f else if (cfg.smallestScreenWidthDp < 600) 0.40f else 0.30f)).dp).aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(12.dp)).border(2.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                 else Modifier.fillMaxSize()
             ) { PlayerScreen(vm) }

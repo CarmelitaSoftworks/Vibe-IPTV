@@ -34,9 +34,27 @@ class MainActivity : ComponentActivity() {
             !packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
     }
 
+    /** Hay algo reproduciéndose: al salir de la app pasa a imagen en imagen. */
     var pipEnabled = false
+        set(v) { field = v; updatePipParams() }
     var inPip by mutableStateOf(false)
         private set
+    /** Se estaba en el mini reproductor al pasar a imagen en imagen: al volver se regresa a él. */
+    private var miniBeforePip = false
+
+    private fun pipSupported() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+
+    private fun pipParams(): PictureInPictureParams = PictureInPictureParams.Builder()
+        .setAspectRatio(Rational(16, 9))
+        .apply {
+            // Android 12+: el sistema entra solo en imagen en imagen al salir de la app (también con gestos)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { setAutoEnterEnabled(pipEnabled && !isTv); setSeamlessResizeEnabled(true) }
+        }.build()
+
+    private fun updatePipParams() {
+        if (pipSupported()) runCatching { setPictureInPictureParams(pipParams()) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,21 +101,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        enterPip()
+        // Android 12+ ya entra solo (setAutoEnterEnabled); antes se pide aquí
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !isTv) enterPip()
     }
 
     /** Imagen en imagen (también desde el botón del reproductor). Devuelve false si el equipo no lo permite. */
     fun enterPip(): Boolean {
-        if (pipEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-        ) {
-            return runCatching { enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }.getOrDefault(false)
-        }
+        if (pipEnabled && pipSupported()) return runCatching { enterPictureInPictureMode(pipParams()) }.getOrDefault(false)
         return false
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         inPip = isInPictureInPictureMode
+        // En la ventanita del sistema sólo va el video: el mini reproductor pasa a pantalla completa y vuelve después
+        if (isInPictureInPictureMode) { miniBeforePip = vm.mini; if (vm.mini) vm.expandMini() }
+        else if (miniBeforePip) { miniBeforePip = false; vm.enterMini(quiet = true) }
     }
 }

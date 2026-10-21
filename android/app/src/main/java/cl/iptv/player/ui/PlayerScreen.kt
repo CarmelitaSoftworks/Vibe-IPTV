@@ -427,14 +427,25 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
 
-    // Pantalla completa inmersiva + horizontal en teléfonos; PiP al salir con el botón Inicio
+    // Pantalla completa inmersiva + horizontal en teléfonos; PiP al salir de la app.
+    // En el mini reproductor el teléfono vuelve a girar libre y con las barras del sistema, para usar el menú.
+    val prevOrientation = remember { activity.requestedOrientation }
+    DisposableEffect(vm.mini) {
+        val win = activity.window
+        val wc = WindowCompat.getInsetsController(win, win.decorView)
+        if (vm.mini) {
+            wc.show(WindowInsetsCompat.Type.systemBars())
+            if (!activity.isTv) activity.requestedOrientation = prevOrientation
+        } else {
+            wc.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            wc.hide(WindowInsetsCompat.Type.systemBars())
+            if (!activity.isTv) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+        onDispose {}
+    }
     DisposableEffect(Unit) {
         val win = activity.window
         val wc = WindowCompat.getInsetsController(win, win.decorView)
-        wc.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        wc.hide(WindowInsetsCompat.Type.systemBars())
-        val prevOrientation = activity.requestedOrientation
-        if (!activity.isTv) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         activity.pipEnabled = true
         onDispose {
             // El brillo ajustado con el gesto sólo vale dentro del reproductor
@@ -573,7 +584,9 @@ fun PlayerScreen(vm: AppViewModel) {
                 vm.message = if (wasFav) "${item.name} quitado de favoritos" else "★ ${item.name} añadido a favoritos"
             }
             // En TV: mini reproductor dentro de la app para recorrer el menú y la guía; en celulares, el PiP del sistema
-            PAction.PIP -> if (activity.isTv || !activity.enterPip()) vm.enterMini()
+            // Igual que en la TV: el video sigue en una ventanita y se puede usar el menú de la app.
+            // La imagen en imagen del sistema queda para cuando se sale de la app.
+            PAction.PIP -> vm.enterMini()
             PAction.EXTERNAL -> openInVlc()
             PAction.RECORD -> if (vm.recording?.item?.id == item.id) vm.stopRecording() else vm.startRecording(item)
             PAction.LASTCH -> vm.previousChannel()
@@ -802,6 +815,10 @@ fun PlayerScreen(vm: AppViewModel) {
             Box(Modifier.fillMaxSize().clickable { vm.expandMini() }) {
                 Text("⤢", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x99000000)).padding(horizontal = 6.dp))
+                // En teléfonos: cerrar el video sin volver a pantalla completa
+                if (!activity.isTv) Text("✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x99000000))
+                        .clickable { vm.closePlayer() }.padding(horizontal = 7.dp))
             }
         }
         if (!vm.mini) error?.let { msg ->

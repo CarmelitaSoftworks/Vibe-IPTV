@@ -43,7 +43,7 @@ import kotlinx.coroutines.delay
 enum class PAction(val label: String) {
     BACK("Volver"), PREV("Anterior"), REW("Retroceder 10 s"), PLAY("Reproducir / pausa"), FWD("Adelantar 10 s"), NEXT("Siguiente"),
     LIST("Lista de canales"), AUDIO("Audio"), SUBS("Subtítulos"), QUALITY("Calidad"), ASPECT("Formato de pantalla"),
-    SPEED("Velocidad"), ENGINE("Motor de reproducción"), INFO("Información técnica"), FAV("Favorito"), PIP("Imagen en imagen"),
+    SPEED("Velocidad"), ENGINE("Motor de reproducción"), INFO("Información técnica"), FAV("Favorito"), PIP("Mini reproductor (ver el menú)"),
     EXTERNAL("Abrir en la app VLC"), RECORD("Grabar"), LASTCH("Canal anterior"), SLEEP("Temporizador para dormir"),
     MULTI("Multivista"), MORE("Más opciones"),
 }
@@ -56,7 +56,7 @@ fun moreActions(live: Boolean, hasList: Boolean, showQuality: Boolean): List<PAc
     if (live && hasList) add(PAction.LASTCH)
     if (live) add(PAction.RECORD)
     if (live && hasList) add(PAction.MULTI)
-    add(PAction.PIP); add(PAction.SLEEP); add(PAction.ENGINE); add(PAction.INFO); add(PAction.EXTERNAL)
+    add(PAction.SLEEP); add(PAction.ENGINE); add(PAction.INFO); add(PAction.EXTERNAL)
 }
 
 /** Íconos dibujados (líneas simples, como los del menú). */
@@ -193,6 +193,7 @@ fun PlayerControlsBar(
                     if (hasList) add(PAction.LIST)
                     add(PAction.AUDIO); add(PAction.SUBS); add(PAction.FAV)
                     if (recording) add(PAction.RECORD)      // grabando: el botón para detenerla queda visible
+                    add(PAction.PIP)                        // mini reproductor: seguir viendo mientras se usa el menú
                     add(PAction.MORE)
                 }
                 extra.forEach { a -> CtlButton(a, on = (a == PAction.FAV && fav) || (a == PAction.RECORD && recording), onFocused = focused) { onAction(a) } }
