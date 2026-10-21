@@ -220,13 +220,12 @@ private fun SavedCard(s: Source, current: Boolean, modifier: Modifier, onClick: 
 
 @Composable
 private fun AppLogo(modifier: Modifier) {
-    val c = LocalIptv.current
-    Canvas(modifier.softShadow(3.dp, RoundedCornerShape(22)).clip(RoundedCornerShape(22)).background(c.tileA)) {
-        val s = size.minDimension / 512f
-        fun tile(x: Float, y: Float, a: Float) = drawRoundRect(c.accent.copy(alpha = a), Offset(x * s, y * s), Size(148 * s, 104 * s), CornerRadius(26 * s))
-        tile(96f, 128f, 1f); tile(268f, 128f, .45f); tile(96f, 256f, .45f); tile(268f, 256f, .45f)
-        drawPath(Path().apply { moveTo(152 * s, 156 * s); lineTo(152 * s, 204 * s); lineTo(192 * s, 180 * s); close() }, Color.White)
-    }
+    // Logo oficial de Vibe IPTV sobre fondo blanco
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(cl.iptv.player.R.drawable.logo_mark),
+        contentDescription = "Vibe IPTV",
+        modifier = modifier.softShadow(3.dp, RoundedCornerShape(22)).clip(RoundedCornerShape(22)).background(Color.White),
+    )
 }
 
 @Composable

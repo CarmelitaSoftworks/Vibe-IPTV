@@ -1,6 +1,8 @@
 <div align="center">
 
-# 📺 Vibe IPTV
+<img src="docs/img/logo.png" width="300" alt="Vibe IPTV · by Carmelita Softworks">
+
+# Vibe IPTV
 
 **Tu propio reproductor IPTV, libre y de código abierto, para navegador, Android y Android TV.**
 
