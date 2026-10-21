@@ -81,6 +81,12 @@ jobs:
           name: Vibe-IPTV-APK
           path: android/app/build/outputs/apk/*/release/*.apk
 
+      # Las pruebas van antes de publicar: si fallan, la versión no sale
+      - name: Pruebas / Unit tests
+        run: |
+          set -o pipefail
+          ./gradlew testEstandarReleaseUnitTest --no-daemon 2>&1 | tee test.log
+
       - name: Publicar versiones (Releases)
         if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && (inputs.publicar || contains(github.event.head_commit.message, '[publicar]'))
         env:
@@ -115,11 +121,6 @@ jobs:
           gh release delete prueba --yes --cleanup-tag || true
           gh release create prueba dist/*.apk --prerelease --target "$GITHUB_SHA" \
             --title "Vibe IPTV — última versión / latest (0.1.$N)" --notes-file notes.md
-
-      - name: Pruebas / Unit tests
-        run: |
-          set -o pipefail
-          ./gradlew testEstandarReleaseUnitTest --no-daemon 2>&1 | tee test.log
 
       - name: Mostrar errores / Show errors
         if: failure()
