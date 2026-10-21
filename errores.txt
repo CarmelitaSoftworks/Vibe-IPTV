@@ -1,0 +1,17 @@
+BUILD FAILED in 14s
+* What went wrong:
+A problem occurred configuring project ':app'.
+> com.android.builder.sdk.InstallFailedException: Failed to install the following SDK components:
+      ndk;27.0.12077973 NDK (Side by side) 27.0.12077973
+  Install the missing components using the SDK manager in Android Studio.
+
+
+* Try:
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+* Exception is:
+org.gradle.api.ProjectConfigurationException: A problem occurred configuring project ':app'.
+	at org.gradle.configuration.project.LifecycleProjectEvaluator.wrapException(LifecycleProjectEvaluator.java:84)
+	at org.gradle.configuration.project.LifecycleProjectEvaluator.addConfigurationFailure(LifecycleProjectEvaluator.java:77)
