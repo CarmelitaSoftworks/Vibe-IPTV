@@ -147,7 +147,7 @@ fun MetroScreen(vm: AppViewModel) {
                                     Text(if (vm.loading != null) lc("Cargando…") else lc("No hay contenido para mostrar."), color = c.inkSoft, fontSize = 18.sp)
                                 }
                             }
-                            items(columns, key = { it.first().id }) { col ->
+                            items(columns, key = { col -> col.joinToString("|") { it.id } }) { col ->
                                 Column(verticalArrangement = Arrangement.spacedBy(gap)) {
                                     col.forEach { it0 ->
                                         MetroTile(

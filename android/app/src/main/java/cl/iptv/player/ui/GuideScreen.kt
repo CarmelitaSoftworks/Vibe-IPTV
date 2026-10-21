@@ -135,7 +135,7 @@ fun GuideScreen(vm: AppViewModel) {
         }
 
         LazyColumn(Modifier.fillMaxSize().padding(start = 16.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            itemsIndexed(channels, key = { _, ch -> ch.id }) { i, ch ->
+            itemsIndexed(channels, key = { i, ch -> "$i:${ch.id}" }) { i, ch ->
                 GuideRow(
                     ch = ch, progs = remember(vm.epg, ch.id) { vm.epg.listFor(ch) }, sh = sh, now = now,
                     winStart = winStart, winEnd = winEnd, dpPerMin = dpPerMin, chanW = chanW, rowH = rowH,

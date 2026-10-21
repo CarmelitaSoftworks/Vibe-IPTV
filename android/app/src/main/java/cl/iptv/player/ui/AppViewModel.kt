@@ -349,14 +349,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         store.upsert(updated); sources = store.sources(); source = updated
                         message = "Dirección corregida a $fixed"
                     }
-                    allItems = x.loadAll().map { it.withCategory() }; applyParental()
+                    allItems = uniqueIds(x.loadAll().map { it.withCategory() }); applyParental()
                     if (epgUrl.isBlank()) epgUrl = x.epgUrl()
                 } else {
                     xtream = null
                     val result = if (src.localFile) withContext(Dispatchers.IO) {
                         store.localM3u(src.id).bufferedReader().use(M3uParser::parse)
                     } else Http.stream(src.url) { it.bufferedReader().use(M3uParser::parse) }
-                    allItems = result.items.map { it.withCategory() }; applyParental()
+                    allItems = uniqueIds(result.items.map { it.withCategory() }); applyParental()
                     if (epgUrl.isBlank()) epgUrl = result.epgUrl
                 }
                 val kinds = sectionsAvailable
@@ -391,6 +391,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             kotlinx.coroutines.delay(8_000)
             Arranque.listo(getApplication())
         }
+    }
+
+    /**
+     * Xtream puede repetir el mismo canal en varias categorías con el mismo stream_id. Dos elementos con el mismo id
+     * cierran la app en las listas de Compose ("Key was already used"), sobre todo en los temas Mosaicos y en la Guía.
+     * El primero conserva su id (favoritos y "Seguir viendo" no cambian); los repetidos se numeran como en M3U.
+     */
+    private fun uniqueIds(list: List<Item>): List<Item> {
+        val seen = HashMap<String, Int>(list.size * 2)
+        var dup = 0
+        val out = list.map { item ->
+            val n = seen.getOrDefault(item.id, 0)
+            seen[item.id] = n + 1
+            if (n == 0) item else { dup++; item.copy(id = "${item.id}_$n") }
+        }
+        if (dup > 0) logEvent("Lista con $dup elementos de id repetido (numerados)")
+        return out
     }
 
     // ---------- guía EPG: caché en disco + actualización ----------

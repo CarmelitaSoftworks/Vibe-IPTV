@@ -21,7 +21,15 @@ import coil.compose.rememberAsyncImagePainter
 /** Fondo de las pantallas según el tema: líneas (clásico), degradado radial (metro), ondas (wave) o imagen propia. */
 fun Modifier.themeBackground(): Modifier = composed {
     val c = LocalIptv.current
-    val painter = if (c.bgImage.isNotBlank()) rememberAsyncImagePainter(java.io.File(c.bgImage)) else null
+    // Imagen propia limitada a 1920×1080 al decodificarla: una imagen grande (p. ej. de un tema importado)
+    // agotaba la memoria o superaba el máximo que puede dibujar Android y la app se cerraba al abrir
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val painter = if (c.bgImage.isNotBlank()) rememberAsyncImagePainter(
+        remember(c.bgImage) {
+            coil.request.ImageRequest.Builder(ctx).data(java.io.File(c.bgImage)).size(1920, 1080)
+                .precision(coil.size.Precision.INEXACT).allowHardware(true).build()
+        }
+    ) else null
     val stars = remember { List(70) { Triple(Math.random().toFloat(), Math.random().toFloat(), (Math.random() * 1.6 + 0.4).toFloat()) } }
     drawBehind {
         when (c.bgStyle) {
