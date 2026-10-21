@@ -10,7 +10,7 @@ import * as store from './storage.js';
 import * as subs from './subtitles.js';
 import { demoM3U, demoEpg, DEMO_SOURCE } from './demo.js';
 import { readScreenshot } from './ocr.js';
-import { openGuide, openDetails, catchupUrl, exportBackup, importBackup } from './extras.js';
+import { openGuide, openDetails, catchupUrl, exportBackup, importBackup, saveFile } from './extras.js';
 
 // En la versión artefacto (vista previa en línea) se define __ARTIFACT__ al empaquetar
 const IS_ARTIFACT = typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__;
@@ -85,10 +85,7 @@ function logReport() {
     ...(eventLog.length ? eventLog : ['(sin eventos todavía)'])].join('\n');
 }
 function saveLog() {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([logReport()], { type: 'text/plain' }));
-  a.download = 'vibe-iptv-registro.txt'; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  saveFile(new Blob([logReport()], { type: 'text/plain' }), 'vibe-iptv-registro.txt');
   toast(t('Registro guardado: no contiene usuarios ni contraseñas'));
 }
 
@@ -849,6 +846,8 @@ function closeSheets(restore = true) {
 const video = $('video');
 // iPhone / iPad: controles adaptados (zonas seguras, botones táctiles, sin lo que iOS no permite)
 if (IOS) document.documentElement.classList.add('ios');
+// iOS no reconoce .m3u / .srt / .vtt / .json y los deja en gris en el selector de archivos: en iPhone se acepta cualquiera
+if (IOS) document.querySelectorAll('input[type=file]').forEach((i) => { if (!/^image\//.test(i.accept || '')) i.removeAttribute('accept'); });
 // iPhone: si el video empezó en silencio (Safari bloquea el sonido sin un toque), un toque lo activa
 if (IOS) document.addEventListener('pointerup', () => { if (video.dataset.autoMuted === '1') { delete video.dataset.autoMuted; video.muted = false; } }, { capture: true });
 const player = new Player(video, {

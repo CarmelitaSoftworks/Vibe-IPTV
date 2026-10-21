@@ -1,5 +1,5 @@
 // Guía de programación XMLTV (admite .xml y .xml.gz)
-import { fetchSmart } from './net.js';
+import { fetchSmart, proxyBase } from './net.js';
 
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function decode(s) {
@@ -71,18 +71,26 @@ export class Epg {
   }
 }
 
-async function gunzipIfNeeded(buf) {
+async function gunzipIfNeeded(buf, url) {
   const b = new Uint8Array(buf);
-  if (b[0] === 0x1f && b[1] === 0x8b && 'DecompressionStream' in window) {
-    const stream = new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'));
-    return await new Response(stream).text();
+  if (b[0] === 0x1f && b[1] === 0x8b) {
+    if ('DecompressionStream' in window) {
+      const stream = new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'));
+      return await new Response(stream).text();
+    }
+    // Navegador sin descompresión (Safari antes de iOS 16.4): la hace el servidor
+    if (proxyBase() && url) {
+      const r = await fetch(`${proxyBase()}/proxy/gunzip?${new URLSearchParams({ url })}`);
+      if (r.ok) return await r.text();
+    }
+    throw new Error('Este navegador no puede abrir guías comprimidas (.gz): actualiza iOS o usa la guía sin comprimir');
   }
   return new TextDecoder('utf-8').decode(b);
 }
 
 async function loadOne(url) {
   const buf = await fetchSmart(url, 'buffer');
-  return parseXmltv(await gunzipIfNeeded(buf));
+  return parseXmltv(await gunzipIfNeeded(buf, url));
 }
 
 // Admite varias guías separadas por coma o espacio; se combinan (la primera tiene prioridad)

@@ -20,6 +20,7 @@ const { Transform, PassThrough } = require('stream');
 const { spawn, spawnSync } = require('child_process');
 const os = require('os');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const subtitles = require('./subtitles.js');
 
 // ---- ffmpeg (opcional): convierte al vuelo formatos que el navegador no reproduce ----
@@ -469,6 +470,20 @@ function handleHlsFile(req, res, reqUrl) {
   });
 }
 
+// Guías .xml.gz para navegadores que no saben descomprimir (Safari antes de iOS 16.4)
+async function handleGunzip(req, res, reqUrl) {
+  const target = reqUrl.searchParams.get('url');
+  if (!target) { res.writeHead(400, CORS); return res.end('Falta ?url='); }
+  let up;
+  try { up = await upstream(target, req, { ua: reqUrl.searchParams.get('ua') || '', ref: '' }); }
+  catch (e) { res.writeHead(502, { ...CORS, 'X-Proxy-Error': encodeURIComponent(explain(e)) }); return res.end(); }
+  if (up.statusCode >= 400) { res.writeHead(up.statusCode, CORS); up.resume(); return res.end(); }
+  res.writeHead(200, { ...CORS, 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'no-store' });
+  const gz = zlib.createGunzip();
+  gz.on('error', () => res.end());
+  up.pipe(gz).pipe(res);
+}
+
 async function handleProxy(req, res, reqUrl) {
   if (reqUrl.pathname === '/proxy/caps') {
     res.writeHead(200, { ...CORS, 'Content-Type': 'application/json' });
@@ -476,6 +491,7 @@ async function handleProxy(req, res, reqUrl) {
   }
   if (reqUrl.pathname === '/proxy/transcode') return handleTranscode(req, res, reqUrl);
   if (reqUrl.pathname === '/proxy/hls/start') return handleHlsStart(req, res, reqUrl);
+  if (reqUrl.pathname === '/proxy/gunzip') return handleGunzip(req, res, reqUrl);
   if (reqUrl.pathname.startsWith('/proxy/hls/')) return handleHlsFile(req, res, reqUrl);
   if (reqUrl.pathname === '/proxy/subs/subdl-account') {
     try {

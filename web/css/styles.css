@@ -69,7 +69,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 :focus { outline: none; }
 
 /* ===== Menú ===== */
-.menu { height: 100dvh; display: grid; grid-template-rows: auto auto 1fr auto auto; grid-template-columns: minmax(0, 1fr); }
+.menu { height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto auto 1fr auto auto; grid-template-columns: minmax(0, 1fr); }
 .topbar {
   display: flex; align-items: center; gap: 12px;
   padding: max(12px, env(safe-area-inset-top)) clamp(12px, 3vw, 40px) 4px;
@@ -181,10 +181,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .round-btn:hover, .round-btn:focus-visible { transform: scale(1.07); box-shadow: 0 0 0 4px var(--focus), 0 0 20px rgba(63,210,255,.55); }
 
 /* ===== Paneles ===== */
-.sheet-backdrop { position: fixed; inset: 0; background: rgba(20,28,34,.45); z-index: 20; backdrop-filter: blur(2px); }
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(20,28,34,.45); z-index: 20; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 .sheet {
   position: fixed; z-index: 21; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto;
+  width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow: auto;
   background: var(--sheet); color: var(--ink); border-radius: 22px; padding: 22px 22px 26px;
   box-shadow: 0 0 0 2px var(--accent), 0 18px 50px rgba(0,0,0,.35);
 }
@@ -394,7 +394,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .set-empty { color: var(--ink-soft); padding: 18px 4px; }
 .set-row {
   width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; text-align: left;
-  padding: 14px 14px; border: 2px solid transparent; border-bottom: 1px solid color-mix(in srgb, var(--tile-edge) 55%, transparent);
+  padding: 14px 14px; border: 2px solid transparent; border-bottom: 1px solid var(--tile-edge); border-bottom: 1px solid color-mix(in srgb, var(--tile-edge) 55%, transparent);
   border-radius: 12px; background: transparent; cursor: pointer; color: var(--ink);
 }
 .set-row:last-child { border-bottom-color: transparent; }
@@ -500,7 +500,7 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 .pmenu {
   position: absolute; right: max(20px, env(safe-area-inset-right, 0px)); bottom: 132px; z-index: 4; width: min(320px, calc(100vw - 32px));
   max-height: 60vh; overflow: auto; padding: 12px; border-radius: 18px; color: #fff;
-  background: var(--pglass); border: 1px solid var(--pedge); backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  background: var(--pglass); border: 1px solid var(--pedge); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(0,0,0,.45);
 }
 .pmenu h4 { margin: 2px 6px 8px; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.65); }
 .pmenu button {
@@ -516,7 +516,7 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 /* Lista lateral de canales */
 .plist {
   position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(560px, 92vw); display: flex; flex-direction: column; color: #fff;
-  background: rgba(14,17,20,.88); backdrop-filter: blur(16px); border-left: 1px solid var(--pedge);
+  background: rgba(14,17,20,.88); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-left: 1px solid var(--pedge);
   padding: max(14px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 12px 12px;
   animation: slideIn .2s ease;
 }
@@ -539,7 +539,7 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 /* Panel de información técnica */
 .pinfo {
   position: absolute; top: 84px; right: max(20px, env(safe-area-inset-right, 0px)); z-index: 4; min-width: 260px; padding: 12px 16px; border-radius: 16px; color: #fff;
-  background: var(--pglass); border: 1px solid var(--pedge); backdrop-filter: blur(12px); font-size: .85rem;
+  background: var(--pglass); border: 1px solid var(--pedge); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); font-size: .85rem;
 }
 .pinfo h4 { margin: 0 0 8px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.65); }
 .pinfo dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-variant-numeric: tabular-nums; }
@@ -745,4 +745,10 @@ html.ios .plist, html.ios .pmenu { padding-bottom: env(safe-area-inset-bottom); 
   html.ios .epg-now { display: none; }
   html.ios .controls { flex-direction: row; align-items: center; }
   html.ios .controls .ctl-group.right { flex: 1; min-width: 0; }
+}
+
+/* Pantallas táctiles: el "hover" de iOS queda pegado después de tocar; sin agrandar ni brillar por hover */
+@media (hover: none) {
+  .tile:not(.empty-slot):hover:not(:focus):not(:focus-visible),
+  .round-btn:hover:not(:focus-visible), .saved-card:hover:not(:focus):not(:focus-visible) { transform: none; }
 }

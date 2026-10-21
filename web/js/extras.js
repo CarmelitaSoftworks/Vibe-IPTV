@@ -250,15 +250,31 @@ export async function exportBackup() {
   const files = {};
   for (const s of store.getSources()) { try { const txt = await store.idbGet(`m3u:${s.id}`); if (txt) files[s.id] = txt; } catch { /* sin archivo */ } }
   const blob = new Blob([JSON.stringify({ app: 'vibe-iptv-web', version: 1, at: Date.now(), prefs, files })], { type: 'application/json' });
+  await saveFile(blob, `vibe-iptv-respaldo-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.json`);
+}
+
+/**
+ * Guarda un archivo. En iPhone/iPad, con la app agregada a la pantalla de inicio, los enlaces de descarga no
+ * funcionan: se usa "Compartir" (Guardar en Archivos, AirDrop, Mail…) cuando el navegador lo permite.
+ */
+export async function saveFile(blob, name) {
+  const ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios && navigator.canShare) {
+    try {
+      const file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
+      if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+    } catch (e) { if (e?.name === 'AbortError') return; }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `vibe-iptv-respaldo-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.json`;
+  a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 export function importBackup() {
   return new Promise((resolve, reject) => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.json,application/json' });
+    const ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const input = Object.assign(document.createElement('input'), { type: 'file', ...(ios ? {} : { accept: '.json,application/json' }) });
     input.onchange = async () => {
       try {
         const o = JSON.parse(await input.files[0].text());
