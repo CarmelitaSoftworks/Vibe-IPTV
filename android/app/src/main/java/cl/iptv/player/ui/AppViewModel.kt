@@ -399,13 +399,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * El primero conserva su id (favoritos y "Seguir viendo" no cambian); los repetidos se numeran como en M3U.
      */
     private fun uniqueIds(list: List<Item>): List<Item> {
-        val seen = HashMap<String, Int>(list.size * 2)
-        var dup = 0
-        val out = list.map { item ->
-            val n = seen.getOrDefault(item.id, 0)
-            seen[item.id] = n + 1
-            if (n == 0) item else { dup++; item.copy(id = "${item.id}_$n") }
-        }
+        val (out, dup) = list.withUniqueIds()
         if (dup > 0) logEvent("Lista con $dup elementos de id repetido (numerados)")
         return out
     }
@@ -903,7 +897,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal fun loadPreview(src: Source, list: List<Item>, theme: String) {
         loadJob?.cancel()
         source = src; showWelcome = false
-        allItems = list.map { it.withCategory() }; applyParental()
+        allItems = uniqueIds(list.map { it.withCategory() }); applyParental()
         updateSettings(settings.copy(theme = theme, lite = "off"))
         selectSection(Kind.LIVE); goHome()
     }

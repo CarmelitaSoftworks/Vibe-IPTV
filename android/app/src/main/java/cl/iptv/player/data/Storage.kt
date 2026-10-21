@@ -17,10 +17,14 @@ class Storage(private val ctx: Context) {
                 id = it.optString("id"), name = it.optString("name"),
                 type = runCatching { SourceType.valueOf(it.optString("type")) }.getOrDefault(SourceType.M3U),
                 url = it.optString("url"), server = it.optString("server"),
-                username = it.optString("username"), password = it.optString("password"),
+                username = it.optString("username"), password = Secrets.decrypt(it.optString("password")),
                 epgUrl = it.optString("epgUrl"), localFile = it.optBoolean("localFile"),
             )
-        }.getOrNull() }.filter { it.id.isNotBlank() }
+        }.getOrNull() }.filter { it.id.isNotBlank() }.also { list ->
+            // Contraseñas guardadas en texto por versiones anteriores: se cifran una vez
+            val raw = (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.optString("password") }
+            if (raw.any { it.isNotEmpty() && !Secrets.isEncrypted(it) } && Secrets.encrypt("x") != "x") saveSources(list)
+        }
     }
 
     fun saveSources(list: List<Source>) {
@@ -28,7 +32,7 @@ class Storage(private val ctx: Context) {
         list.forEach {
             arr.put(JSONObject().apply {
                 put("id", it.id); put("name", it.name); put("type", it.type.name); put("url", it.url)
-                put("server", it.server); put("username", it.username); put("password", it.password)
+                put("server", it.server); put("username", it.username); put("password", Secrets.encrypt(it.password))
                 put("epgUrl", it.epgUrl); put("localFile", it.localFile)
             })
         }
@@ -174,6 +178,14 @@ class Storage(private val ctx: Context) {
                 is Float -> p.put(k, JSONObject().put("f", v.toDouble()))
             }
         }
+        // Las contraseñas van descifradas: la clave del Keystore no viaja a otro equipo (el respaldo ya avisa que las contiene)
+        p.put("sources", JSONObject().put("s", JSONArray().apply {
+            sources().forEach { put(JSONObject().apply {
+                put("id", it.id); put("name", it.name); put("type", it.type.name); put("url", it.url)
+                put("server", it.server); put("username", it.username); put("password", it.password)
+                put("epgUrl", it.epgUrl); put("localFile", it.localFile)
+            }) }
+        }.toString()))
         val files = JSONObject()
         ctx.filesDir.listFiles { f -> f.name.startsWith("m3u_") && f.length() < 20_000_000 }?.forEach { files.put(it.name, it.readText()) }
         return JSONObject().put("app", "vibe-iptv").put("version", 1).put("at", System.currentTimeMillis())
