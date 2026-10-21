@@ -84,6 +84,10 @@ object VoskModels {
 /**
  * Subtítulos generados en vivo: toma el audio que ya decodificó ExoPlayer (sin grabar nada ni usar el micrófono),
  * lo pasa a 16 kHz mono y lo reconoce con Vosk en un hilo aparte. Todo queda en el equipo.
+ *
+ * Para que vaya a la par del video aunque el equipo sea lento: el audio se entrega a Vosk en trozos de 0,2 s,
+ * el texto parcial se pide como mucho 4 veces por segundo y, si el reconocimiento se atrasa más de 3 s,
+ * se descarta lo más antiguo y se reinicia (antes se acumulaba y los subtítulos quedaban muy atrasados o sin sentido).
  */
 @androidx.annotation.OptIn(UnstableApi::class)
 class LiveCaptioner {
@@ -92,76 +96,127 @@ class LiveCaptioner {
     var partial by mutableStateOf(""); private set
     var lastAt by mutableStateOf(0L); private set
 
-    private val queue = LinkedBlockingQueue<ShortArray>(600)
-    private var worker: Thread? = null
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    private val queue = LinkedBlockingQueue<ShortArray>()
+    private val queued = java.util.concurrent.atomic.AtomicInteger(0)      // muestras en espera (16 kHz)
+    /** Cada inicio tiene su número: un hilo de un inicio anterior se detiene solo (antes podían quedar dos a la vez). */
+    @Volatile private var generation = 0
+    @Volatile private var resetPending = false
     @Volatile private var rate = 0
     @Volatile private var channels = 0
     @Volatile private var encoding = C.ENCODING_INVALID
     private var frac = 0.0
+    private val chunk = ShortArray(CHUNK)
+    private var filled = 0
+
+    /** Muestras de 16 kHz en espera (para pruebas). */
+    internal val pendingSamples get() = queued.get()
+    internal fun armForTest() { enabled = true }
+    internal fun drainForTest(): List<ShortArray> = mutableListOf<ShortArray>().also { queue.drainTo(it); queued.set(0) }
 
     /** Se engancha al audio de ExoPlayer (TeeAudioProcessor): recibe el PCM justo antes de que suene. */
     val sink = object : TeeAudioProcessor.AudioBufferSink {
         override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
             rate = sampleRateHz; channels = channelCount; this@LiveCaptioner.encoding = encoding; frac = 0.0
+            // Cambio de canal, salto o nuevo formato: lo pendiente ya no corresponde
+            filled = 0; queue.clear(); queued.set(0); resetPending = true
         }
         override fun handleBuffer(buffer: ByteBuffer) {
-            if (!enabled || encoding != C.ENCODING_PCM_16BIT || rate <= 0 || channels <= 0) return
+            val enc = encoding
+            if (!enabled || rate <= 0 || channels <= 0 || (enc != C.ENCODING_PCM_16BIT && enc != C.ENCODING_PCM_FLOAT)) return
+            val bytes = if (enc == C.ENCODING_PCM_FLOAT) 4 else 2
+            val ch = channels
             val b = buffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
             val base = b.position()
-            val frames = b.remaining() / (2 * channels)
+            val frames = b.remaining() / (bytes * ch)
             if (frames <= 0) return
+            fun sample(i: Int, c: Int): Int = if (bytes == 2) b.getShort(base + (i * ch + c) * 2).toInt()
+                else (b.getFloat(base + (i * ch + c) * 4).coerceIn(-1f, 1f) * 32767f).toInt()
+            // 5.1 / 7.1: los diálogos van en el canal central; mezclarlo con los demás (música, efectos) confunde a Vosk
+            fun mono(i: Int): Int = if (ch >= 6) sample(i, 2) else { var s = 0; for (c in 0 until ch) s += sample(i, c); s / ch }
             val step = rate / 16_000.0
-            val out = ShortArray((frames / step).toInt() + 2)
-            var n = 0
             var pos = frac
-            while (pos < frames && n < out.size) {
-                // Promedio de las muestras que caen en este instante (filtro simple contra el aliasing) y mezcla a mono
+            while (pos < frames) {
+                // Promedio de las muestras que caen en este instante (filtro simple contra el aliasing)
                 val from = pos.toInt(); val to = minOf(frames, maxOf(from + 1, (pos + step).toInt()))
-                var sum = 0L; var cnt = 0
-                for (i in from until to) for (ch in 0 until channels) { sum += b.getShort(base + (i * channels + ch) * 2); cnt++ }
-                out[n++] = (sum / maxOf(1, cnt)).toInt().toShort()
+                var sum = 0L
+                for (i in from until to) sum += mono(i)
+                chunk[filled++] = (sum / (to - from)).toInt().coerceIn(-32768, 32767).toShort()
+                if (filled == CHUNK) { push(chunk.copyOf()); filled = 0 }
                 pos += step
             }
             frac = pos - frames
-            queue.offer(out.copyOf(n))
+        }
+    }
+
+    private fun push(a: ShortArray) {
+        queue.offer(a)
+        // Atraso de más de 3 s: se descarta lo más antiguo y se reinicia el reconocimiento para volver a la par
+        if (queued.addAndGet(a.size) > MAX_BACKLOG) {
+            while (queued.get() > KEEP_BACKLOG) { val old = queue.poll() ?: break; queued.addAndGet(-old.size) }
+            resetPending = true
         }
     }
 
     fun start(modelDir: File, onError: (String) -> Unit) {
         stop()
+        val gen = ++generation
         enabled = true
-        worker = Thread({
+        Thread({
             try {
                 org.vosk.LibVosk.setLogLevel(org.vosk.LogLevel.WARNINGS)
                 val model = cachedModel(modelDir)
                 org.vosk.Recognizer(model, 16_000f).use { rec ->
-                    while (enabled) {
+                    var partialAt = 0L
+                    var shown = ""
+                    while (enabled && gen == generation) {
                         val a = queue.poll(400, TimeUnit.MILLISECONDS) ?: continue
+                        queued.addAndGet(-a.size)
+                        if (resetPending) { resetPending = false; rec.reset(); shown = ""; post(gen) { partial = "" } }
                         if (rec.acceptWaveForm(a, a.size)) {
-                            val t = JSONObject(rec.result).optString("text").trim()
-                            if (t.isNotEmpty()) { lines = (lines + t.replaceFirstChar { it.uppercase() }).takeLast(2); lastAt = System.currentTimeMillis() }
-                            partial = ""
+                            val t = clean(JSONObject(rec.result).optString("text"))
+                            shown = ""
+                            post(gen) {
+                                if (t.isNotEmpty()) { lines = (lines + t.replaceFirstChar { it.uppercase() }).takeLast(2); lastAt = System.currentTimeMillis() }
+                                partial = ""
+                            }
                         } else {
-                            val p = JSONObject(rec.partialResult).optString("partial").trim()
-                            if (p != partial) { partial = p; if (p.isNotEmpty()) lastAt = System.currentTimeMillis() }
+                            val now = android.os.SystemClock.uptimeMillis()
+                            if (now - partialAt >= 250) {
+                                partialAt = now
+                                val p = clean(JSONObject(rec.partialResult).optString("partial"))
+                                if (p != shown) { shown = p; post(gen) { partial = p; if (p.isNotEmpty()) lastAt = System.currentTimeMillis() } }
+                            }
                         }
                     }
                 }
             } catch (e: Throwable) {
-                enabled = false
-                onError(e.message ?: e.toString())
+                post(gen) { enabled = false; onError(e.message ?: e.toString()) }
             }
         }, "vibe-subtitulos-ia").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1; start() }
     }
 
+    /** Los estados de Compose se cambian en el hilo principal, y sólo si ese inicio sigue vigente. */
+    private fun post(gen: Int, block: () -> Unit) { main.post { if (gen == generation) block() } }
+
     fun stop() {
         enabled = false
-        worker = null
-        queue.clear()
+        generation++
+        queue.clear(); queued.set(0); filled = 0
         lines = emptyList(); partial = ""
     }
 
     companion object {
+        private const val CHUNK = 3_200                 // 0,2 s a 16 kHz
+        private const val MAX_BACKLOG = 16_000 * 3      // 3 s de atraso como máximo…
+        private const val KEEP_BACKLOG = 16_000 / 2     // …y se vuelve a 0,5 s
+
+        /** Ruido que el modelo pequeño "oye" como palabras sueltas: se descarta. */
+        internal fun clean(raw: String): String {
+            val t = raw.replace("[unk]", "").replace(Regex("\\s+"), " ").trim()
+            return if (!t.contains(' ') && t.length <= 2) "" else t
+        }
+
         private var model: org.vosk.Model? = null
         private var modelPath = ""
         @Synchronized private fun cachedModel(dir: File): org.vosk.Model {
