@@ -89,6 +89,16 @@ val Horizon = Dark.copy(
     dock = Color(0x99040A16), sheet = Color(0xFF101A2D), radius = 14f, dark = true,
 )
 
+/** Escritorio: ventana clásica de escritorio de principios de los 2000 (azul, crema y verde). Diseño propio. */
+val Desk = Light.copy(
+    bg = Color(0xFF2B66D6), bg2 = Color(0xFF5B95EE), bgLines = Color.Transparent, bgStyle = "flat",
+    tileA = Color(0xFFFFFFFF), tileB = Color(0xFFF4F3EE), tileEdge = Color(0xFFACA899), tileLines = Color.Transparent,
+    emptyA = Color(0xFFF4F3EE), emptyB = Color(0xFFECE9D8),
+    ink = Color(0xFF1B1B1B), inkSoft = Color(0xFF55585C),
+    accent = Color(0xFF316AC5), accentDeep = Color(0xFF1C4FA8), focus = Color(0xFF316AC5),
+    dock = Color(0xFFECE9D8), sheet = Color(0xFFFFFFFF), radius = 4f,
+)
+
 val LocalIptv = staticCompositionLocalOf { Light }
 
 /** Tema personalizado guardado en Ajustes (JSON): base, colores, esquinas, transparencia e imagen de fondo. */
@@ -130,6 +140,7 @@ fun IptvTheme(theme: String = "light", accent: String = "celeste", custom: Strin
         "wave" -> Wave
         "pulse" -> Pulse
         "horizon" -> Horizon
+        "desk" -> Desk
         "custom" -> customTheme(custom, bgImage)
         else -> Light
     }

@@ -42,6 +42,7 @@ fun App(vm: AppViewModel) {
             vm.settings.theme == "wave" -> WaveScreen(vm)
             vm.settings.theme == "pulse" -> PulseScreen(vm)
             vm.settings.theme == "horizon" -> HorizonScreen(vm)
+            vm.settings.theme == "desk" -> DeskScreen(vm)
             else -> {
                 BackHandler(enabled = !vm.home || vm.series != null || vm.query.isNotBlank()) { vm.back() }
                 MenuScreen(vm)

@@ -58,10 +58,10 @@ import kotlinx.coroutines.delay
  */
 
 private val CTABS = listOf("Inicio", "TV en vivo", "Películas", "Series", "Guía", "Ajustes")
-private fun ckind(tab: Int) = when (tab) { 1 -> Kind.LIVE; 2 -> Kind.MOVIE; 3 -> Kind.SERIES; else -> null }
+internal fun ckind(tab: Int) = when (tab) { 1 -> Kind.LIVE; 2 -> Kind.MOVIE; 3 -> Kind.SERIES; else -> null }
 
 /** Lo común a los dos temas: pestaña actual, abrir elementos y diálogos. */
-private class ConsoleCtl(val vm: AppViewModel) {
+internal class ConsoleCtl(val vm: AppViewModel) {
     var dialog by mutableStateOf<String?>(null)
     fun goTab(t: Int) {
         vm.shell.tab = t
@@ -77,7 +77,7 @@ private class ConsoleCtl(val vm: AppViewModel) {
 }
 
 @Composable
-private fun rememberConsoleCtl(vm: AppViewModel): ConsoleCtl {
+internal fun rememberConsoleCtl(vm: AppViewModel): ConsoleCtl {
     val ctl = remember(vm) { ConsoleCtl(vm) }
     LaunchedEffect(Unit) { ckind(vm.shell.tab)?.let { k -> if (vm.section != k || vm.home) vm.selectSection(k) } }
     BackHandler(enabled = ctl.dialog == null && vm.details == null &&
@@ -92,7 +92,7 @@ private fun rememberConsoleCtl(vm: AppViewModel): ConsoleCtl {
 }
 
 @Composable
-private fun ConsoleDialogs(vm: AppViewModel, ctl: ConsoleCtl) {
+internal fun ConsoleDialogs(vm: AppViewModel, ctl: ConsoleCtl) {
     when (ctl.dialog) {
         "search" -> SearchDialog(vm) { ctl.dialog = null }
         "cats" -> CategoriesDialog(vm) { ctl.dialog = null }
@@ -102,7 +102,7 @@ private fun ConsoleDialogs(vm: AppViewModel, ctl: ConsoleCtl) {
 }
 
 @Composable
-private fun Clock(color: Color, size: Int) {
+internal fun Clock(color: Color, size: Int) {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(15_000); now = System.currentTimeMillis() } }
     androidx.compose.material3.Text(java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(now)),

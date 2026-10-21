@@ -86,6 +86,7 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Choice("Tema", options = listOf("light" to "Claro", "dark" to "Oscuro", "system" to "Según el sistema",
                 "metro" to "Mosaicos (gris y verde, esquinas rectas)", "wave" to "Ondas (violeta)",
                 "pulse" to "Pulso (estilo consola: mosaicos redondeados, verde)", "horizon" to "Horizonte (estilo consola: fila de íconos y fondo grande)",
+                "desk" to "Escritorio (estilo escritorio de 2001: ventana azul, panel lateral y barra de tareas)",
                 "custom" to "Personalizado"),
                 get = { it.theme }, set = { s, v -> s.copy(theme = v) }),
             Row.Choice("Personalizado: base", "Cualquier opción \"Personalizado\" activa ese tema", listOf("dark" to "Oscura", "light" to "Clara"),

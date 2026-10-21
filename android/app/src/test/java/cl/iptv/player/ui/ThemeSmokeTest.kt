@@ -25,7 +25,7 @@ import org.robolectric.annotation.Config
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w960dp-h540dp-land-xhdpi")
-class ThemeSmokeTest {
+open class ThemeSmokeTest {
 
     private fun lista(): List<Item> {
         val live = (1..1500).map { i -> Item("l${i % 600}", Kind.LIVE, "Canal $i", group = "PAÍS | GRUPO ${i % 25}", num = i, tvgId = "c${i % 600}") }
@@ -68,5 +68,11 @@ class ThemeSmokeTest {
 
     @Test fun horizonte() = abrir("horizon", recorrer = { vm -> for (t in 0..5) { vm.shell.tab = t; idle() } }) { HorizonScreen(it) }
 
+    @Test fun escritorio() = abrir("desk", recorrer = { vm -> for (t in 0..5) { vm.shell.tab = t; idle() } }) { DeskScreen(it) }
+
     @Test fun asistenteDePrimerInicio() = abrir("light") { SetupWizard(it) }
 }
+
+/** Las mismas pruebas en un teléfono en horizontal (pantalla baja): ahí es donde más fácil algo no cabe o no se desplaza. */
+@Config(sdk = [34], qualifiers = "w780dp-h360dp-land-xxhdpi")
+class ThemeSmokePhoneTest : ThemeSmokeTest()
