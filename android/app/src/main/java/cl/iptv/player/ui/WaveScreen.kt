@@ -12,7 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -116,9 +116,42 @@ fun WaveScreen(vm: AppViewModel) {
     }
     BackHandler(enabled = nav.level == 1 && dialog == null && vm.details == null) { goBack() }
 
+    // Pantallas táctiles: deslizar arriba/abajo recorre la lista; a los lados cambia de columna (o vuelve).
+    // Los gestos van en el contenedor (no en una capa encima): así los toques llegan a filas e íconos.
+    // Se leen los valores actuales con rememberUpdatedState: el gesto se crea una vez y antes usaba
+    // la posición de cuando se creó, por eso la lista no avanzaba bien al deslizar.
+    val selNow by androidx.compose.runtime.rememberUpdatedState(sel)
+    val selectTo by androidx.compose.runtime.rememberUpdatedState<(Int) -> Unit>({ setSel(it) })
+    val swipe by androidx.compose.runtime.rememberUpdatedState<(Int) -> Unit>({ dir ->
+        if (dir > 0) { if (nav.level == 1) goBack() else if (nav.col > 0) nav.col-- }
+        else if (nav.level == 0 && nav.col < cols.lastIndex) nav.col++
+    })
+    val stepPx = remember { androidx.compose.runtime.mutableFloatStateOf(150f) }
+
     BoxWithConstraints(
         Modifier.fillMaxSize()
             .focusRequester(focus).focusable()
+            .pointerInput(Unit) {
+                var accY = 0f; var accX = 0f; var axis = 0       // 0: sin decidir · 1: vertical · 2: lateral · 3: ya cambió
+                detectDragGestures(onDragStart = { accY = 0f; accX = 0f; axis = 0 }) { ch, d ->
+                    ch.consume()
+                    if (axis == 0) axis = if (kotlin.math.abs(d.y) >= kotlin.math.abs(d.x)) 1 else 2
+                    when (axis) {
+                        1 -> {
+                            accY += d.y
+                            val px = stepPx.floatValue
+                            var cur = selNow
+                            while (accY > px) { cur--; accY -= px }
+                            while (accY < -px) { cur++; accY += px }
+                            if (cur != selNow) selectTo(cur)
+                        }
+                        2 -> {
+                            accX += d.x
+                            if (kotlin.math.abs(accX) > 64.dp.toPx()) { swipe(if (accX > 0) 1 else -1); axis = 3 }
+                        }
+                    }
+                }
+            }
             .onPreviewKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (ev.key) {
@@ -179,6 +212,7 @@ fun WaveScreen(vm: AppViewModel) {
         val listX = if (nav.level == 1) anchorX - w * 0.04f else anchorX - (if (compact) 26.dp else 34.dp)
         val focusY = h * (if (compact) 0.46f else 0.50f)
         val step = if (compact) 52.dp else 66.dp
+        with(androidx.compose.ui.platform.LocalDensity.current) { stepPx.floatValue = (step * 0.8f).toPx() }
         if (entries.isEmpty()) Text(if (vm.loading != null) "Cargando…" else "Sin contenido", color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp,
             modifier = Modifier.offset(x = listX, y = focusY))
         val from = (sel - 2).coerceAtLeast(0)
@@ -194,21 +228,11 @@ fun WaveScreen(vm: AppViewModel) {
             WaveRow(
                 e, selected = d == 0, compact = compact, live = col.kind == Kind.LIVE && nav.level == 1, vm = vm,
                 modifier = Modifier.offset(x = listX, y = y - (if (d == 0) step * 0.5f else step * 0.35f)).widthIn(max = w * 0.72f)
-                    .clickable(remember(e.key) { MutableInteractionSource() }, null) { if (d == 0) e.open() else setSel(i) },
+                    // Un toque abre directamente (en el teléfono no hace falta elegir y luego confirmar)
+                    .clickable(remember(e.key) { MutableInteractionSource() }, null) { setSel(i); e.open() },
             )
         }
 
-        // Deslizar arriba / abajo en pantallas táctiles
-        Box(Modifier.matchParentSize().pointerInput(entries.size, nav.level) {
-            var acc = 0f
-            detectVerticalDragGestures(onDragEnd = { acc = 0f }) { ch, dy ->
-                acc += dy
-                val px = step.toPx()
-                while (acc > px) { setSel(sel - 1); acc -= px }
-                while (acc < -px) { setSel(sel + 1); acc += px }
-                ch.consume()
-            }
-        })
     }
 
     when (dialog) {

@@ -690,7 +690,15 @@ fun PlayerScreen(vm: AppViewModel) {
         // Subtítulos IA en vivo (últimas dos frases + lo que se está oyendo)
         if (vm.aiSubs != null && !vm.mini) {
             val cap = vm.captioner
-            val textNow = (cap.lines + listOfNotNull(cap.partial.takeIf { it.isNotBlank() })).takeLast(2).joinToString("\n")
+            val textNow = (cap.lines + cap.partial.split('\n').filter { it.isNotBlank() }).takeLast(2).joinToString("\n")
+            val t0 = System.currentTimeMillis()
+            // Sin texto: un aviso discreto de que está escuchando, o de que no le llega audio que reconocer
+            if ((textNow.isBlank() || now - cap.lastAt >= 6000) && t0 - cap.startedAt > 4000) Text(
+                if (t0 - cap.audioAt < 3000) "✨ Escuchando…" else "✨ Sin audio para reconocer (usa el motor ExoPlayer)",
+                color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (controls) 150.dp else 40.dp)
+                    .clip(RoundedCornerShape(8.dp)).background(Color(0x80000000)).padding(horizontal = 10.dp, vertical = 4.dp),
+            )
             if (textNow.isNotBlank() && now - cap.lastAt < 6000) Text(
                 textNow, color = Color.White, fontSize = (22 * subtitleScale(vm.settings.subSize)).sp, fontWeight = FontWeight.Bold,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = (28 * subtitleScale(vm.settings.subSize)).sp,

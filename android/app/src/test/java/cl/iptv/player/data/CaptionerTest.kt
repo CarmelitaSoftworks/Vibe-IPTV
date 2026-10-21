@@ -51,6 +51,30 @@ class CaptionerTest {
         assertTrue(cap.pendingSamples <= 16_000 * 3)
     }
 
+    @Test fun lineasCortasSinPartirPalabras() {
+        val t = "esta es una frase bastante larga que antes llenaba toda la pantalla con subtítulos interminables"
+        val l = LiveCaptioner.wrap(t)
+        assertTrue(l.size > 1 && l.all { it.length <= LiveCaptioner.LINE })
+        assertEquals(t, l.joinToString(" "))
+    }
+
+    @Test fun volumenAutomaticoSubeLaVozBajaYNoElSilencio() {
+        val voz = ShortArray(3_200) { if (it % 2 == 0) 500 else -500 }
+        var g = 1f
+        repeat(30) { g = LiveCaptioner.normalize(voz.copyOf(), g) }
+        assertTrue(g > 3f)
+        val silencio = ShortArray(3_200) { 20 }
+        assertEquals(g, LiveCaptioner.normalize(silencio, g))
+    }
+
+    @Test fun conAtrasoSeSaltanLosSilencios() {
+        val cap = LiveCaptioner().apply { armForTest() }
+        cap.sink.flush(16_000, 1, C.ENCODING_PCM_16BIT)
+        repeat(10) { cap.sink.handleBuffer(pcm16(3_200, 1) { _, _ -> 3000 }) }   // 2 s de voz sin leer
+        repeat(10) { cap.sink.handleBuffer(pcm16(3_200, 1) { _, _ -> 0 }) }      // 2 s de silencio
+        assertEquals(16_000 * 2, cap.pendingSamples)
+    }
+
     @Test fun descartaRuidoSuelto() {
         assertEquals("", LiveCaptioner.clean("[unk]"))
         assertEquals("", LiveCaptioner.clean(" y "))

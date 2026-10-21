@@ -95,6 +95,9 @@ class LiveCaptioner {
     var lines by mutableStateOf<List<String>>(emptyList()); private set
     var partial by mutableStateOf(""); private set
     var lastAt by mutableStateOf(0L); private set
+    /** Último momento en que llegó audio decodificado (para avisar si no llega nada). */
+    @Volatile var audioAt = 0L; private set
+    @Volatile var startedAt = 0L; private set
 
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     private val queue = LinkedBlockingQueue<ShortArray>()
@@ -130,6 +133,7 @@ class LiveCaptioner {
             val base = b.position()
             val frames = b.remaining() / (bytes * ch)
             if (frames <= 0) return
+            audioAt = System.currentTimeMillis()
             fun sample(i: Int, c: Int): Int = if (bytes == 2) b.getShort(base + (i * ch + c) * 2).toInt()
                 else (b.getFloat(base + (i * ch + c) * 4).coerceIn(-1f, 1f) * 32767f).toInt()
             // 5.1 / 7.1: los diálogos van en el canal central; mezclarlo con los demás (música, efectos) confunde a Vosk
@@ -150,6 +154,8 @@ class LiveCaptioner {
     }
 
     private fun push(a: ShortArray) {
+        // Atrasado más de 1,5 s: los trozos en silencio se saltan (así se vuelve a la par sin cortar frases)
+        if (queued.get() > CATCH_UP && rms(a) < SILENCE) return
         queue.offer(a)
         // Atraso de más de 3 s: se descarta lo más antiguo y se reinicia el reconocimiento para volver a la par
         if (queued.addAndGet(a.size) > MAX_BACKLOG) {
@@ -162,6 +168,7 @@ class LiveCaptioner {
         stop()
         val gen = ++generation
         enabled = true
+        startedAt = System.currentTimeMillis(); audioAt = 0L
         Thread({
             try {
                 org.vosk.LibVosk.setLogLevel(org.vosk.LogLevel.WARNINGS)
@@ -169,15 +176,17 @@ class LiveCaptioner {
                 org.vosk.Recognizer(model, 16_000f).use { rec ->
                     var partialAt = 0L
                     var shown = ""
+                    var gain = 1f
                     while (enabled && gen == generation) {
                         val a = queue.poll(400, TimeUnit.MILLISECONDS) ?: continue
                         queued.addAndGet(-a.size)
                         if (resetPending) { resetPending = false; rec.reset(); shown = ""; post(gen) { partial = "" } }
+                        gain = normalize(a, gain)
                         if (rec.acceptWaveForm(a, a.size)) {
                             val t = clean(JSONObject(rec.result).optString("text"))
                             shown = ""
                             post(gen) {
-                                if (t.isNotEmpty()) { lines = (lines + t.replaceFirstChar { it.uppercase() }).takeLast(2); lastAt = System.currentTimeMillis() }
+                                if (t.isNotEmpty()) { lines = (lines + wrap(t.replaceFirstChar { it.uppercase() })).takeLast(2); lastAt = System.currentTimeMillis() }
                                 partial = ""
                             }
                         } else {
@@ -185,7 +194,9 @@ class LiveCaptioner {
                             if (now - partialAt >= 250) {
                                 partialAt = now
                                 val p = clean(JSONObject(rec.partialResult).optString("partial"))
-                                if (p != shown) { shown = p; post(gen) { partial = p; if (p.isNotEmpty()) lastAt = System.currentTimeMillis() } }
+                                // Lo que se está oyendo: sólo las últimas dos líneas (una frase larga llenaba la pantalla)
+                                if (p != shown) { shown = p; val tail = wrap(p).takeLast(2).joinToString("\n")
+                                    post(gen) { partial = tail; if (tail.isNotEmpty()) lastAt = System.currentTimeMillis() } }
                             }
                         }
                     }
@@ -210,6 +221,39 @@ class LiveCaptioner {
         private const val CHUNK = 3_200                 // 0,2 s a 16 kHz
         private const val MAX_BACKLOG = 16_000 * 3      // 3 s de atraso como máximo…
         private const val KEEP_BACKLOG = 16_000 / 2     // …y se vuelve a 0,5 s
+        private const val CATCH_UP = 16_000 * 3 / 2     // con 1,5 s de atraso se saltan los silencios
+        private const val SILENCE = 300.0               // nivel (RMS) bajo el cual un trozo se considera silencio
+        private const val TARGET = 4_000.0              // nivel al que se lleva la voz antes de reconocerla
+        internal const val LINE = 42                    // caracteres por línea de subtítulo
+
+        internal fun rms(a: ShortArray): Double {
+            var s = 0.0
+            for (v in a) s += v.toDouble() * v
+            return kotlin.math.sqrt(s / maxOf(1, a.size))
+        }
+
+        /**
+         * Control de volumen automático: el audio de TV suele llegar bajo (o muy comprimido) y el modelo pequeño
+         * reconoce mucho peor así. Se lleva la voz a un nivel parejo, con cambios suaves; el silencio no se amplifica.
+         */
+        internal fun normalize(a: ShortArray, gain: Float): Float {
+            val r = rms(a)
+            val g = if (r < SILENCE) gain else (gain * 0.8f + (TARGET / r).toFloat().coerceIn(0.5f, 6f) * 0.2f)
+            if (g != 1f) for (i in a.indices) a[i] = (a[i] * g).toInt().coerceIn(-32768, 32767).toShort()
+            return g
+        }
+
+        /** Corta el texto en líneas de hasta [LINE] caracteres, sin partir palabras. */
+        internal fun wrap(text: String, max: Int = LINE): List<String> {
+            val out = mutableListOf<String>(); val cur = StringBuilder()
+            for (w in text.split(' ').filter { it.isNotBlank() }) {
+                if (cur.isNotEmpty() && cur.length + 1 + w.length > max) { out += cur.toString(); cur.clear() }
+                if (cur.isNotEmpty()) cur.append(' ')
+                cur.append(w)
+            }
+            if (cur.isNotEmpty()) out += cur.toString()
+            return out
+        }
 
         /** Ruido que el modelo pequeño "oye" como palabras sueltas: se descarta. */
         internal fun clean(raw: String): String {
