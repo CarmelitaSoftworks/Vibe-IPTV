@@ -218,11 +218,11 @@ fun PlayerSidePanel(title: String, rows: List<PanelRow>, onClose: () -> Unit, mo
     val state = rememberLazyListState(initialFirstVisibleItemIndex = (start - 2).coerceAtLeast(0))
     LaunchedEffect(title) { delay(60); runCatching { first.requestFocus() } }
     Column(
-        modifier.fillMaxHeight().then(if (wide) Modifier.widthIn(min = 300.dp, max = 620.dp).fillMaxWidth(0.62f) else Modifier.widthIn(max = 380.dp).fillMaxWidth(0.42f))
+        modifier.fillMaxHeight().then(if (wide) Modifier.widthIn(min = 300.dp, max = 620.dp).fillMaxWidth(0.62f) else Modifier.widthIn(min = 300.dp, max = 480.dp).fillMaxWidth(0.5f))   // más ancho: el texto completo se lee
             .background(Color(0xF2161A1D)).padding(vertical = 18.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, modifier = Modifier.weight(1f))
+            Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 24.sp, modifier = Modifier.weight(1f))
             Text("✕", color = Color.White.copy(alpha = 0.7f), fontSize = 20.sp, modifier = Modifier.clip(CircleShape).clickable { onClose() }.padding(8.dp))
         }
         Spacer(Modifier.height(10.dp))
@@ -252,8 +252,10 @@ fun PlayerSidePanel(title: String, rows: List<PanelRow>, onClose: () -> Unit, mo
                     }
                     Column(Modifier.weight(1f)) {
                         Text(r.label, color = if (f) Color(0xFF1A1F23) else Color.White, fontWeight = if (r.selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            fontSize = 15.sp, maxLines = if (wide) 2 else 1, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
-                        if (r.detail.isNotBlank()) Text(r.detail, color = if (f) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // Lista de canales: hasta 2 líneas; en los demás paneles el texto se muestra completo (sin "…")
+                            fontSize = 15.sp, maxLines = if (wide) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis, lineHeight = 19.sp)
+                        if (r.detail.isNotBlank()) Text(r.detail, color = if (f) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontSize = 12.sp,
+                            maxLines = if (wide) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
                         if (r.progress >= 0f) Box(Modifier.padding(top = 4.dp).fillMaxWidth(0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.2f))) {
                             Box(Modifier.fillMaxWidth(r.progress).fillMaxHeight().background(c.accent))
                         }
