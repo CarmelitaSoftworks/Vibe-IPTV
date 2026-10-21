@@ -49,6 +49,13 @@ android {
                 t.systemProperty("roborazzi.test.record", "true")
                 t.systemProperty("vibe.capturas", System.getProperty("vibe.capturas") ?: (project.findProperty("capturas")?.toString() ?: "false"))
                 t.maxHeapSize = "3g"
+                // Si una prueba se queda colgada, la compilación falla a los 12 min (en vez de esperar horas)
+                // y el registro muestra cuál fue la última que empezó
+                t.timeout.set(java.time.Duration.ofMinutes(12))
+                t.testLogging {
+                    events("started", "passed", "failed", "skipped")
+                    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                }
             }
         }
     }
