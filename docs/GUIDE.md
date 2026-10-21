@@ -21,6 +21,8 @@ Two native apps that share the same menu design (a grid of rounded tiles with si
 
 ## 1. Web app
 
+**Download:** on GitHub, green button **Code → Download ZIP** and unzip it (or `git clone`). The `.bat` files are inside the `web` folder. You need **Node.js** (LTS version, from [nodejs.org](https://nodejs.org)).
+
 **Easiest on Windows:** double-click `web/iniciar.bat` (opens the browser by itself) or `web/iniciar-red-local.bat` to also use it from the TV or phone on your network (it shows the address to use). Keep the black window open while you use the app.
 
 ```bash
@@ -37,6 +39,8 @@ To leave it installed on a NAS, Raspberry Pi or server, see [Install on your own
 **Why a server?** Almost no IPTV provider lets a browser read its streams (CORS), and many use `http://`. `server.js` serves the app and acts as a proxy: it rewrites HLS playlists so segments also go through it, follows redirects and sends a player User-Agent. The app first tries a direct connection and, if that fails, uses the proxy automatically (configurable in Settings). Don't expose the server to the Internet without a password (`VIBE_PASSWORD`): it's a proxy meant for your PC or local network.
 
 It can also be installed as an app (PWA) from Chrome on Android: ⋮ menu → "Install app".
+
+**iPhone and iPad:** with the server running on your local network (`iniciar-red-local.bat`, `--lan` or Docker), open the address it shows in **Safari** (for example `http://192.168.1.20:8080`) and tap **Share → Add to Home Screen**: it opens full screen with its own icon. Safari on iPhone can't play MPEG-TS, so the app uses the channel's `.m3u8` version or, if there isn't one, the server converts it to HLS with ffmpeg (*Preparing the channel for iPhone…*). Picture-in-picture and AirPlay work. If the video starts muted, tap the screen once to turn the sound on (an iOS rule). If Windows asks about the firewall, allow access on private networks.
 
 **Keys:** arrows to move (← → at the edge change page), Enter to open, Esc/Back to go back, `F` toggles favorite, `/` searches. In the player: ▲/▼ changes channel, ◄/► skips 10 s in movies, Enter shows the controls.
 
@@ -58,7 +62,7 @@ Installing on an Android TV without Android Studio: enable *Developer options �
 
 **Android TV:** it shows up in the TV launcher (banner included), needs no touchscreen and everything works with the remote: D-pad on the grid (reaching the edge changes page), long-press OK or the MENU key to mark a favorite, CH+/CH− and ▲/▼ change channel in the player, MENU opens the options (favorite, subtitles, Open in VLC), INFO shows the guide.
 
-**Phone:** the app opens in landscape, like a TV. Swipe the grid to change page and long-press a tile to mark it as a favorite; the player supports picture-in-picture (PiP) when you leave with Home.
+**Phone:** the app opens in landscape, like a TV. Swipe the grid to change page and long-press a tile to mark it as a favorite. In the player, the **⧉ Mini player** button keeps the video in a small window while you use the menu, and if you leave the app **while something is playing** it switches to the system picture-in-picture (PiP) by itself (not when paused).
 
 ## 3. Sections: Live TV, Movies and Series
 
@@ -83,6 +87,8 @@ When a list opens you get **Home** with three big tiles (Live TV, Movies, Series
 
 ## 5. Lists screen and Settings
 
+- **First launch:** the first time, with no saved lists, a wizard appears (design inspired by OwnTV): *Welcome → Before you start → Add your list*, with **Type it here** (M3U link, file or Xtream Codes), **From a screenshot** or **Restore a backup**; you can also *Skip for now*.
+- **List saved on the device (Android):** the processed list is stored, so the app opens **instantly** and works even if the server doesn't answer (it warns and shows the saved one). It updates itself in the background; to download it again: Settings → Lists & guide → **Update list now**. There, **Account** shows an Xtream account's expiry and connections (it warns if it expires within 7 days or all connections are in use).
 - **Lists screen**: four big options to add a list (M3U list by link, M3U file, Xtream Codes and from a screenshot) and your saved lists to open them with one click. Open it with the list button (top left).
 - **Settings** (gear button), in the style of OwnTV: sections on the left with their number of options and, on the right, each setting with its value; search at the top. With the remote: ▲▼ between sections, ► enters, ◄ goes back.
   - Quick: channel numbers, guide below the tiles, autoplay next episode, animations.
@@ -94,7 +100,9 @@ When a list opens you get **Home** with three big tiles (Live TV, Movies, Series
 
 **Cable-TV formats:** many live channels carry **AC-3 / MP2** audio or **interlaced MPEG-2** video, which browsers can't play.
 - **Web:** the local server converts them on the fly with **ffmpeg** (only what's needed: H.264 video is copied and audio converted to AAC; MPEG-2 video is deinterlaced and converted to 720p H.264). `iniciar.bat` installs ffmpeg by itself the first time (`npm install`, about 70 MB). In Settings → Playback: *Automatic* (when the channel fails or has no sound), *Always on Live TV* or *Never*, plus the conversion quality.
-- **Android / TV:** three engines: **ExoPlayer**, **VLC (LibVLC)** and **MPV (libmpv, the same one OwnTV uses)**. In *Automatic* they're tried in that order: if ExoPlayer can't, it moves to VLC and, if VLC can't either, to MPV (Android 8.0+); the following live channels start with the last engine that worked. In the player menu (MENU key) you can switch engine, aspect ratio and audio track.
+- **Android / TV:** three engines: **ExoPlayer**, **VLC (LibVLC)** and **MPV (libmpv, the same one OwnTV uses)**. In *Automatic* every channel starts with **ExoPlayer** and only moves to VLC, then MPV (Android 8.0+), if that channel fails. In the player menu (MENU key) you can switch engine, aspect ratio and audio track.
+
+**Controls (Android):** only the most used ones are visible — channel list, audio, subtitles, favorite, mini player and **⋯ More options**. Inside *More options* (with icons): quality, aspect ratio, speed, previous channel, record, multiview, picture-in-picture, sleep timer, engine, technical info and open in VLC. Panels show the full text and mark the chosen option with ✓.
 
 ## 7. Subtitles from several sources
 
@@ -163,16 +171,18 @@ The app is available in **Spanish** and **English**. By default it follows the s
 - **Recently watched:** the 🕘 pill in the category bar.
 - **Organize categories:** *Categories* button → ✎ *Organize categories*: ▲▼ to reorder and *Hide* to remove them from the bar (and from “All”). Saved per list and per profile.
 - **Search the guide:** in the grid guide, 🔍 *Search programme* searches every channel by name; OK opens it live, as catch-up, or shows when it starts.
-- **Mini player (TV and TV boxes):** the player's *Picture in picture* button leaves the video in a small corner window and returns to the menu so you can browse other listings or the guide. The video keeps playing; the remote's *Channel +/−* and *Play/Pause* still work. To go back to full screen: *Back* on Home, or tap the window. Picking another channel opens it full screen. On phones the button uses the system PiP.
+- **Mini player (TV and TV boxes):** the player's *Picture in picture* button leaves the video in a small corner window and returns to the menu so you can browse other listings or the guide. The video keeps playing; the remote's *Channel +/−* and *Play/Pause* still work. To go back to full screen: *Back* on Home, or tap the window. Picking another channel opens it full screen. Phones work the same way (⧉ button visible; the small window's ✕ closes the video); the system PiP is used when you leave the app.
 - **Multiview:** the ⊞ player button (live TV): up to 4 channels at once. OK picks which one plays sound, OK again opens it full screen, *Menu* (or long press) changes that tile's channel.
 - **Android TV / Google TV home screen:** the app publishes a “Vibe IPTV” row with your favorites and recent channels; picking one opens it directly. (Fire TV doesn't support this.)
-- **Send log:** Settings → About → *Send log* or *Save log to a file*. It includes recent errors and engine switches; addresses are stored without username or password.
-- **Detected device and lite mode:** the first time the app opens it detects the device (memory, 32/64-bit, MPEG-2 / HEVC / AC-3 decoders) and sets lite mode, buffer and animations. If the device can't decode MPEG-2, live TV starts straight with VLC. See it and run it again in Settings → About → *Detect again and configure*; lite mode can also be forced in Settings → Appearance.
+- **Send log:** Settings → About → *Send log* or *Save log to a file*. It includes recent errors and engine switches, the **last unexpected close** (also in About) and the exit reasons Android 11+ reports; addresses are stored without username or password.
+- **Safe mode:** if the app closes twice in a row on launch, the next start doesn't load the last list or the guide and shows a notice, so you never have to clear the app's data. What happened is in *Send log*.
+- **Detected device and lite mode:** the first time the app opens it detects the device (memory, 32/64-bit, MPEG-2 / HEVC / AC-3 decoders) and sets lite mode, buffer and animations. See it and run it again in Settings → About → *Detect again and configure*; lite mode can also be forced in Settings → Appearance.
 - **Continue watching:** a row on Home with what you left half-watched; also in the *Categories* button and as a pill in Movies and Series.
 - **Buffer:** Settings → Playback → *Buffer*. *Fast* changes channels quicker, *Balanced* is recommended and *Stable* keeps more video ahead for providers that drop out. If a live channel stalls 3 times, the app raises its buffer (up to two levels) and remembers it; clear it with Settings → Data → *Forget learned buffer*.
 - **Automatic subtitles:** Settings → Subtitles (on by default). When a movie or episode starts, if the audio isn't in your first preferred language, it uses the built-in track in that language or searches OpenSubtitles and Podnapisi (no key) and loads the best result. Change or remove it from the player's Subtitles button.
-- **AI subtitles (Android):** in the player, *Subtitles → ✨ Generate with AI* and pick the audio language. Audio is transcribed on the device with Vosk, offline and without sending anything. It uses the ExoPlayer engine. The **AI** build (`vibe-iptv-ia-armv7.apk` for TV, `vibe-iptv-ia-arm64.apk` for phones) includes the Spanish model; the regular one downloads it the first time (~40 MB). It doesn't translate: it writes what is said in the audio's language.
-- **Themes:** Settings → Appearance → *Theme*: Light, Dark, Tiles, Waves or Custom. In Custom you choose base, background and accent colours (hex), background style, background image, translucent tiles and square corners; *Export theme* saves it to a .json file (with the image) to use on another device or share, and *Import theme* loads it.
+- **AI subtitles (Android):** in the player, *Subtitles → ✨ Generate with AI* and pick the audio language. Audio is transcribed on the device with Vosk, offline and without sending anything. It uses the ExoPlayer engine. The **AI** build (`vibe-iptv-ia-armv7.apk` for TV, `vibe-iptv-ia-arm64.apk` for phones) includes the Spanish model; the regular one downloads it the first time (~40 MB). It doesn't translate: it writes what is said in the audio's language. It evens out the voice volume, shows at most two lines and says *✨ Listening…* or *No audio to recognise* when there's no text.
+- **Whisper subtitles (test, mid-to-high-end phones):** *Subtitles → ✨ Whisper (test)* in Spanish, English or detect language. Much more accurate than Vosk (whisper.cpp with the *base* model, ~57 MB downloaded the first time, offline afterwards). So subtitles aren't late, the video starts **about 8 seconds later**: during that time Whisper is already transcribing the audio that's coming. Needs a 64-bit phone with an ARMv8.2 or newer CPU and 4 GB of RAM; if the device doesn't qualify, the option says why.
+- **Themes:** Settings → Appearance → *Theme*: Light, Dark, Tiles, Waves or Custom. In Custom you choose base, background and accent colours (hex), background style, background image, translucent tiles and square corners; *Export theme* saves it to a .json file (with the image) to use on another device or share, and *Import theme* loads it. In **Waves** on a touch screen: swipe up/down to move through the list, sideways to change column (or go back), and a tap opens.
 - **SubDL:** paste your free key in Settings → Subtitles and use *Test SubDL key*. Searches use the title's IMDb ID and, for series, download only the episode even when the subtitle comes in a season pack.
 
 ## Preview version (artifact)

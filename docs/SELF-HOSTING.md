@@ -136,6 +136,7 @@ Advanced system settings → Environment Variables) and restart the task.
 - It's best if the server always keeps **the same IP**: reserve it in your router (*static DHCP* or *IP reservation*).
 - On the phone or TV, open the browser menu → **Add to Home screen** for a shortcut.
 - Browsers only offer full app (PWA) installation over **HTTPS**; at home the shortcut works just as well.
+- **iPhone and iPad:** open the address in **Safari** and tap **Share → Add to Home Screen**. Safari on iPhone can't play MPEG-TS: the server converts those channels to HLS with **ffmpeg** (so it's worth installing; Docker already includes it). One conversion at a time; it stops by itself 45 s after you stop watching.
 - On **Android and Android TV** you can also use the **native app** (APK), which doesn't need this server: it connects straight to your list and plays with ExoPlayer, VLC or MPV.
 
 ---
@@ -173,6 +174,7 @@ Recommended, from most to least secure:
    - always set `VIBE_PASSWORD` (the browser asks for it only once);
    - put it behind an HTTPS proxy. There are ready-made examples in [`web/deploy/Caddyfile`](../web/deploy/Caddyfile) (automatic certificate) and [`web/deploy/nginx.conf`](../web/deploy/nginx.conf);
    - only forward port 443 on your router to the proxy, **never port 8080 directly**.
+3. **Cloudflare Tunnel** (no open ports): with `cloudflared` you publish `http://localhost:8080` on a subdomain of yours with HTTPS. Use it **always with `VIBE_PASSWORD`** and, if you can, add Cloudflare Access to require a sign-in before reaching the server.
 
 > [!CAUTION]
 > Without a password, anyone who finds your address could use your server and your connection as a
@@ -202,6 +204,8 @@ It also accepts the `--lan` (same as `HOST=0.0.0.0`) and `--open` (opens the bro
 | The page doesn't open from another device | The server must start with `HOST=0.0.0.0` (or `--lan`); check the server's firewall (port 8080, private network) and that both devices are on the same network. |
 | `Port 8080 is already in use` | Another copy is running or another program uses that port: change `PORT`. |
 | Some channels don't play in the browser | In Settings → Playback, *Conversion (ffmpeg)* should say *Available*. On Linux: `sudo apt install ffmpeg`; Docker already includes it. |
+| On iPhone a channel stays on *Preparing the channel for iPhone…* | The server needs ffmpeg (see the row above). Check the `[ffmpeg → HLS]` line in the log. |
+| On iPhone the video starts with no sound | It's an iOS rule: tap the screen once and it turns on. |
 | It cuts out when watching two channels at once | Many IPTV accounts allow a single connection: close the other device. |
 | It keeps asking for the password | Check that the proxy (nginx/Caddy) forwards the `Authorization` header and doesn't cache responses. |
 | The guide (EPG) doesn't show | Check that the XMLTV URL opens in the server's browser and that the list's `tvg-id`s match the guide's. |

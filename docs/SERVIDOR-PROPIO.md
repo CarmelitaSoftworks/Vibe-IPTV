@@ -136,6 +136,7 @@ Sistema → Configuración avanzada → Variables de entorno) y reinicia la tare
 - Conviene que el servidor tenga siempre **la misma IP**: resérvala en tu router (opción *DHCP estático* o *reserva de IP*).
 - En el celular o el TV, abre el menú del navegador → **Agregar a la pantalla de inicio** para tener un acceso directo.
 - La instalación como app completa (PWA) la ofrecen los navegadores solo con **HTTPS**; dentro de casa, el acceso directo funciona igual.
+- **iPhone y iPad:** abre la dirección en **Safari** y toca **Compartir → Agregar a inicio**. Safari en iPhone no reproduce MPEG-TS: el servidor convierte esos canales a HLS con **ffmpeg** (por eso conviene tenerlo instalado; en Docker ya viene). Una conversión a la vez; se apaga sola 45 s después de dejar de verla.
 - En **Android y Android TV** también puedes usar la **app nativa** (APK), que no necesita este servidor: se conecta directo a tu lista y reproduce con ExoPlayer, VLC o MPV.
 
 ---
@@ -173,6 +174,7 @@ Recomendado, de más a menos seguro:
    - define siempre `VIBE_PASSWORD` (el navegador la pide una sola vez);
    - ponlo detrás de un proxy con HTTPS. Hay ejemplos listos en [`web/deploy/Caddyfile`](../web/deploy/Caddyfile) (certificado automático) y [`web/deploy/nginx.conf`](../web/deploy/nginx.conf);
    - abre en el router solo el puerto 443 hacia el proxy, **nunca el 8080 directo**.
+3. **Túnel de Cloudflare** (sin abrir puertos): con `cloudflared` publicas `http://localhost:8080` en un subdominio tuyo con HTTPS. Úsalo **siempre con `VIBE_PASSWORD`** y, si puedes, agrega Cloudflare Access para pedir inicio de sesión antes de llegar al servidor.
 
 > [!CAUTION]
 > Sin contraseña, cualquiera que encuentre tu dirección podría usar tu servidor como intermediario
@@ -202,6 +204,8 @@ También acepta las opciones `--lan` (equivale a `HOST=0.0.0.0`) y `--open` (abr
 | Desde otro equipo no abre la página | El servidor debe arrancar con `HOST=0.0.0.0` (o `--lan`); revisa el firewall del servidor (puerto 8080, red privada) y que ambos equipos estén en la misma red. |
 | `El puerto 8080 ya está en uso` | Ya hay otra copia corriendo u otro programa usa ese puerto: cambia `PORT`. |
 | Algunos canales no se ven en el navegador | En Ajustes → Reproducción, *Conversión (ffmpeg)* debe decir *Disponible*. En Linux: `sudo apt install ffmpeg`; en Docker ya viene incluido. |
+| En iPhone un canal queda en *Preparando el canal para iPhone…* | Necesita ffmpeg en el servidor (ver la fila anterior). Revisa en el registro la línea `[ffmpeg → HLS]`. |
+| En iPhone el video empieza sin sonido | Es una regla de iOS: toca la pantalla una vez y se activa. |
 | Se corta al ver dos canales a la vez | Muchas cuentas IPTV permiten una sola conexión: cierra el otro equipo. |
 | Pide la contraseña muchas veces | Revisa que el proxy (nginx/Caddy) reenvíe el encabezado `Authorization` y no guarde en caché las respuestas. |
 | La guía (EPG) no aparece | Comprueba que la URL XMLTV abra en el navegador del servidor y que los `tvg-id` de la lista coincidan con los de la guía. |

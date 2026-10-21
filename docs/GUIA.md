@@ -21,6 +21,8 @@ Dos apps nativas que comparten el mismo diseño de menú (cuadrícula de mosaico
 
 ## 1. App web
 
+**Descargar:** en GitHub, botón verde **Code → Download ZIP** y descomprímelo (o `git clone`). Los archivos `.bat` están dentro de la carpeta `web`. Necesitas **Node.js** (versión LTS, de [nodejs.org](https://nodejs.org)).
+
 **En Windows lo más fácil:** doble clic en `web/iniciar.bat` (abre el navegador solo) o en `web/iniciar-red-local.bat` para usarla también desde el TV o el celular de tu red (muestra la dirección a usar). Deja la ventana negra abierta mientras usas la app.
 
 ```bash
@@ -37,6 +39,8 @@ Para dejarlo instalado en un NAS, Raspberry Pi o servidor, mira [Instalar en tu 
 **¿Por qué un servidor?** Casi ningún proveedor IPTV permite que un navegador lea sus streams (CORS) y muchos usan `http://`. `server.js` sirve la app y hace de proxy: reescribe las listas HLS para que los segmentos también pasen por él, sigue redirecciones y envía un User-Agent de reproductor. La app primero intenta la conexión directa y, si falla, usa el proxy automáticamente (se puede cambiar en Ajustes). No expongas el servidor a Internet sin contraseña (`VIBE_PASSWORD`): es un proxy pensado para tu PC o tu red local.
 
 También se puede instalar como app (PWA) desde Chrome en Android: menú ⋮ → "Instalar app".
+
+**iPhone y iPad:** con el servidor iniciado en la red local (`iniciar-red-local.bat`, `--lan` o Docker), abre en **Safari** la dirección que muestra (por ejemplo `http://192.168.1.20:8080`) y toca **Compartir → Agregar a inicio**: se abre a pantalla completa con su ícono. Safari en iPhone no reproduce MPEG-TS, así que la app usa la versión `.m3u8` del canal o, si no existe, el servidor lo convierte a HLS con ffmpeg (*Preparando el canal para iPhone…*). Funcionan la imagen en imagen y AirPlay. Si el video empieza en silencio, toca la pantalla una vez para activar el sonido (regla de iOS). Si Windows pregunta por el firewall, permite el acceso en redes privadas.
 
 **Teclas:** flechas para moverse (← → al borde cambian de página), Enter para abrir, Esc/Atrás para volver, `F` marca favorito, `/` busca. En el reproductor: ▲/▼ cambia de canal, ◄/► avanza 10 s en películas, Enter muestra los controles.
 
@@ -58,7 +62,7 @@ Instalar en un Android TV sin Android Studio: activa *Opciones de desarrollador 
 
 **Android TV:** aparece en el lanzador de TV (banner incluido), no requiere pantalla táctil y todo se maneja con el control: D-pad en la cuadrícula (al llegar al borde cambia de página), mantener pulsado OK o la tecla MENÚ marca favorito, CH+/CH− y ▲/▼ cambian de canal en el reproductor, MENÚ abre las opciones (favorito, subtítulos, Abrir en VLC), INFO muestra la guía.
 
-**Teléfono:** la app se abre en horizontal, como un TV. Desliza la cuadrícula para cambiar de página y mantén pulsado un mosaico para marcarlo como favorito; el reproductor admite imagen en imagen (PiP) al salir con Inicio.
+**Teléfono:** la app se abre en horizontal, como un TV. Desliza la cuadrícula para cambiar de página y mantén pulsado un mosaico para marcarlo como favorito. En el reproductor, el botón **⧉ Mini reproductor** deja el video en una ventanita mientras usas el menú, y si sales de la app **mientras algo se reproduce** pasa sola a imagen en imagen (PiP) del sistema (en pausa no).
 
 ## 3. Secciones: TV en vivo, Películas y Series
 
@@ -83,6 +87,8 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
 
 ## 5. Pantalla de listas y Ajustes
 
+- **Primer inicio:** la primera vez, sin listas guardadas, aparece un asistente (diseño inspirado en OwnTV): *Bienvenida → Antes de empezar → Agrega tu lista*, con **Escribirla aquí** (enlace M3U, archivo o Xtream Codes), **Desde una captura** o **Restaurar un respaldo**; también se puede *Saltar por ahora*.
+- **Lista guardada en el equipo (Android):** la lista ya procesada queda guardada, así que la app abre **al instante** y funciona aunque el servidor no responda (avisa y muestra la guardada). Se actualiza sola en segundo plano; para descargarla de nuevo: Ajustes → Listas y guía → **Actualizar lista ahora**. Ahí mismo, **Cuenta** muestra el vencimiento y las conexiones de una cuenta Xtream (avisa si vence en 7 días o si ya usas todas las conexiones).
 - **Pantalla de listas**: cuatro opciones grandes para añadir (lista M3U por enlace, archivo M3U, Xtream Codes y desde una captura) y tus listas guardadas para abrirlas con un clic. Se abre con el botón de la lista (arriba a la izquierda).
 - **Ajustes** (botón con engranaje), al estilo de OwnTV: secciones a la izquierda con su número de opciones y, a la derecha, cada ajuste con su valor; buscador arriba. Con el control: ▲▼ entre secciones, ► entra, ◄ vuelve.
   - Rápido: números de canal, guía bajo los mosaicos, siguiente episodio automático, animaciones.
@@ -94,7 +100,9 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
 
 **Formatos de la TV de cable:** muchos canales en vivo traen audio **AC-3 / MP2** o video **MPEG-2 entrelazado**, que los navegadores no reproducen.
 - **Web:** el servidor local los convierte al vuelo con **ffmpeg** (sólo lo necesario: copia el video H.264 y convierte el audio a AAC; si el video es MPEG-2 lo desentrelaza y lo pasa a H.264 a 720p). `iniciar.bat` instala ffmpeg sola la primera vez (`npm install`, unos 70 MB). En Ajustes → Reproducción: *Automático* (cuando el canal falla o queda sin sonido), *Siempre en TV en vivo* o *Nunca*, y la calidad de conversión.
-- **Android / TV:** tres motores: **ExoPlayer**, **VLC (LibVLC)** y **MPV (libmpv, el mismo de OwnTV)**. En *Automático* prueba en ese orden: si ExoPlayer no puede, pasa a VLC y, si VLC tampoco, a MPV (Android 8.0+); los siguientes canales en vivo parten con el último motor que funcionó. En el menú del reproductor (tecla MENÚ) se puede cambiar de motor, el formato de pantalla y la pista de audio.
+- **Android / TV:** tres motores: **ExoPlayer**, **VLC (LibVLC)** y **MPV (libmpv, el mismo de OwnTV)**. En *Automático* cada canal parte con **ExoPlayer** y sólo si ese canal falla pasa a VLC y luego a MPV (Android 8.0+). En el menú del reproductor (tecla MENÚ) se puede cambiar de motor, el formato de pantalla y la pista de audio.
+
+**Controles (Android):** a la vista sólo lo más usado — lista de canales, audio, subtítulos, favorito, mini reproductor y **⋯ Más opciones**. Dentro de *Más opciones* (con íconos): calidad, formato, velocidad, canal anterior, grabar, multivista, imagen en imagen, temporizador, motor, información técnica y abrir en VLC. Los paneles muestran el texto completo y marcan con ✓ la opción elegida.
 
 ## 7. Subtítulos de varias fuentes
 
@@ -163,16 +171,18 @@ La app está en **español** y en **inglés**. Por defecto sigue el idioma del s
 - **Vistos recientemente:** píldora 🕘 en la barra de categorías.
 - **Organizar categorías:** botón *Categorías* → ✎ *Organizar categorías*: ▲▼ para ordenarlas y *Ocultar* para sacarlas de la barra (y de «Todos»). Se guarda por lista y por perfil.
 - **Buscar en la guía:** en la guía en grilla, 🔍 *Buscar programa* busca por nombre en todos los canales; OK lo abre en vivo, en diferido o muestra cuándo empieza.
-- **Mini reproductor (TV y TV boxes):** el botón *Imagen en imagen* del reproductor deja el video en una ventana chica en la esquina y vuelve al menú para mirar otra programación o la guía. El video sigue sonando; *Canal +/−* y *Play/Pausa* del control siguen funcionando. Para volver a pantalla completa: *Atrás* en el Inicio, o toca la ventana. Si eliges otro canal, se abre ese en pantalla completa. En celulares el botón usa el PiP del sistema.
+- **Mini reproductor (TV y TV boxes):** el botón *Imagen en imagen* del reproductor deja el video en una ventana chica en la esquina y vuelve al menú para mirar otra programación o la guía. El video sigue sonando; *Canal +/−* y *Play/Pausa* del control siguen funcionando. Para volver a pantalla completa: *Atrás* en el Inicio, o toca la ventana. Si eliges otro canal, se abre ese en pantalla completa. En celulares funciona igual (botón ⧉ a la vista; la ✕ de la ventanita cierra el video); el PiP del sistema queda para cuando sales de la app.
 - **Multivista:** botón ⊞ del reproductor (TV en vivo): hasta 4 canales a la vez. Con OK eliges cuál suena, OK otra vez lo abre en pantalla completa, *Menú* (o mantener presionado) cambia el canal de ese recuadro.
 - **Inicio de Android TV / Google TV:** la app publica una fila «Vibe IPTV» con tus favoritos y canales recientes; al elegir uno se abre directo. (Fire TV no tiene esta función.)
-- **Enviar registro:** Ajustes → Acerca de → *Enviar registro* o *Guardar registro en un archivo*. Incluye errores y cambios de motor recientes; las direcciones se guardan sin usuario ni contraseña.
-- **Equipo detectado y modo liviano:** al abrir la app por primera vez detecta el equipo (memoria, 32/64 bits, decodificadores MPEG-2 / HEVC / AC-3) y ajusta modo liviano, búfer y animaciones. Si el equipo no decodifica MPEG-2, la TV en vivo arranca directo con VLC. Se ve y se repite en Ajustes → Acerca de → *Volver a detectar y configurar*; el modo liviano también se puede forzar en Ajustes → Apariencia.
+- **Enviar registro:** Ajustes → Acerca de → *Enviar registro* o *Guardar registro en un archivo*. Incluye errores y cambios de motor recientes, el **último cierre inesperado** (también en Acerca de) y los motivos de cierre que informa Android 11+; las direcciones se guardan sin usuario ni contraseña.
+- **Modo seguro:** si la app se cierra dos veces seguidas al abrir, el siguiente inicio no carga la última lista ni la guía y avisa; así nunca hay que borrar los datos. Lo que pasó queda en *Enviar registro*.
+- **Equipo detectado y modo liviano:** al abrir la app por primera vez detecta el equipo (memoria, 32/64 bits, decodificadores MPEG-2 / HEVC / AC-3) y ajusta modo liviano, búfer y animaciones. Se ve y se repite en Ajustes → Acerca de → *Volver a detectar y configurar*; el modo liviano también se puede forzar en Ajustes → Apariencia.
 - **Seguir viendo:** fila en el Inicio con lo que dejaste a medias; también en el botón *Categorías* y como píldora en Películas y Series.
 - **Búfer:** Ajustes → Reproducción → *Búfer*. *Rápido* cambia de canal antes, *Equilibrado* es el recomendado y *Estable* guarda más video por adelantado para proveedores que se cortan. Si un canal en vivo se queda cargando 3 veces, la app le sube el búfer (hasta dos niveles) y lo recuerda; se borra con Ajustes → Datos → *Olvidar búfer aprendido*.
 - **Subtítulos automáticos:** Ajustes → Subtítulos (activado por defecto). Al empezar una película o episodio, si el audio no está en tu primer idioma preferido, usa la pista interna en ese idioma o busca en OpenSubtitles y Podnapisi (sin clave) y carga el mejor resultado. Se cambia o quita desde el botón Subtítulos del reproductor.
-- **Subtítulos con IA (Android):** en el reproductor, *Subtítulos → ✨ Generar con IA* y elige el idioma del audio. El audio se transcribe en el equipo con Vosk, sin internet y sin enviar nada. Usa el motor ExoPlayer. La versión **IA** (`vibe-iptv-ia-armv7.apk` para TV, `vibe-iptv-ia-arm64.apk` para celular) trae el modelo de español; en la normal se descarga la primera vez (~40 MB). No traduce: escribe lo que se dice en el idioma del audio.
-- **Temas:** Ajustes → Apariencia → *Tema*: Claro, Oscuro, Mosaicos, Ondas o Personalizado. En el personalizado eliges base, colores de fondo y acento (en hexadecimal), estilo del fondo, imagen de fondo, mosaicos translúcidos y esquinas rectas; *Exportar tema* lo guarda en un archivo .json (con la imagen) para usarlo en otro equipo o compartirlo, y *Importar tema* lo carga.
+- **Subtítulos con IA (Android):** en el reproductor, *Subtítulos → ✨ Generar con IA* y elige el idioma del audio. El audio se transcribe en el equipo con Vosk, sin internet y sin enviar nada. Usa el motor ExoPlayer. La versión **IA** (`vibe-iptv-ia-armv7.apk` para TV, `vibe-iptv-ia-arm64.apk` para celular) trae el modelo de español; en la normal se descarga la primera vez (~40 MB). No traduce: escribe lo que se dice en el idioma del audio. Ajusta solo el volumen de la voz, muestra como máximo dos líneas y avisa *✨ Escuchando…* o *Sin audio para reconocer* cuando no hay texto.
+- **Subtítulos con Whisper (prueba, celulares de gama media-alta):** *Subtítulos → ✨ Whisper (prueba)* en español, inglés o detectar idioma. Reconoce mucho mejor que Vosk (whisper.cpp con el modelo *base*, ~57 MB que se descargan la primera vez, sin internet después). Para que los subtítulos no lleguen tarde, el video empieza **unos 8 segundos después**: ese tiempo Whisper ya va transcribiendo el audio que viene. Requiere un teléfono de 64 bits con procesador ARMv8.2 o superior y 4 GB de RAM; si el equipo no cumple, la opción dice por qué.
+- **Temas:** Ajustes → Apariencia → *Tema*: Claro, Oscuro, Mosaicos, Ondas o Personalizado. En el personalizado eliges base, colores de fondo y acento (en hexadecimal), estilo del fondo, imagen de fondo, mosaicos translúcidos y esquinas rectas; *Exportar tema* lo guarda en un archivo .json (con la imagen) para usarlo en otro equipo o compartirlo, y *Importar tema* lo carga. En **Ondas** con pantalla táctil: desliza arriba/abajo para recorrer la lista, a los lados para cambiar de columna (o volver) y un toque abre.
 - **SubDL:** pega tu clave gratuita en Ajustes → Subtítulos y usa *Probar la clave de SubDL*. La búsqueda usa el código IMDb del título y, en series, baja sólo el episodio aunque el subtítulo venga en un paquete de temporada.
 
 ## Versión de vista previa (artefacto)
