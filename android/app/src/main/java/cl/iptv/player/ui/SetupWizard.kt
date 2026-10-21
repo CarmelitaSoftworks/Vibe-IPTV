@@ -171,7 +171,7 @@ private fun SetupFrame(
             if (!sub.isNullOrBlank()) Text(sub, color = c.inkSoft, fontWeight = FontWeight.SemiBold, fontSize = if (narrow) 15.sp else 18.sp,
                 lineHeight = if (narrow) 21.sp else 26.sp, modifier = Modifier.padding(top = 10.dp))
             if (body != null) Column(Modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally) { body(narrow, first) }
+                horizontalAlignment = Alignment.CenterHorizontally) { this.body(narrow, first) }
             if (back != null || next != null) {
                 Row(Modifier.fillMaxWidth().padding(top = 28.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (back != null) Pill("‹ " + back.label, modifier = if (next == null && body == null) Modifier.focusRequester(nextFocus) else Modifier, onClick = back.onClick)
