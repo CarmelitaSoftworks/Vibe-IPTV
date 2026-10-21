@@ -182,8 +182,9 @@ fun PlayerScreen(vm: AppViewModel) {
             if (vm.bumpBuffer(it0)) bumpTick.value++
         }
     }
-    val aiOn = vm.aiSubs != null
-    val player = remember(bufLevel, live, aiOn) {
+    val whisperOn = vm.whisperLang != null
+    val aiOn = vm.aiSubs != null || whisperOn
+    val player = remember(bufLevel, live, aiOn, whisperOn) {
         // Búfer medido en segundos (no en megas: con canales 1080p pesados el límite en megas lo dejaba en pocos
         // segundos) y velocidad fija en directo: evita cortes y saltos hacia adelante
         val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -204,6 +205,8 @@ fun PlayerScreen(vm: AppViewModel) {
                     .setAudioProcessors(arrayOf(androidx.media3.exoplayer.audio.TeeAudioProcessor(vm.captioner.sink)))
                     .apply { if (aiOn) @Suppress("DEPRECATION") setAudioCapabilities(androidx.media3.exoplayer.audio.AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES) }
                     .build()
+                    // Whisper: se juntan unos segundos de audio antes de sonar, para reconocerlo con adelanto
+                    .let { if (whisperOn) cl.iptv.player.data.DelayAudioSink(it, vm.whisper) else it }
         }
             .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
@@ -333,7 +336,7 @@ fun PlayerScreen(vm: AppViewModel) {
 
     // Subtítulos IA: necesitan ExoPlayer (es el motor que entrega el audio decodificado); se apagan al salir
     LaunchedEffect(vm.aiSubs, engine) {
-        if (vm.aiSubs != null && engine != "exo") { engineFor = item.id to "exo"; vm.message = "Subtítulos IA: usando el motor ExoPlayer" }
+        if ((vm.aiSubs != null || vm.whisperLang != null) && engine != "exo") { engineFor = item.id to "exo"; vm.message = "Subtítulos IA: usando el motor ExoPlayer" }
     }
     DisposableEffect(Unit) { onDispose { vm.stopAiSubs() } }
 
@@ -687,6 +690,19 @@ fun PlayerScreen(vm: AppViewModel) {
                     }
                 },
         )
+        // Whisper: la frase que corresponde a lo que suena ahora
+        if (vm.whisperLang != null && !vm.mini) {
+            var tick by remember { mutableStateOf(0L) }
+            LaunchedEffect(Unit) { while (true) { delay(200); tick = System.currentTimeMillis() } }
+            val w = vm.whisper
+            val text = remember(tick) { w.textAt(w.positionUs) }
+            if (text.isNotBlank()) Text(
+                text, color = Color.White, fontSize = (22 * subtitleScale(vm.settings.subSize)).sp, fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = (28 * subtitleScale(vm.settings.subSize)).sp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (controls) 150.dp else 40.dp, start = 40.dp, end = 40.dp)
+                    .clip(RoundedCornerShape(10.dp)).background(Color(0xA6000000)).padding(horizontal = 14.dp, vertical = 6.dp),
+            )
+        }
         // Subtítulos IA en vivo (últimas dos frases + lo que se está oyendo)
         if (vm.aiSubs != null && !vm.mini) {
             val cap = vm.captioner
@@ -835,6 +851,18 @@ fun PlayerScreen(vm: AppViewModel) {
                     tracks.forEach { t -> add(PanelRow(t.label, t.selected) { k?.selectSubtitle(t.id); panel = null }) }
                     add(PanelRow("Buscar subtítulos…", detail = "OpenSubtitles · SubDL · Podnapisi") { panel = null; showSubs = true })
                     // Generados con IA en el equipo (Vosk): transcribe el audio en su idioma, sin internet
+                    // Whisper (prueba): mejor calidad, sólo teléfonos de gama media-alta
+                    if (vm.whisperLang != null) add(PanelRow("✨ Desactivar Whisper", true, "Prueba · reconociendo con adelanto") { vm.stopWhisper(); panel = null })
+                    else {
+                        val why = vm.whisperUnavailable()
+                        listOf("es" to "Español", "en" to "Inglés", "auto" to "Detectar idioma").forEach { (l, n) ->
+                            add(PanelRow("✨ Whisper (prueba) · $n", false,
+                                why ?: (if (cl.iptv.player.data.WhisperModel.ready(ctx)) "Mejor calidad · sin internet"
+                                else "Mejor calidad · descarga el modelo la 1.ª vez (~${cl.iptv.player.data.WhisperModel.SIZE_MB} MB)")) {
+                                panel = null; vm.startWhisper(l)
+                            })
+                        }
+                    }
                     if (vm.aiSubs != null) add(PanelRow("✨ Desactivar subtítulos IA", true, "Generando en ${cl.iptv.player.data.VoskModels.names[vm.aiSubs] ?: ""}") { vm.stopAiSubs(); panel = null })
                     else listOf("es", "en", "pt").forEach { l ->
                         add(PanelRow("✨ Generar con IA · audio en ${cl.iptv.player.data.VoskModels.names[l]}", false,

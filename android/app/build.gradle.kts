@@ -18,6 +18,7 @@ android {
         val build = (System.getenv("VIBE_BUILD") ?: "1").toIntOrNull() ?: 1
         versionCode = build
         versionName = "0.1.$build"
+        externalNativeBuild { cmake { arguments += listOf("-DANDROID_STL=c++_static") } }
     }
 
     // Firma fija: la misma clave en cada versión permite actualizar encima sin perder listas ni ajustes.
@@ -72,6 +73,9 @@ android {
     }
 
     // VLC y MPV traen la misma librería de C++: se usa una sola copia
+    // Subtítulos con Whisper (prueba): whisper.cpp se compila para arm64-v8a; en las demás arquitecturas, un sustituto
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
+
     packaging {
         jniLibs { pickFirsts += setOf("**/libc++_shared.so") }
     }

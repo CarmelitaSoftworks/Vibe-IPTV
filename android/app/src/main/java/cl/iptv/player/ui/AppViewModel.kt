@@ -859,6 +859,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun startAiSubs(lang: String) {
         if (aiPreparing) return
         aiPreparing = true
+        stopWhisper()
         viewModelScope.launch {
             val app = getApplication<Application>()
             runCatching { VoskModels.prepare(app, lang) { msg -> viewModelScope.launch { message = msg } } }
@@ -873,6 +874,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     fun stopAiSubs() { captioner.stop(); aiSubs = null }
+
+    // ---------- Subtítulos con Whisper (prueba, teléfonos de gama media-alta) ----------
+    val whisper = WhisperCaptioner()
+    /** Idioma de Whisper ("auto" = detectar) o null si está apagado. */
+    var whisperLang by mutableStateOf<String?>(null); private set
+    fun whisperUnavailable(): String? = WhisperModel.unavailableReason(getApplication())
+    fun startWhisper(lang: String) {
+        if (aiPreparing) return
+        whisperUnavailable()?.let { message = "Whisper: $it"; return }
+        aiPreparing = true
+        stopAiSubs()
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            runCatching { WhisperModel.prepare(app) { msg -> viewModelScope.launch { message = msg } } }
+                .onSuccess { f ->
+                    whisper.start(f, lang) { err -> viewModelScope.launch { whisperLang = null; message = "Whisper: $err" } }
+                    whisperLang = lang
+                    message = "Whisper (prueba): el video empieza unos segundos después para que los subtítulos lleguen a tiempo"
+                    logEvent("Whisper activado ($lang)")
+                }
+                .onFailure { message = "No se pudo preparar Whisper: ${it.message}" }
+            aiPreparing = false
+        }
+    }
+    fun stopWhisper() { whisper.stop(); whisperLang = null }
 
     // ---------- Temas: imagen de fondo y temas del usuario (exportar / importar) ----------
     // Un nombre nuevo por imagen: así la pantalla la vuelve a cargar al cambiarla
