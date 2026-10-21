@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -75,6 +76,8 @@ fun MetroScreen(vm: AppViewModel) {
         Column(Modifier.fillMaxSize()) {
             // Pestañas
             Row(Modifier.fillMaxWidth().padding(start = side - 14.dp, top = if (compact) 10.dp else 34.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                // En un teléfono las pestañas no caben: se deslizan de lado (antes quedaban cortadas)
+                Row(Modifier.weight(1f).horizontalScroll(androidx.compose.foundation.rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                 TABS.forEachIndexed { i, t ->
                     val src = remember { MutableInteractionSource() }
                     val focused by src.collectIsFocusedAsState()
@@ -88,7 +91,7 @@ fun MetroScreen(vm: AppViewModel) {
                             .clickable(src, null) { goTab(i) }.padding(horizontal = 14.dp, vertical = 4.dp),
                     )
                 }
-                Spacer(Modifier.weight(1f))
+                }
                 Box(Modifier.size(36.dp).clip(RoundedCornerShape(3.dp)).background(c.accent), contentAlignment = Alignment.Center) {
                     TIconView(TIcon.PROFILE, Color.White, Modifier.size(24.dp))
                 }

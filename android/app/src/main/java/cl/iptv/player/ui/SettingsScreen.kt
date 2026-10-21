@@ -84,7 +84,9 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
         Section("look", "Apariencia", SecIcon.LOOK, listOf(
             Row.Choice("Idioma", "Idioma de la app", listOf("auto" to "Automático (idioma del sistema)", "es" to "Español", "en" to "English"), get = { it.lang }, set = { s, v -> s.copy(lang = v) }),
             Row.Choice("Tema", options = listOf("light" to "Claro", "dark" to "Oscuro", "system" to "Según el sistema",
-                "metro" to "Mosaicos (gris y verde, esquinas rectas)", "wave" to "Ondas (violeta)", "custom" to "Personalizado"),
+                "metro" to "Mosaicos (gris y verde, esquinas rectas)", "wave" to "Ondas (violeta)",
+                "pulse" to "Pulso (estilo consola: mosaicos redondeados, verde)", "horizon" to "Horizonte (estilo consola: fila de íconos y fondo grande)",
+                "custom" to "Personalizado"),
                 get = { it.theme }, set = { s, v -> s.copy(theme = v) }),
             Row.Choice("Personalizado: base", "Cualquier opción \"Personalizado\" activa ese tema", listOf("dark" to "Oscura", "light" to "Clara"),
                 get = { (ctGet(it, "base") as? String) ?: "dark" }, set = { s, v -> ctSet(s, "base", v) }),

@@ -64,5 +64,9 @@ class ThemeSmokeTest {
 
     @Test fun guia() = abrir("light") { GuideScreen(it) }
 
+    @Test fun pulso() = abrir("pulse", recorrer = { vm -> for (t in 0..5) { vm.shell.tab = t; idle() } }) { PulseScreen(it) }
+
+    @Test fun horizonte() = abrir("horizon", recorrer = { vm -> for (t in 0..5) { vm.shell.tab = t; idle() } }) { HorizonScreen(it) }
+
     @Test fun asistenteDePrimerInicio() = abrir("light") { SetupWizard(it) }
 }
