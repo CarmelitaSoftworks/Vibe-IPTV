@@ -150,6 +150,7 @@ class WhisperCaptioner {
         val step = rate / 16_000.0
         var pos = frac
         while (pos < frames) {
+            if (filled >= MAX_WINDOW) filled = 0                    // por si se borró a mitad (al apagar Whisper)
             if (filled == 0) windowStartUs = ptsUs + (pos * 1_000_000.0 / rate).toLong()
             val from = pos.toInt(); val to = minOf(frames, maxOf(from + 1, (pos + step).toInt()))
             var sum = 0L

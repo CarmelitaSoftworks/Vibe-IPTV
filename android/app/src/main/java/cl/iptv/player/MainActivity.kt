@@ -89,6 +89,13 @@ class MainActivity : ComponentActivity() {
         intent.data?.let { vm.openLink(it) }
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Salir de la app con normalidad (Inicio, Atrás) también cuenta como inicio correcto: así abrir y salir
+        // rápido dos veces no deja la app en modo seguro sin motivo
+        cl.iptv.player.data.Arranque.listo(this)
+    }
+
     override fun onStart() {
         super.onStart()
         vm.onForeground()   // al abrir o volver a la app: guía al día
