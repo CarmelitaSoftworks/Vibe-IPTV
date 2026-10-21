@@ -96,6 +96,12 @@ function sections() {
       { type: 'danger', label: 'Borrar guías guardadas', desc: 'Se vuelven a descargar al abrir cada lista', run: async () => { await ctx.clearEpgCache(); ctx.toast('Guías guardadas borradas'); } },
       { type: 'danger', label: 'Borrar favoritos de esta lista', run: () => { if (!st.source) return ctx.toast('Abre una lista primero'); ctx.clearFavorites(); ctx.toast('Favoritos borrados'); } },
       { type: 'danger', label: 'Restablecer ajustes', desc: 'Vuelve a los valores de fábrica (no borra tus listas)', run: () => { store.resetSettings(); ctx.apply(); ctx.toast('Ajustes restablecidos'); renderAll(); } },
+      { type: 'danger', label: 'Borrar todo de este navegador', desc: 'Listas, cuentas, favoritos, guías y ajustes guardados aquí. La app queda como recién instalada', run: async () => {
+        if (!confirm('¿Borrar todas las listas y datos guardados en este navegador?')) return;
+        try { Object.keys(localStorage).filter((k) => k.startsWith('iptv.')).forEach((k) => localStorage.removeItem(k)); } catch {}
+        try { indexedDB.deleteDatabase('iptv'); } catch {}
+        location.reload();
+      } },
     ] },
     { id: 'about', name: 'Acerca de', rows: [
       { type: 'info', label: 'Vibe IPTV', value: () => 'Versión 1.0' },
