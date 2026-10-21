@@ -252,10 +252,10 @@ fun PlayerSidePanel(title: String, rows: List<PanelRow>, onClose: () -> Unit, mo
                     }
                     Column(Modifier.weight(1f)) {
                         Text(r.label, color = if (f) Color(0xFF1A1F23) else Color.White, fontWeight = if (r.selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            // Lista de canales: hasta 2 líneas; en los demás paneles el texto se muestra completo (sin "…")
-                            fontSize = 15.sp, maxLines = if (wide) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis, lineHeight = 19.sp)
+                            // Texto completo en todos los paneles (también la lista de canales): sin "…"
+                            fontSize = 15.sp, lineHeight = 19.sp)
                         if (r.detail.isNotBlank()) Text(r.detail, color = if (f) Color(0xFF5D666C) else Color.White.copy(alpha = 0.6f), fontSize = 12.sp,
-                            maxLines = if (wide) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+                            lineHeight = 16.sp)
                         if (r.progress >= 0f) Box(Modifier.padding(top = 4.dp).fillMaxWidth(0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.2f))) {
                             Box(Modifier.fillMaxWidth(r.progress).fillMaxHeight().background(c.accent))
                         }
