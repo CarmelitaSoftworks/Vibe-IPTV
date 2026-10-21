@@ -338,41 +338,47 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         recompute(true)
         loadJob = viewModelScope.launch {
             loading = "Cargando ${src.name}…"
+            val app = getApplication<Application>()
+            var epgUrl = src.epgUrl
+            val x = if (src.type == SourceType.XTREAM) XtreamClient(src.server, src.username, src.password, settings.liveFormat) else null
+            xtream = x
+            xtreamAccount = null
+            // 1) Lista guardada en el equipo: se muestra al instante, sin esperar al servidor
+            val cached = withContext(Dispatchers.IO) { ListCache.load(app, src.id) { s -> x?.restore(s) ?: s } }
+            if (cached != null) {
+                allItems = cached.items; applyParental()
+                if (epgUrl.isBlank()) epgUrl = cached.epgUrl
+                listReady(src)
+            }
+            // 2) Lista del servidor: en segundo plano si ya se ve la guardada (en equipos modestos, sólo si tiene más de 12 h)
+            val fresh = cached != null && lowEnd && System.currentTimeMillis() - cached.savedAt < 12 * 3600_000L
             try {
-                var epgUrl = src.epgUrl
-                if (src.type == SourceType.XTREAM) {
-                    val x = XtreamClient(src.server, src.username, src.password, settings.liveFormat)
-                    xtream = x
-                    x.login()
-                    x.workingBase?.takeIf { it != XtreamClient.normalize(src.server) }?.let { fixed ->
-                        val updated = src.copy(server = fixed)
-                        store.upsert(updated); sources = store.sources(); source = updated
-                        message = "Dirección corregida a $fixed"
+                if (!fresh) {
+                    if (cached != null) loading = null
+                    val loaded: List<Item>
+                    if (x != null) {
+                        x.login()
+                        xtreamAccount = x.account
+                        warnAccount(x.account)
+                        x.workingBase?.takeIf { it != XtreamClient.normalize(src.server) }?.let { fixed ->
+                            val updated = src.copy(server = fixed)
+                            store.upsert(updated); sources = store.sources(); source = updated
+                            message = "Dirección corregida a $fixed"
+                        }
+                        loaded = uniqueIds(x.loadAll().map { it.withCategory() })
+                        if (epgUrl.isBlank()) epgUrl = x.epgUrl()
+                    } else {
+                        val result = if (src.localFile) withContext(Dispatchers.IO) {
+                            store.localM3u(src.id).bufferedReader().use(M3uParser::parse)
+                        } else Http.stream(src.url) { it.bufferedReader().use(M3uParser::parse) }
+                        loaded = uniqueIds(result.items.map { it.withCategory() })
+                        if (epgUrl.isBlank()) epgUrl = result.epgUrl
                     }
-                    allItems = uniqueIds(x.loadAll().map { it.withCategory() }); applyParental()
-                    if (epgUrl.isBlank()) epgUrl = x.epgUrl()
-                } else {
-                    xtream = null
-                    val result = if (src.localFile) withContext(Dispatchers.IO) {
-                        store.localM3u(src.id).bufferedReader().use(M3uParser::parse)
-                    } else Http.stream(src.url) { it.bufferedReader().use(M3uParser::parse) }
-                    allItems = uniqueIds(result.items.map { it.withCategory() }); applyParental()
-                    if (epgUrl.isBlank()) epgUrl = result.epgUrl
-                }
-                val kinds = sectionsAvailable
-                section = if (section in kinds) section else kinds.firstOrNull() ?: Kind.LIVE
-                category = CAT_ALL; query = ""
-                recompute(true)
-                loading = null
-                publishTvHome()
-                // Abierto desde la pantalla de inicio de Android TV
-                pendingLink?.let { (sid, id) ->
-                    if (sid == src.id) { pendingLink = null; resumeLastChannel = false; playLinked(id) }
-                }
-                // Inicio de la app → "Último canal visto"
-                if (resumeLastChannel) {
-                    resumeLastChannel = false
-                    items.firstOrNull { it.id == store.lastItemId }?.let { activate(it, items.filter { i -> i.kind == it.kind }) }
+                    if (source?.id != src.id) return@launch
+                    allItems = loaded; applyParental()
+                    val epgForCache = epgUrl
+                    withContext(Dispatchers.IO) { runCatching { ListCache.save(app, src.id, loaded, epgForCache) { s -> x?.scrub(s) ?: s } } }
+                    if (cached == null) listReady(src) else { recompute(false); publishTvHome() }
                 }
                 // La guía guardada se carga después de la lista, no en paralelo: juntar ambas cargas
                 // agotaba la memoria en TV boxes y la app se cerraba al volver a abrirla
@@ -380,17 +386,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 refreshEpg(epgUrl)   // siempre al añadir la lista y al abrir la app
             } catch (e: Throwable) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                if (e is OutOfMemoryError) {
-                    allItems = emptyList(); items = emptyList(); epg = Epg.EMPTY
-                    logEvent("Sin memoria al cargar la lista")
-                    message = "La lista es demasiado grande para la memoria de este equipo. Activa el modo liviano o usa una lista más pequeña."
-                } else message = e.message ?: e.toString()
+                val why = if (e is OutOfMemoryError) "La lista es demasiado grande para la memoria de este equipo" else (e.message ?: e.toString())
+                if (e is OutOfMemoryError) logEvent("Sin memoria al cargar la lista")
+                if (cached != null) {
+                    // Sin conexión o servidor caído: se sigue usando la lista guardada
+                    message = "No se pudo actualizar la lista ($why). Se muestra la guardada."
+                    loadCachedEpg(src)
+                } else {
+                    if (e is OutOfMemoryError) { allItems = emptyList(); items = emptyList(); epg = Epg.EMPTY }
+                    message = if (e is OutOfMemoryError) "$why. Activa el modo liviano o usa una lista más pequeña." else why
+                }
                 loading = null
             }
             // La app siguió abierta tras cargar: el inicio fue correcto (se apaga el contador del modo seguro)
             kotlinx.coroutines.delay(8_000)
-            Arranque.listo(getApplication())
+            Arranque.listo(app)
         }
+    }
+
+    /** La lista ya está en memoria: secciones, enlaces de Android TV y "último canal visto". */
+    private fun listReady(src: Source) {
+        val kinds = sectionsAvailable
+        section = if (section in kinds) section else kinds.firstOrNull() ?: Kind.LIVE
+        category = CAT_ALL; query = ""
+        recompute(true)
+        loading = null
+        publishTvHome()
+        // Abierto desde la pantalla de inicio de Android TV
+        pendingLink?.let { (sid, id) ->
+            if (sid == src.id) { pendingLink = null; resumeLastChannel = false; playLinked(id) }
+        }
+        // Inicio de la app → "Último canal visto"
+        if (resumeLastChannel) {
+            resumeLastChannel = false
+            items.firstOrNull { it.id == store.lastItemId }?.let { activate(it, items.filter { i -> i.kind == it.kind }) }
+        }
+    }
+
+    /** Descarga de nuevo la lista activa (Ajustes → Listas y guía). */
+    fun refreshList() {
+        val src = source ?: run { message = "Abre una lista primero"; return }
+        ListCache.delete(getApplication(), src.id)
+        open(src)
+    }
+
+    // ---------- Cuenta Xtream: vencimiento y conexiones ----------
+    var xtreamAccount by mutableStateOf<XtreamClient.Account?>(null); private set
+    fun accountSummary(): String {
+        val a = xtreamAccount ?: return if (source?.type == SourceType.XTREAM) "Sin datos todavía" else "Sólo en listas Xtream"
+        val vence = a.expiresAt?.let { "vence el " + java.text.SimpleDateFormat("dd/MM/yyyy", localeOf("es", "CL")).format(java.util.Date(it)) } ?: "sin vencimiento"
+        val con = if (a.maxConnections > 0) " · ${a.activeConnections}/${a.maxConnections} conexiones" else ""
+        return (if (a.trial) "Prueba · " else "") + vence + con
+    }
+    private fun warnAccount(a: XtreamClient.Account?) {
+        val exp = a?.expiresAt ?: return
+        val days = ((exp - System.currentTimeMillis()) / 86_400_000L).toInt()
+        if (days in 0..7) message = if (days == 0) "Tu cuenta IPTV vence hoy" else "Tu cuenta IPTV vence en $days ${if (days == 1) "día" else "días"}"
+        else if (a.maxConnections > 0 && a.activeConnections >= a.maxConnections) message = "Tu cuenta ya usa todas sus conexiones (${a.maxConnections}): otro equipo podría cortar la señal"
     }
 
     /**
@@ -472,6 +524,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     s = s.copy(localFile = true, url = "")
                 }
+                ListCache.delete(getApplication(), s.id)
                 store.upsert(s)
                 sources = store.sources()
                 open(s)

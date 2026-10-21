@@ -47,6 +47,7 @@ class Storage(private val ctx: Context) {
     }
 
     fun remove(id: String) {
+        ListCache.delete(ctx, id)
         saveSources(sources().filterNot { it.id == id })
         prefs.edit().remove("favs_$id").apply()
         localM3u(id).delete()

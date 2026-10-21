@@ -73,6 +73,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
         )),
         Section("sources", "Listas y guía", SecIcon.SOURCES, listOf(
             Row.Action("Mis listas", value = { "${vm.sources.size} ${if (vm.sources.size == 1) "guardada" else "guardadas"}" }, arrow = true) { vm.showSettings = false; vm.showWelcome = true },
+            Row.Action("Actualizar lista ahora", "La lista se guarda en el equipo y se actualiza sola al abrir; esto la descarga de nuevo", value = { vm.loading ?: "" }) { vm.showSettings = false; vm.refreshList() },
+            Row.Info("Cuenta", vm.accountSummary()),
             Row.Action("Actualizar guía ahora", value = { vm.epgStatus.ifBlank { if (vm.source == null) "Abre una lista primero" else "Sin guía cargada" } }) { vm.refreshEpg() },
             Row.Choice("Actualización automática de la guía", "Además de al añadir una lista y al abrir la app",
                 listOf("4" to "Cada 4 horas", "12" to "Cada 12 horas", "24" to "Una vez al día", "0" to "Sólo al abrir la app"),

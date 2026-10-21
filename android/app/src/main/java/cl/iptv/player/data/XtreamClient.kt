@@ -61,6 +61,12 @@ class XtreamClient(server: String, private val user: String, private val pass: S
                 val status = ui.optString("status")
                 if (status.isNotBlank() && !status.equals("Active", true)) throw SecurityException("La cuenta está ${status.lowercase()}")
                 serverTz = o.optJSONObject("server_info")?.optString("timezone").orEmpty()
+                account = Account(
+                    expiresAt = ui.optString("exp_date").toLongOrNull()?.takeIf { it > 0 }?.times(1000),
+                    maxConnections = ui.optString("max_connections").toIntOrNull() ?: 0,
+                    activeConnections = ui.optString("active_cons").toIntOrNull() ?: 0,
+                    trial = ui.optString("is_trial") == "1",
+                )
                 workingBase = b
                 return
             } catch (e: SecurityException) {
@@ -81,6 +87,14 @@ class XtreamClient(server: String, private val user: String, private val pass: S
         null -> "No se pudo conectar con el servidor"
         else -> e.message ?: e.toString()
     }
+
+    /** Datos de la cuenta que entrega el servidor al iniciar sesión (vencimiento y conexiones). */
+    data class Account(val expiresAt: Long?, val maxConnections: Int, val activeConnections: Int, val trial: Boolean)
+    var account: Account? = null; private set
+
+    /** Para guardar la lista en disco sin el usuario ni la contraseña; [restore] los vuelve a poner al leerla. */
+    fun scrub(s: String) = s.replace("/$u/$p/", "/{xu}/{xp}/").replace("username=$u&password=$p", "username={xu}&password={xp}")
+    fun restore(s: String) = s.replace("/{xu}/{xp}/", "/$u/$p/").replace("username={xu}&password={xp}", "username=$u&password=$p")
 
     /** Zona horaria del servidor (para TV en diferido). */
     var serverTz: String = ""; private set
