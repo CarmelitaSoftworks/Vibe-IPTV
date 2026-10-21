@@ -166,32 +166,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         Perf.lite = lite
     }
 
-    init {
-        applyLite()
-        autoConfigure()
-        val last = sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull()
-        if (Arranque.seguro) {
-            // Se cerró dos veces seguidas al abrir: no cargar la última lista ni la guía guardada
-            showWelcome = true
-            logEvent("Inicio en modo seguro (cierres seguidos al abrir)")
-            message = "La app se cerró al abrir: se inició sin cargar la última lista. Si se repite: Ajustes → Acerca de → Enviar registro"
-        } else if (last != null && settings.startup != "welcome") {
-            // La lista se abre cuando la app ya está en pantalla (no durante el arranque): menos carga al iniciar
-            source = last; loading = "Iniciando…"
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(1_500)
-                if (source?.id == last.id && allItems.isEmpty()) open(last)
-            }
-        } else showWelcome = true
-        // Renovación periódica de la guía mientras la app está abierta
-        viewModelScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(10 * 60_000L)
-                val every = settings.epgEvery * 3600_000L   // 0 = sólo al abrir la app
-                if (every > 0 && source != null && epgUrls.isNotBlank() && System.currentTimeMillis() - epgAt > every) refreshEpg()
-            }
-        }
-    }
 
     companion object {
         const val EPG_ON_RETURN_MS = 30 * 60_000L
@@ -987,4 +961,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun subtitleDir() = File(getApplication<Application>().cacheDir, "subs")
+
+    // Al final de la clase a propósito: así todas las propiedades de arriba ya existen cuando corre.
+    // (Antes estaba en medio y open() usaba "recent", declarado más abajo y todavía nulo: la app se cerraba
+    // en cada inicio con una lista guardada.)
+    init {
+        applyLite()
+        autoConfigure()
+        val last = sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull()
+        if (Arranque.seguro) {
+            // Se cerró dos veces seguidas al abrir: no cargar la última lista ni la guía guardada
+            showWelcome = true
+            logEvent("Inicio en modo seguro (cierres seguidos al abrir)")
+            message = "La app se cerró al abrir: se inició sin cargar la última lista. Si se repite: Ajustes → Acerca de → Enviar registro"
+        } else if (last != null && settings.startup != "welcome") {
+            // La lista se abre cuando la app ya está en pantalla (no durante el arranque): menos carga al iniciar
+            source = last; loading = "Iniciando…"
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(1_500)
+                if (source?.id == last.id && allItems.isEmpty()) open(last)
+            }
+        } else showWelcome = true
+        // Renovación periódica de la guía mientras la app está abierta
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(10 * 60_000L)
+                val every = settings.epgEvery * 3600_000L   // 0 = sólo al abrir la app
+                if (every > 0 && source != null && epgUrls.isNotBlank() && System.currentTimeMillis() - epgAt > every) refreshEpg()
+            }
+        }
+    }
 }
