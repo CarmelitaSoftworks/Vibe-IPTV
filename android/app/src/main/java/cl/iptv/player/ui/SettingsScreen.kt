@@ -110,7 +110,7 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
                 listOf("fast" to "Rápido: cambia de canal antes", "balanced" to "Equilibrado (recomendado)", "stable" to "Estable: para proveedores que se cortan"),
                 get = { it.buffer }, set = { s, v -> s.copy(buffer = v) }),
             Row.Choice("Motor de reproducción", "VLC reproduce el audio AC-3 / MP2 y el video MPEG-2 de la TV de cable",
-                listOf("auto" to "Automático: ExoPlayer, y VLC o MPV si hace falta", "exo" to "ExoPlayer", "vlc" to "VLC siempre", "mpv" to "MPV siempre"),
+                listOf("auto" to "ExoPlayer (VLC o MPV sólo si un canal falla)", "exo" to "ExoPlayer", "vlc" to "VLC siempre", "mpv" to "MPV siempre"),
                 { it.engine }, { s, v -> s.copy(engine = v) }),
             Row.Choice("Formato de pantalla", options = listOf("fit" to "Ajustar", "fill" to "Rellenar", "stretch" to "Estirar", "zoom" to "Zoom"),
                 get = { it.aspect }, set = { s, v -> s.copy(aspect = v) }),

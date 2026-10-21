@@ -158,8 +158,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.hwConfigured = key
         updateSettings(settings.copy(lite = "auto", buffer = hw.buffer, animations = !hw.lite))
         logEvent("Equipo: ${hw.text()}")
-        message = "Equipo detectado: ${hw.name}" + (if (hw.lite) " · modo liviano activado" else "") +
-            (if (hw.liveEngine != null) " · TV en vivo con VLC" else "")
+        message = "Equipo detectado: ${hw.name}" + (if (hw.lite) " · modo liviano activado" else "")
     }
     var lite by mutableStateOf(false); private set
     fun applyLite() {
@@ -169,7 +168,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         applyLite()
-        hw.liveEngine?.let { preferLiveEngine = it }   // sin MPEG-2 por hardware: la TV de cable arranca directo con VLC
         autoConfigure()
         val last = sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull()
         if (Arranque.seguro) {
@@ -177,7 +175,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             showWelcome = true
             logEvent("Inicio en modo seguro (cierres seguidos al abrir)")
             message = "La app se cerró al abrir: se inició sin cargar la última lista. Si se repite: Ajustes → Acerca de → Enviar registro"
-        } else if (last != null && settings.startup != "welcome") open(last) else showWelcome = true
+        } else if (last != null && settings.startup != "welcome") {
+            // La lista se abre cuando la app ya está en pantalla (no durante el arranque): menos carga al iniciar
+            source = last; loading = "Iniciando…"
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(1_500)
+                if (source?.id == last.id && allItems.isEmpty()) open(last)
+            }
+        } else showWelcome = true
         // Renovación periódica de la guía mientras la app está abierta
         viewModelScope.launch {
             while (true) {
@@ -380,8 +385,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     withContext(Dispatchers.IO) { runCatching { ListCache.save(app, src.id, loaded, epgForCache) { s -> x?.scrub(s) ?: s } } }
                     if (cached == null) listReady(src) else { recompute(false); publishTvHome() }
                 }
-                // La guía guardada se carga después de la lista, no en paralelo: juntar ambas cargas
-                // agotaba la memoria en TV boxes y la app se cerraba al volver a abrirla
+                // La guía se carga unos segundos después de la lista, no en paralelo: juntar ambas cargas
+                // agotaba la memoria y la app se cerraba al volver a abrirla
+                kotlinx.coroutines.delay(4_000)
                 loadCachedEpg(src)
                 refreshEpg(epgUrl)   // siempre al añadir la lista y al abrir la app
             } catch (e: Throwable) {

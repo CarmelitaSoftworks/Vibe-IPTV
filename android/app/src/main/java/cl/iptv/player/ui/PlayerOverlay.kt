@@ -45,7 +45,18 @@ enum class PAction(val label: String) {
     LIST("Lista de canales"), AUDIO("Audio"), SUBS("Subtítulos"), QUALITY("Calidad"), ASPECT("Formato de pantalla"),
     SPEED("Velocidad"), ENGINE("Motor de reproducción"), INFO("Información técnica"), FAV("Favorito"), PIP("Imagen en imagen"),
     EXTERNAL("Abrir en la app VLC"), RECORD("Grabar"), LASTCH("Canal anterior"), SLEEP("Temporizador para dormir"),
-    MULTI("Multivista"),
+    MULTI("Multivista"), MORE("Más opciones"),
+}
+
+/** Opciones que van dentro de "Más opciones" (las de uso frecuente quedan a la vista en la barra). */
+fun moreActions(live: Boolean, hasList: Boolean, showQuality: Boolean): List<PAction> = buildList {
+    if (showQuality) add(PAction.QUALITY)
+    add(PAction.ASPECT)
+    if (!live) add(PAction.SPEED)
+    if (live && hasList) add(PAction.LASTCH)
+    if (live) add(PAction.RECORD)
+    if (live && hasList) add(PAction.MULTI)
+    add(PAction.PIP); add(PAction.SLEEP); add(PAction.ENGINE); add(PAction.INFO); add(PAction.EXTERNAL)
 }
 
 /** Íconos dibujados (líneas simples, como los del menú). */
@@ -84,6 +95,7 @@ fun PlayerIcon(a: PAction, tint: Color, modifier: Modifier = Modifier, on: Boole
             PAction.LASTCH -> { drawArc(tint, 200f, 250f, false, p(4f, 4f), Size(16f * s, 16f * s), style = Stroke(w, cap = StrokeCap.Round)); poly(true, 2.5f, 8.5f, 7.5f, 9.5f, 4f, 13.5f) }
             PAction.SLEEP -> { drawArc(tint, 60f, 250f, false, p(4f, 4f), Size(16f * s, 16f * s), style = Stroke(w, cap = StrokeCap.Round)); line(12f, 8f, 12f, 12f, 15f, 14f) }
             PAction.MULTI -> { rect(3f, 5f, 8.2f, 6.2f, 1.5f); rect(12.8f, 5f, 8.2f, 6.2f, 1.5f); rect(3f, 12.8f, 8.2f, 6.2f, 1.5f); rect(12.8f, 12.8f, 8.2f, 6.2f, 1.5f) }
+            PAction.MORE -> listOf(5f, 12f, 19f).forEach { x -> drawCircle(tint, 2f * s, p(x, 12f)) }
         }
     }
 }
@@ -176,16 +188,12 @@ fun PlayerControlsBar(
             if (hasList) CtlButton(PAction.NEXT, onFocused = focused) { onAction(PAction.NEXT) }
             Spacer(Modifier.width(12.dp))
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.End) {
+                // A la vista sólo lo más usado; el resto en "Más opciones"
                 val extra = buildList {
                     if (hasList) add(PAction.LIST)
-                    add(PAction.AUDIO); add(PAction.SUBS)
-                    if (showQuality) add(PAction.QUALITY)
-                    add(PAction.ASPECT)
-                    if (!live) add(PAction.SPEED)
-                    if (live) add(PAction.RECORD)
-                    if (live && hasList) { add(PAction.LASTCH); add(PAction.MULTI) }
-                    add(PAction.SLEEP)
-                    add(PAction.ENGINE); add(PAction.INFO); add(PAction.FAV); add(PAction.PIP); add(PAction.EXTERNAL)
+                    add(PAction.AUDIO); add(PAction.SUBS); add(PAction.FAV)
+                    if (recording) add(PAction.RECORD)      // grabando: el botón para detenerla queda visible
+                    add(PAction.MORE)
                 }
                 extra.forEach { a -> CtlButton(a, on = (a == PAction.FAV && fav) || (a == PAction.RECORD && recording), onFocused = focused) { onAction(a) } }
             }

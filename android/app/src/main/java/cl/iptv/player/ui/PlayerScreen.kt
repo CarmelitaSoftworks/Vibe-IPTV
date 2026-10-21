@@ -131,11 +131,11 @@ fun PlayerScreen(vm: AppViewModel) {
     val playUrl = if (altFor == item.id) altFormat(item.url) ?: item.url else item.url
     val currentItem by rememberUpdatedState(item)
     // Motor: "exo" (ExoPlayer), "vlc" o "mpv". engineFor = (id del elemento, motor) cuando se cambió para este canal.
-    // En automático: ExoPlayer → VLC → MPV, y los siguientes canales en vivo parten con el último motor que funcionó.
+    // En automático cada canal parte con ExoPlayer; VLC y luego MPV sólo si ese canal falla.
     var engineFor by remember { mutableStateOf<Pair<String, String>?>(null) }
     val defaultEngine = when (vm.settings.engine) {
         "vlc", "mpv", "exo" -> vm.settings.engine
-        else -> if (item.kind == Kind.LIVE) vm.preferLiveEngine ?: "exo" else "exo"
+        else -> "exo"
     }
     val engine = engineFor?.takeIf { it.first == item.id }?.second ?: defaultEngine
     val useAlt = engine != "exo"          // motor alternativo (VLC o MPV) en vez de ExoPlayer
@@ -148,7 +148,6 @@ fun PlayerScreen(vm: AppViewModel) {
         val it0 = currentItem
         if (engineFor?.first == it0.id && engineFor?.second == to) return
         engineFor = it0.id to to
-        if (it0.kind == Kind.LIVE) vm.preferLiveEngine = to
         vm.logEvent("Cambio de motor → $to (${it0.name}): $reason")
         vm.message = reason
     }
@@ -860,6 +859,10 @@ fun PlayerScreen(vm: AppViewModel) {
                     val left = if (vm.sleepAt > 0) ((vm.sleepAt - now) / 60_000 + 1) else 0
                     PanelRow(if (m == 0) "Desactivado" else "$m min", if (m == 0) vm.sleepAt == 0L else false,
                         if (m == 0 && vm.sleepAt > 0) "Quedan $left min" else "") { vm.setSleep(m); panel = null }
+                }
+                PAction.MORE -> moreActions(live, vm.playList.size > 1, !useAlt && exo.qualities().isNotEmpty()).map { a ->
+                    val rec = a == PAction.RECORD && vm.recording?.item?.id == item.id
+                    PanelRow(if (rec) "Detener grabación" else a.label, selected = rec) { panel = null; onAction(a) }
                 }
                 PAction.INFO -> (listOf("Motor" to engineName[engine].orEmpty()) + k?.info().orEmpty() +
                     listOfNotNull(Uri.parse(playUrl).host?.let { "Servidor del canal" to it })).map { (l, v) -> PanelRow(l, detail = v) {} }
