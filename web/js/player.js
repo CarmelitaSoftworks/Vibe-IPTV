@@ -148,7 +148,9 @@ export class Player {
   watchSilentAudio(item, token, live) {
     clearTimeout(this.silentTimer);
     const v = this.video;
-    if (!('webkitAudioDecodedByteCount' in v)) return;
+    // Safari (iPhone/iPad) no cuenta el audio decodificado en HLS nativo: siempre marca 0 y la app
+    // reiniciaba el canal para "convertirlo" cada pocos segundos (parecía que nunca terminaba de cargar)
+    if (IOS || !('webkitAudioDecodedByteCount' in v)) return;
     this.silentTimer = setTimeout(async () => {
       if (token !== this.token || v.paused || v.webkitAudioDecodedByteCount > 0 || v.currentTime < 2) return;
       this.onStatus('El audio del canal no es compatible: convirtiendo…');
@@ -164,7 +166,8 @@ export class Player {
       let settled = false;
       const ok = () => { if (!settled) { settled = true; cleanup(); this.onInfo(); resolve(); } };
       const fail = (msg) => { if (!settled) { settled = true; cleanup(); reject(new Error(msg)); } };
-      const timer = setTimeout(() => fail('Tiempo de espera agotado'), 25000);
+      // La conversión a HLS para iPhone tarda más en entregar los primeros trozos
+      const timer = setTimeout(() => fail('Tiempo de espera agotado'), /iPhone/.test(kindOverride || '') ? 50000 : 25000);
       const onPlaying = () => ok();
       const onErr = () => fail('Formato no soportado o error de red');
       const cleanup = () => { clearTimeout(timer); v.removeEventListener('playing', onPlaying); v.removeEventListener('error', onErr); };

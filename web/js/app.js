@@ -847,6 +847,8 @@ function closeSheets(restore = true) {
 
 /* ---------- reproductor ---------- */
 const video = $('video');
+// iPhone / iPad: controles adaptados (zonas seguras, botones táctiles, sin lo que iOS no permite)
+if (IOS) document.documentElement.classList.add('ios');
 // iPhone: si el video empezó en silencio (Safari bloquea el sonido sin un toque), un toque lo activa
 if (IOS) document.addEventListener('pointerup', () => { if (video.dataset.autoMuted === '1') { delete video.dataset.autoMuted; video.muted = false; } }, { capture: true });
 const player = new Player(video, {

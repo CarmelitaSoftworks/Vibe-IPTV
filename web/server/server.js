@@ -371,7 +371,7 @@ async function handleTranscode(req, res, reqUrl) {
 // ---- Conversión a HLS para iPhone y iPad ----
 // Safari en iOS no reproduce MPEG-TS directo (no tiene MediaSource en iPhone): ffmpeg lo pasa a HLS en
 // trozos de 2 s, que Safari reproduce de forma nativa. Una sesión a la vez; se apaga sola si nadie la pide.
-let hlsSession = null;   // { id, dir, ff, last }
+let hlsSession = null;   // { id, key, dir, ff, last, exited }
 const HLS_ROOT = path.join(os.tmpdir(), 'vibe-hls');
 function stopHls() {
   if (!hlsSession) return;
@@ -380,6 +380,19 @@ function stopHls() {
   fs.rm(s.dir, { recursive: true, force: true }, () => {});
 }
 setInterval(() => { if (hlsSession && Date.now() - hlsSession.last > 45000) stopHls(); }, 10000).unref();
+
+/** Lista HLS con las rutas completas de los trozos: así se puede servir en la misma dirección de inicio. */
+function sessionPlaylist(s) {
+  try {
+    const text = fs.readFileSync(path.join(s.dir, 'index.m3u8'), 'utf8');
+    return text.replace(/^(s\d{5}\.ts)\s*$/gm, `/proxy/hls/${s.id}/$1`);
+  } catch { return ''; }
+}
+
+function sendPlaylist(res, s, what) {
+  res.writeHead(200, { ...CORS, 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store', ...(what ? { 'X-Transcode': encodeURIComponent(what) } : {}) });
+  res.end(sessionPlaylist(s));
+}
 
 function countSegments(file) {
   try { return (fs.readFileSync(file, 'utf8').match(/\.ts\s*$/gm) || []).length; } catch { return 0; }
@@ -393,6 +406,16 @@ async function handleHlsStart(req, res, reqUrl) {
   const target = reqUrl.searchParams.get('url');
   if (!target) { res.writeHead(400, CORS); return res.end('Falta ?url='); }
   const live = reqUrl.searchParams.get('live') !== '0';
+  // Safari vuelve a pedir esta misma dirección cada pocos segundos para actualizar la lista en vivo:
+  // si ya hay una conversión de este canal, se entrega su lista (antes se reiniciaba ffmpeg cada vez
+  // y el video se quedaba cargando para siempre)
+  const key = ['url', 'live', 'ua', 'ref', 'q', 'mode'].map((k) => reqUrl.searchParams.get(k) || '').join('|');
+  if (hlsSession && hlsSession.key === key && !hlsSession.exited) {
+    hlsSession.last = Date.now();
+    const s = hlsSession, t0 = Date.now();
+    while (!countSegments(path.join(s.dir, 'index.m3u8')) && hlsSession === s && Date.now() - t0 < 25000) await new Promise((r) => setTimeout(r, 250));
+    if (hlsSession === s && countSegments(path.join(s.dir, 'index.m3u8'))) return sendPlaylist(res, s);
+  }
   stopHls();
   if (currentFfmpeg) { try { currentFfmpeg.kill('SIGKILL'); } catch {} currentFfmpeg = null; }
   const { args, what, vcopy } = await ffmpegArgs(target, reqUrl);
@@ -413,8 +436,9 @@ async function handleHlsStart(req, res, reqUrl) {
   const ff = spawn(FFMPEG, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   let errText = '', exited = false;
   ff.stderr.on('data', (d) => { errText = (errText + d).slice(-600); });
-  ff.on('close', () => { exited = true; });
-  hlsSession = { id, dir, ff, last: Date.now() };
+  hlsSession = { id, key, dir, ff, last: Date.now(), exited: false };
+  const session = hlsSession;
+  ff.on('close', () => { exited = true; session.exited = !live ? false : true; });
   // Esperar a que haya al menos 2 trozos listos (o el primero, si ffmpeg ya terminó: archivo corto)
   const t0 = Date.now();
   while (Date.now() - t0 < 25000) {
@@ -429,8 +453,7 @@ async function handleHlsStart(req, res, reqUrl) {
     res.writeHead(502, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8', 'X-Proxy-Error': encodeURIComponent(why) });
     return res.end(why);
   }
-  res.writeHead(302, { ...CORS, Location: `/proxy/hls/${id}/index.m3u8`, 'Cache-Control': 'no-store', 'X-Transcode': encodeURIComponent(what) });
-  res.end();
+  sendPlaylist(res, session, what);
 }
 
 function handleHlsFile(req, res, reqUrl) {
