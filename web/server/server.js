@@ -336,7 +336,7 @@ async function ffmpegArgs(target, reqUrl) {
   ]));
   args.push(...(acopy ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '160k', '-ac', '2']));
   const what = codecs ? `${[...codecs.video, ...codecs.audio].join('+')} → ${vcopy ? 'video copiado' : 'H.264'} / ${acopy ? 'audio copiado' : 'AAC'}` : 'conversión completa';
-  return { args, what };
+  return { args, what, vcopy };
 }
 
 async function handleTranscode(req, res, reqUrl) {
@@ -395,13 +395,17 @@ async function handleHlsStart(req, res, reqUrl) {
   const live = reqUrl.searchParams.get('live') !== '0';
   stopHls();
   if (currentFfmpeg) { try { currentFfmpeg.kill('SIGKILL'); } catch {} currentFfmpeg = null; }
-  const { args, what } = await ffmpegArgs(target, reqUrl);
+  const { args, what, vcopy } = await ffmpegArgs(target, reqUrl);
   const id = crypto.randomBytes(8).toString('hex');
   const dir = path.join(HLS_ROOT, id);
   fs.mkdirSync(dir, { recursive: true });
   const index = path.join(dir, 'index.m3u8');
-  args.push('-f', 'hls', '-hls_time', '2', '-hls_segment_filename', path.join(dir, 's%05d.ts'));
-  if (live) args.push('-hls_list_size', '8', '-hls_flags', 'delete_segments+independent_segments');
+  // Video copiado: los trozos se cortan en los cuadros clave del canal (cada 2-5 s); con trozos de 2 s
+  // la duración máxima cambiaba a mitad de la lista y Safari se quedaba cargando. Convertido: cuadro clave cada 2 s.
+  if (!vcopy) args.push('-force_key_frames', 'expr:gte(t,n_forced*2)');
+  args.push('-f', 'hls', '-hls_time', vcopy ? '4' : '2', '-hls_segment_filename', path.join(dir, 's%05d.ts'));
+  // En vivo: la lista guarda unos 30 s y los trozos viejos se borran con margen (Safari a veces los pide tarde)
+  if (live) args.push('-hls_list_size', vcopy ? '8' : '15', '-hls_delete_threshold', '6', '-hls_flags', 'delete_segments+independent_segments+omit_endlist');
   else args.push('-hls_list_size', '0', '-hls_playlist_type', 'event', '-hls_flags', 'independent_segments');
   args.push(index);
   let host = ''; try { host = new URL(target).host; } catch {}

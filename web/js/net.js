@@ -1,6 +1,10 @@
 // Red: decide cuándo pasar por el proxy local (CORS / contenido mixto http en página https)
 import { getSettings } from './storage.js';
 
+/** iPhone o iPad (el iPad moderno se presenta como Mac con pantalla táctil). */
+export const IOS = typeof navigator !== 'undefined' &&
+  (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
 export function proxyBase() {
   const s = getSettings();
   if (s.proxyUrl) return s.proxyUrl.replace(/\/+$/, '');
@@ -32,7 +36,9 @@ export function candidates(url, item = {}) {
   const mode = getSettings().proxyMode; // auto | always | never
   const hasProxy = !!proxyBase();
   if (!hasProxy || mode === 'never') return [url];
-  if (mode === 'always' || isMixed(url) || needsProxy.has(hostOf(url))) return [proxify(url, item)];
+  // iPhone/iPad: siempre por el proxy. Safari pide el video con CORS y casi ningún proveedor lo permite:
+  // en directo se quedaba cargando sin dar error hasta agotar el tiempo de espera.
+  if (mode === 'always' || IOS || isMixed(url) || needsProxy.has(hostOf(url))) return [proxify(url, item)];
   return [url, proxify(url, item)];
 }
 

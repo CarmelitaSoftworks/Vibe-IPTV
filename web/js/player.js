@@ -1,12 +1,10 @@
 // Reproductor: HLS (hls.js), MPEG-TS en vivo (mpegts.js), archivos (nativo) y,
 // si el formato no es compatible con el navegador, conversión al vuelo con ffmpeg
 // en el servidor local (MPEG-2 → H.264, AC-3/MP2 → AAC), habitual en canales de cable.
-import { candidates, markNeedsProxy, proxyBase } from './net.js';
+import { candidates, markNeedsProxy, proxyBase, IOS } from './net.js';
 import { getSettings } from './storage.js';
 
-/** iPhone o iPad (el iPad moderno se presenta como Mac con pantalla táctil). */
-export const IOS = typeof navigator !== 'undefined' &&
-  (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+export { IOS };
 
 function streamType(url) {
   const path = url.split('?')[0].toLowerCase();
