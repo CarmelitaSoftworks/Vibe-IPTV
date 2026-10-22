@@ -10,7 +10,7 @@ import * as store from './storage.js';
 import * as subs from './subtitles.js';
 import { demoM3U, demoEpg, DEMO_SOURCE } from './demo.js';
 import { readScreenshot } from './ocr.js';
-import { openGuide, openDetails, catchupUrl, exportBackup, importBackup, saveFile } from './extras.js';
+import { openGuide, catchupUrl, exportBackup, importBackup, saveFile } from './extras.js';
 
 // En la versión artefacto (vista previa en línea) se define __ARTIFACT__ al empaquetar
 const IS_ARTIFACT = typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__;
@@ -672,11 +672,9 @@ function updateFocusInfo(item) {
   $('fiEpg').textContent = extra;
 }
 
-async function activate(idx, skipDetails = false) {
+async function activate(idx) {
   const item = state.view[idx];
   if (!item) return;
-  // Películas: ficha antes de reproducir (Ajustes → Fichas)
-  if (item.kind === 'movie' && cfg().showDetails && !skipDetails && !String(item.id).startsWith('cu_')) return showDetailsFor(item, idx);
   if (item.kind === 'series') {
     loader(true, 'Cargando episodios…');
     try {
@@ -691,20 +689,7 @@ async function activate(idx, skipDetails = false) {
   openPlayer(item, state.view.filter((i) => i.kind === item.kind), state.view.filter((i) => i.kind === item.kind).indexOf(item));
 }
 
-/* ---------- fichas, guía en grilla, diferido y respaldo ---------- */
-function showDetailsFor(item, idx = state.view.indexOf(item)) {
-  const back = document.activeElement;
-  openDetails(item, {
-    xt: state.xt, tmdbKey: cfg().tmdbKey, lang: getLangCode(),
-    resume: item.kind !== 'series' ? state.resume?.[item.id] : null,
-    fav: () => state.favs.has(item.id),
-    toggleFav: () => toggleFavorite(item),
-    play: () => activate(idx, true),
-    playFromStart: () => { delete state.resume[item.id]; store.saveResume(state.source.id, state.resume); activate(idx, true); },
-    openEpisodes: () => { if (state.series !== item) activate(idx, true); },
-    fmtDur,
-  }, () => back?.focus?.());
-}
+/* ---------- guía en grilla, diferido y respaldo ---------- */
 const getLangCode = () => (document.documentElement.lang === 'en' ? 'en-US' : 'es-MX');
 
 function guideChannels() {
@@ -1474,7 +1459,6 @@ $('welcomeSettings').onclick = () => openSettings();
 $('btnCategories').onclick = () => state.source ? openSheet('catSheet') : showWelcome(true);
 $('btnSearch').onclick = () => openSheet('searchSheet');
 $('btnCrumbBack').onclick = () => closeSeries();
-$('btnCrumbInfo').onclick = () => { if (state.series) showDetailsFor(state.series); };
 $('backdrop').onclick = () => closeSheets();
 $('pgPrev').onclick = () => goPage(-1);
 $('pgNext').onclick = () => goPage(1);

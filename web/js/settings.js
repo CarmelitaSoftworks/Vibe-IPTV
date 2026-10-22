@@ -81,10 +81,6 @@ function sections() {
     { id: 'startup', name: 'Inicio de la app', rows: [
       { type: 'choice', key: 'startup', label: 'Al abrir la app', options: [['home', 'Inicio de la última lista'], ['welcome', 'Pantalla de mis listas'], ['lastChannel', 'Último canal visto']] },
     ] },
-    { id: 'meta', name: 'Fichas', rows: [
-      { type: 'toggle', key: 'showDetails', label: 'Mostrar la ficha de las películas', desc: 'Al elegir una película se ve su sinopsis antes de reproducir' },
-      { type: 'text', key: 'tmdbKey', label: 'Clave de TMDB (opcional)', desc: 'Gratis en themoviedb.org → Ajustes → API. Las cuentas Xtream ya traen fichas; la clave sirve para listas M3U.', secret: true },
-    ] },
     { id: 'parental', name: 'Control parental', rows: [
       { type: 'text', key: 'parentalPin', label: 'PIN de control parental', desc: '4 dígitos. Con PIN, las categorías para adultos (XXX, Adultos, +18…) quedan ocultas. Vacío = desactivado.', secret: true },
       { type: 'info', label: 'Contenido para adultos', value: () => { const s = st; return !store.getSettings().parentalPin ? 'Visible (sin PIN)' : s.adultUnlocked ? 'Desbloqueado' : `Oculto (${s.hiddenAdult || 0})`; } },

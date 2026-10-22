@@ -62,7 +62,7 @@ fun WaveScreen(vm: AppViewModel) {
     val col = cols[nav.col.coerceIn(0, cols.lastIndex)]
     val lite = cl.iptv.player.data.Perf.lite
 
-    LaunchedEffect(dialog, vm.details, vm.showGuide, vm.showSettings, vm.showWelcome) { if (dialog == null && vm.details == null) { delay(60); runCatching { focus.requestFocus() } } }
+    LaunchedEffect(dialog, vm.showGuide, vm.showSettings, vm.showWelcome) { if (dialog == null) { delay(60); runCatching { focus.requestFocus() } } }
     // Al pasar por una columna de contenido, la sección del menú es esa (categorías, búsqueda, favoritos)
     LaunchedEffect(nav.col) { col.kind?.let { k -> if (vm.section != k || nav.level == 0) { if (vm.series == null) vm.selectSection(k) } } }
 
@@ -114,7 +114,7 @@ fun WaveScreen(vm: AppViewModel) {
         nav.level == 1 -> { nav.level = 0; true }
         else -> false
     }
-    BackHandler(enabled = nav.level == 1 && dialog == null && vm.details == null) { goBack() }
+    BackHandler(enabled = nav.level == 1 && dialog == null) { goBack() }
 
     // Pantallas táctiles: deslizar arriba/abajo recorre la lista; a los lados cambia de columna (o vuelve).
     // Los gestos van en el contenedor (no en una capa encima): así los toques llegan a filas e íconos.
@@ -239,7 +239,6 @@ fun WaveScreen(vm: AppViewModel) {
         "search" -> SearchDialog(vm) { dialog = null; if (vm.query.isNotBlank()) nav.enter("Búsqueda: ${vm.query}") }
         "profiles" -> ProfilesDialog(vm) { dialog = null }
     }
-    vm.details?.let { DetailsScreen(vm, it) }
 }
 
 @Composable

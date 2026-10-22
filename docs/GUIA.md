@@ -148,9 +148,8 @@ En **TV en vivo**, el botón **📅 Guía** de la barra de categorías abre la g
 - **Seguir viendo:** películas y episodios continúan donde quedaste. Las carátulas muestran una barra de avance y hay un filtro **▶ Seguir viendo** en Películas y Series.
 - **Respaldo** (Android, Ajustes → Datos): **Exportar respaldo** guarda listas (con contraseñas), favoritos, Seguir viendo y ajustes en un archivo `.json`; **Importar respaldo** los restaura en otro equipo. Guárdalo en un lugar privado.
 
-## 12. Fichas, grabación, perfiles y tamaño de los controles
+## 12. Grabación, perfiles y tamaño de los controles
 
-- **Fichas:** al elegir una película se ve su ficha (sinopsis, año, puntuación, género, reparto) con **▶ Ver** o **▶ Continuar**. En series, el botón **ⓘ Ficha** junto a «Volver». Las cuentas Xtream ya traen fichas; para listas M3U agrega una clave gratuita de [TMDB](https://www.themoviedb.org/settings/api) en **Ajustes → Fichas** (ahí también puedes desactivar la ficha y reproducir directo).
 - **Grabación (Android):** en un canal en vivo, el botón **●** del reproductor graba en *Descargas/VibeIPTV* (archivo `.ts`, se abre con VLC). Mientras graba se ve «● REC» con el tiempo y el tamaño. Usa una conexión aparte: si tu cuenta admite una sola, la imagen puede cortarse. Mantén la app abierta mientras graba.
 - **Perfiles (Android):** en la pantalla de listas (botón 👤) o en **Ajustes → Control parental → Perfil**. Cada perfil tiene sus favoritos y su «Seguir viendo». Un perfil **infantil** nunca muestra contenido para adultos y, si hay PIN, salir de él lo pide.
 - **Tamaño de los controles del reproductor:** **Ajustes → Reproducción**, de 70 % a 150 % en Android y de 80 % a 140 % en la web. Útil en TV grandes o en celulares.

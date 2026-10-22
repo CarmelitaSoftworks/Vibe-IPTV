@@ -60,9 +60,9 @@ fun MetroScreen(vm: AppViewModel) {
         kindOf(t)?.let { k -> if (vm.section != k || vm.home) vm.selectSection(k) }
     }
     LaunchedEffect(Unit) { kindOf(nav.tab)?.let { k -> if (vm.section != k || vm.home) vm.selectSection(k) } }
-    LaunchedEffect(dialog, vm.details) { if (dialog == null && vm.details == null) { delay(80); runCatching { first.requestFocus() } } }
+    LaunchedEffect(dialog) { if (dialog == null) { delay(80); runCatching { first.requestFocus() } } }
 
-    BackHandler(enabled = dialog == null && vm.details == null && (vm.series != null || vm.category != CAT_ALL || vm.query.isNotBlank() || nav.tab != 0)) {
+    BackHandler(enabled = dialog == null && (vm.series != null || vm.category != CAT_ALL || vm.query.isNotBlank() || nav.tab != 0)) {
         when {
             vm.series != null || vm.query.isNotBlank() -> vm.back()
             vm.category != CAT_ALL -> vm.selectCategory(CAT_ALL)
@@ -183,7 +183,6 @@ fun MetroScreen(vm: AppViewModel) {
         "cats" -> CategoriesDialog(vm) { dialog = null }
         "profiles" -> ProfilesDialog(vm) { dialog = null }
     }
-    vm.details?.let { DetailsScreen(vm, it) }
 }
 
 @Composable

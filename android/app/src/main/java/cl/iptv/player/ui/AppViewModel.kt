@@ -690,21 +690,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun stopRecording() { recJob?.cancel(); recJob = null }
 
-    // ---------- Fichas ----------
-    var details by mutableStateOf<Item?>(null)
-    var detailsMeta by mutableStateOf<Meta?>(null); private set
-    var detailsLoading by mutableStateOf(false); private set
-    fun openDetails(item: Item) {
-        details = item; detailsMeta = null; detailsLoading = true
-        viewModelScope.launch {
-            detailsMeta = runCatching { Metadata.forItem(item, xtream, settings.tmdbKey, if (I18n.lang == "en") "en-US" else "es-MX") }.getOrNull()
-            detailsLoading = false
-        }
-    }
-    /** Elegir un mosaico: las películas muestran su ficha primero (Ajustes → Fichas). */
-    fun choose(item: Item) {
-        if (item.kind == Kind.MOVIE && settings.showDetails && !item.id.startsWith("cu_")) openDetails(item) else activate(item)
-    }
+    /** Elegir un mosaico: se reproduce directo (ya no hay pantalla de ficha). */
+    fun choose(item: Item) = activate(item)
     fun forgetResume(item: Item) {
         val src = source ?: return
         if (item.id in resume) { resume = resume - item.id; store.saveResume(src.id, resume) }
@@ -1004,7 +991,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mini = true; showSettings = false; returnFocusId = playing?.id
         if (!quiet) message = "Mini reproductor: tócalo (o Atrás en el Inicio) para volver a pantalla completa"
     }
-    fun expandMini() { mini = false; showSettings = false; showGuide = false; details = null }
+    fun expandMini() { mini = false; showSettings = false; showGuide = false }
     val menuVisible: Boolean get() = screen == Screen.MENU || mini
 
     fun closePlayer() {

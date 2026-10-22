@@ -654,23 +654,6 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 .g-prog:focus, .g-prog:hover { outline: none; background: #fff; border: 3px solid var(--focus); color: #1a1f23; z-index: 2; }
 .guide-more { height: 1px; }
 
-/* ===== Ficha de película / serie ===== */
-.details-view { position: fixed; inset: 0; z-index: 60; background: #101417; color: #fff; overflow: hidden; outline: none; }
-.d-back { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: .35; }
-.d-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(16,20,23,.95), rgba(16,20,23,.7) 55%, rgba(16,20,23,.25)); }
-.d-body { position: relative; display: flex; gap: clamp(18px, 3vw, 40px); height: 100%; padding: clamp(18px, 4vw, 48px); box-sizing: border-box; }
-.d-poster { height: 100%; max-height: 640px; aspect-ratio: 2/3; object-fit: cover; border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,.5); flex: none; }
-.d-text { flex: 1; min-width: 0; overflow: auto; }
-.d-text h2 { margin: 0 0 6px; font-size: clamp(24px, 3.4vw, 40px); font-weight: 800; line-height: 1.1; }
-.d-line { color: #3fd2ff; font-weight: 700; margin: 0 0 16px; }
-.d-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.d-plot { font-size: 16px; line-height: 1.55; opacity: .92; max-width: 760px; }
-.d-meta { font-size: 14px; opacity: .85; margin: 6px 0; }
-.d-muted { opacity: .7; }
-.d-source { font-size: 11px; opacity: .4; }
-.details-view .btn.ghost { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.25); }
-@media (max-width: 640px) { .d-body { flex-direction: column; overflow: auto; } .d-poster { height: 240px; align-self: center; } }
-
 /* Teclas numéricas, doble toque, multivista, organizar categorías */
 .pdigits { position: absolute; top: 28px; right: 28px; z-index: 6; background: #101417cc; color: #fff; font-size: 44px; font-weight: 800; padding: 6px 22px; border-radius: 14px; }
 .seek-flash { position: absolute; top: 50%; transform: translateY(-50%); z-index: 6; background: #0009; color: #fff; font-size: 22px; font-weight: 800; padding: 10px 18px; border-radius: 30px; pointer-events: none; }

@@ -88,7 +88,6 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Sin cuentas, sin anuncios y sin telemetría.** Tus listas, favoritos y ajustes se guardan solo en tu equipo ([política de privacidad](PRIVACIDAD.md)).
 - **Control parental:** con un PIN, las categorías para adultos quedan ocultas.
 - **Perfiles** (Android): favoritos y «Seguir viendo» por persona; el perfil infantil nunca muestra contenido para adultos.
-- **Fichas** de películas y series: sinopsis, año, puntuación, género y reparto (del servidor Xtream o de TMDB con una clave gratuita).
 - **Grabación** (Android): botón ● en el reproductor para guardar un canal en vivo en *Descargas/VibeIPTV*.
 - **Tamaño de los controles del reproductor** ajustable (Ajustes → Reproducción).
 - **Control remoto completo**: teclas numéricas para ir a un canal, **canal anterior**, y temporizador para dormir (15 a 120 min).

@@ -88,7 +88,6 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **No accounts, no ads and no telemetry.** Your lists, favorites and settings are stored only on your device ([privacy policy](PRIVACIDAD.md)).
 - **Parental control:** with a PIN, adult categories are hidden.
 - **Profiles** (Android): favorites and "Continue watching" per person; the kids profile never shows adult content.
-- **Info pages** for movies and series: synopsis, year, rating, genre and cast (from the Xtream server or TMDB with a free key).
 - **Recording** (Android): the ● button in the player saves a live channel to *Downloads/VibeIPTV*.
 - **Adjustable player controls size** (Settings → Playback).
 - **Full remote support**: number keys to jump to a channel, **previous channel**, and a sleep timer (15 to 120 min).

@@ -72,8 +72,8 @@ fun DeskScreen(vm: AppViewModel) {
     var start by remember { mutableStateOf(false) }
     var paneOpen by remember { mutableStateOf<Boolean?>(null) }
     BackHandler(enabled = start) { start = false }
-    LaunchedEffect(ctl.dialog, vm.details, tab, start) {
-        if (ctl.dialog == null && vm.details == null) { delay(80); runCatching { (if (start) startFirst else first).requestFocus() } }
+    LaunchedEffect(ctl.dialog, tab, start) {
+        if (ctl.dialog == null) { delay(80); runCatching { (if (start) startFirst else first).requestFocus() } }
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(XP_DESKTOP)) {

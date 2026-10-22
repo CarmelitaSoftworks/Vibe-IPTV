@@ -148,9 +148,8 @@ In **Live TV**, the **📅 Guide** button on the category bar opens the grid: ch
 - **Continue watching:** movies and episodes resume where you left off. Posters show a progress bar and there's a **▶ Continue watching** filter in Movies and Series.
 - **Backup** (Android, Settings → Data): **Export backup** saves lists (with passwords), favorites, Continue watching and settings to a `.json` file; **Import backup** restores them on another device. Keep it somewhere private.
 
-## 12. Info pages, recording, profiles and controls size
+## 12. Recording, profiles and controls size
 
-- **Info pages:** choosing a movie shows its info (synopsis, year, rating, genre, cast) with **▶ Play** or **▶ Resume**. For series, the **ⓘ Info** button next to "Back". Xtream accounts already include info; for M3U lists add a free [TMDB](https://www.themoviedb.org/settings/api) key in **Settings → Info pages** (where you can also turn the page off and play directly).
 - **Recording (Android):** on a live channel, the player's **●** button records to *Downloads/VibeIPTV* (`.ts` file, opens with VLC). While recording you see "● REC" with time and size. It uses a separate connection: if your account allows only one, the picture may drop. Keep the app open while recording.
 - **Profiles (Android):** on the lists screen (👤 button) or **Settings → Parental control → Profile**. Each profile has its own favorites and "Continue watching". A **kids** profile never shows adult content and, with a PIN, leaving it asks for the PIN.
 - **Player controls size:** **Settings → Playback**, 70 %–150 % on Android and 80 %–140 % on the web. Handy on large TVs or phones.

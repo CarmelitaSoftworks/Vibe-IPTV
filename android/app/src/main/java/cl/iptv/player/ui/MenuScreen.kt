@@ -114,7 +114,6 @@ fun MenuScreen(vm: AppViewModel) {
         MenuDialog.SEARCH -> SearchDialog(vm) { dialog = MenuDialog.NONE }
         MenuDialog.NONE -> Unit
     }
-    vm.details?.let { DetailsScreen(vm, it) }
 }
 
 
@@ -165,7 +164,6 @@ private fun TopBar(vm: AppViewModel, compact: Boolean, onSources: () -> Unit, on
         val series = vm.series
         if (series != null) {
             Pill("‹ Volver") { vm.back() }
-            Pill("ⓘ Ficha") { vm.openDetails(series) }
             Text(series.name, color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         } else {
             LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(3.dp)) {

@@ -80,7 +80,7 @@ internal class ConsoleCtl(val vm: AppViewModel) {
 internal fun rememberConsoleCtl(vm: AppViewModel): ConsoleCtl {
     val ctl = remember(vm) { ConsoleCtl(vm) }
     LaunchedEffect(Unit) { ckind(vm.shell.tab)?.let { k -> if (vm.section != k || vm.home) vm.selectSection(k) } }
-    BackHandler(enabled = ctl.dialog == null && vm.details == null &&
+    BackHandler(enabled = ctl.dialog == null &&
         (vm.series != null || vm.category != CAT_ALL || vm.query.isNotBlank() || vm.shell.tab != 0)) {
         when {
             vm.series != null || vm.query.isNotBlank() -> vm.back()
@@ -98,7 +98,6 @@ internal fun ConsoleDialogs(vm: AppViewModel, ctl: ConsoleCtl) {
         "cats" -> CategoriesDialog(vm) { ctl.dialog = null }
         "profiles" -> ProfilesDialog(vm) { ctl.dialog = null }
     }
-    vm.details?.let { DetailsScreen(vm, it) }
 }
 
 @Composable
@@ -141,7 +140,7 @@ fun PulseScreen(vm: AppViewModel) {
     val first = remember { FocusRequester() }
     val isTv = (androidx.compose.ui.platform.LocalContext.current as? cl.iptv.player.MainActivity)?.isTv == true
     var hero by remember { mutableStateOf<Item?>(null) }
-    LaunchedEffect(ctl.dialog, vm.details, tab) { if (ctl.dialog == null && vm.details == null) { delay(80); runCatching { first.requestFocus() } } }
+    LaunchedEffect(ctl.dialog, tab) { if (ctl.dialog == null) { delay(80); runCatching { first.requestFocus() } } }
 
     BoxWithConstraints(Modifier.fillMaxSize().themeBackground()) {
         val compact = maxHeight < 480.dp
@@ -367,7 +366,7 @@ fun HorizonScreen(vm: AppViewModel) {
     // Lo elegido queda siempre al comienzo de la fila (la fila se desplaza a la izquierda)
     LaunchedEffect(sel, entries.size) { if (entries.isNotEmpty()) runCatching { state.animateScrollToItem(sel.coerceIn(0, entries.lastIndex)) } }
     LaunchedEffect(tab, vm.category, vm.series?.id, vm.query) { runCatching { state.scrollToItem(0) } }
-    LaunchedEffect(ctl.dialog, vm.details, tab) { if (ctl.dialog == null && vm.details == null) { delay(80); runCatching { first.requestFocus() } } }
+    LaunchedEffect(ctl.dialog, tab) { if (ctl.dialog == null) { delay(80); runCatching { first.requestFocus() } } }
 
     BoxWithConstraints(Modifier.fillMaxSize().themeBackground()) {
         val compact = maxHeight < 480.dp

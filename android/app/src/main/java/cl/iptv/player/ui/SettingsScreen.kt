@@ -136,11 +136,6 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
         Section("startup", "Inicio de la app", SecIcon.STARTUP, listOf(
             Row.Choice("Al abrir la app", options = listOf("home" to "Inicio de la última lista", "welcome" to "Pantalla de mis listas", "lastChannel" to "Último canal visto"), get = { it.startup }, set = { s, v -> s.copy(startup = v) }),
         )),
-        Section("meta", "Fichas", SecIcon.ABOUT, listOf(
-            Row.Toggle("Mostrar la ficha de las películas", "Al elegir una película se ve su sinopsis antes de reproducir", get = { it.showDetails }, set = { s, v -> s.copy(showDetails = v) }),
-            Row.TextField("Clave de TMDB (opcional)", "Gratis en themoviedb.org → Ajustes → API. Las cuentas Xtream ya traen fichas; la clave sirve para listas M3U.",
-                secret = true, get = { it.tmdbKey }, set = { s, v -> s.copy(tmdbKey = v) }),
-        )),
         Section("parental", "Control parental", SecIcon.LOCK, listOf(
             Row.Action("Perfil", "Favoritos y Seguir viendo por persona; perfil infantil sin contenido para adultos",
                 value = { (if (vm.profile.kid) "🧒 " else "👤 ") + vm.profile.name }, arrow = true) { onProfiles() },
