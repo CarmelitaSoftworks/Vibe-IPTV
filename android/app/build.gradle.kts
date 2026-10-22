@@ -75,6 +75,7 @@ android {
     // VLC y MPV traen la misma librería de C++: se usa una sola copia
     // Subtítulos con Whisper (prueba): whisper.cpp se compila para arm64-v8a; en las demás arquitecturas, un sustituto
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
+    ndkVersion = "27.0.12077973"   // el mismo que instala el flujo de compilación
 
     packaging {
         jniLibs { pickFirsts += setOf("**/libc++_shared.so") }

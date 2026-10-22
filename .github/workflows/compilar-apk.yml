@@ -46,6 +46,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # NDK para Whisper: se instala aparte y con reintentos (a veces la descarga llega dañada y la compilación fallaba)
+      - name: NDK (Whisper)
+        run: |
+          for i in 1 2 3 4; do
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973" > /dev/null 2>&1 \
+              && [ -f "$ANDROID_HOME/ndk/27.0.12077973/source.properties" ] && break
+            echo "Reintento $i"; rm -rf "$ANDROID_HOME/ndk/27.0.12077973"; sleep 15
+          done
+
       - name: Modelo de voz para la versión IA (Vosk, español)
         run: |
           curl -fsSL -o "$RUNNER_TEMP/es.zip" https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip
