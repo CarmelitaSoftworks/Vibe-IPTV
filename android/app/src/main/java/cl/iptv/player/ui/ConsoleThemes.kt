@@ -51,10 +51,10 @@ import kotlinx.coroutines.delay
 
 /*
  * Dos temas al estilo de los menús de las consolas actuales (diseño propio: sin logos, nombres ni recursos de marcas).
- *  · Pulso (como PS5): pestañas de texto arriba, una fila de íconos que se desplaza a la izquierda, el elegido grande
+ *  · Pulso: pestañas de texto arriba, una fila de íconos que se desplaza a la izquierda, el elegido grande
  *    con su nombre al lado, su imagen de fondo a pantalla completa, su información y botones debajo y, en Inicio,
  *    tarjetas anchas de lo que se estaba viendo.
- *  · Horizonte (como Xbox Series): perfil y pestañas arriba, la imagen grande de lo enfocado con su nombre, filas de
+ *  · Horizonte: perfil y pestañas arriba, la imagen grande de lo enfocado con su nombre, filas de
  *    mosaicos de esquinas casi rectas (el primero ancho) con borde blanco grueso al enfocar, y una cuadrícula.
  * Funcionan con el control remoto (foco), el tacto y el mouse; todas las listas se desplazan solas hasta lo enfocado.
  */
@@ -122,6 +122,9 @@ internal fun ScaledForWide(content: @Composable () -> Unit) {
     }
 }
 
+/** Imagen que vale la pena poner de fondo: de internet o un archivo del equipo (las capturas de prueba usan archivos). */
+internal fun isImageUrl(s: String) = s.startsWith("http") || s.startsWith("file:")
+
 /** Un acceso de la pantalla de inicio o de Ajustes. */
 private class Shortcut(val label: String, val icon: TIcon, val onClick: () -> Unit)
 
@@ -143,7 +146,7 @@ private fun settingsShortcuts(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean) 
 )
 
 // ============================================================================================
-// Pulso (al estilo del menú de PS5)
+// Pulso
 // ============================================================================================
 
 /** Elemento de la fila de Pulso: contenido o acceso. */
@@ -188,7 +191,7 @@ fun PulseScreen(vm: AppViewModel) {
         val side = if (compact) 16.dp else 48.dp
         // Fondo: la imagen de lo elegido a pantalla completa, fundida hacia la izquierda y hacia abajo
         val img = cur?.image.orEmpty()
-        if (img.startsWith("http") && !Perf.lite) {
+        if (isImageUrl(img) && !Perf.lite) {
             AsyncImage(img, null, contentScale = if (cur?.item?.kind == Kind.LIVE) ContentScale.Fit else ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().then(if (cur?.item?.kind == Kind.LIVE) Modifier.padding(start = maxWidth * 0.45f, top = 60.dp, bottom = maxHeight * 0.35f, end = 40.dp) else Modifier)
                     .graphicsLayer { alpha = 0.6f })
@@ -369,7 +372,7 @@ private fun PulseCard(item: Item, progress: Float, onClick: () -> Unit) {
 }
 
 // ============================================================================================
-// Horizonte (al estilo del menú de Xbox Series)
+// Horizonte
 // ============================================================================================
 
 @Composable
@@ -393,7 +396,7 @@ fun HorizonScreen(vm: AppViewModel) {
         val k = ckind(tab)
         // Arriba, la imagen grande de lo enfocado, fundida hacia abajo y hacia la izquierda
         val heroImg = hero?.logo.orEmpty()
-        if (heroImg.startsWith("http") && hero?.kind != Kind.LIVE && !Perf.lite && (tab == 0 || k != null)) {
+        if (isImageUrl(heroImg) && hero?.kind != Kind.LIVE && !Perf.lite && (tab == 0 || k != null)) {
             Box(Modifier.fillMaxWidth().fillMaxHeight(if (k == null) 0.68f else 0.45f)) {
                 AsyncImage(heroImg, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (k == null) 0.6f else 0.3f })
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(c.bg2.copy(alpha = 0.9f), Color.Transparent))))

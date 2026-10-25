@@ -112,6 +112,8 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Choice("Búfer", "Cuánto video se carga por adelantado. Si un canal se corta seguido, la app le sube el búfer sola",
                 listOf("fast" to "Rápido: cambia de canal antes", "balanced" to "Equilibrado (recomendado)", "stable" to "Estable: para proveedores que se cortan"),
                 get = { it.buffer }, set = { s, v -> s.copy(buffer = v) }),
+            Row.Toggle("Colchón en vivo", "Si un canal en vivo queda con poco video guardado, se reproduce un poco más lento (no se nota) hasta rehacer la reserva. Así aguanta mejor los cortes, a cambio de ir unos segundos más atrás del directo",
+                { it.liveCushion }, { s, v -> s.copy(liveCushion = v) }),
             Row.Choice("Motor de reproducción", "VLC reproduce el audio AC-3 / MP2 y el video MPEG-2 de la TV de cable",
                 listOf("auto" to "ExoPlayer (VLC o MPV sólo si un canal falla)", "exo" to "ExoPlayer", "vlc" to "VLC siempre", "mpv" to "MPV siempre"),
                 { it.engine }, { s, v -> s.copy(engine = v) }),

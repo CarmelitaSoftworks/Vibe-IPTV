@@ -38,12 +38,12 @@ object Http {
         .build()
 
     /**
-     * Para reproducir: si el servidor deja de enviar datos 20 s se corta y el reproductor reintenta
-     * o cambia de formato, en vez de quedarse un minuto con la pantalla negra.
+     * Para reproducir: si el servidor deja de enviar datos 10 s se corta y el reproductor reconecta enseguida
+     * (antes de que se acabe la reserva guardada), en vez de quedarse esperando con la pantalla negra.
      */
     val streamClient: OkHttpClient = client.newBuilder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
     private fun request(url: String, ua: String) = Request.Builder().url(url).header("User-Agent", ua.ifBlank { DEFAULT_UA }).build()

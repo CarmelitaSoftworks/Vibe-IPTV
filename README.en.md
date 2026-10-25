@@ -51,6 +51,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Continue watching on the home screen**: your half-watched movies and series, with their progress bar.
 - **Adjustable buffer** (Fast / Balanced / Stable) across all three engines, plus a **learned buffer**: if a channel keeps stalling, the app raises its buffer on its own and remembers it.
 - **Stable live channels**: no jumping ahead or flickering, with automatic reconnection if the signal drops.
+- **Live cushion**: when a live channel runs low on reserve, it plays slightly slower (unnoticeable) until it is rebuilt; and if the connection drops for a moment, it reconnects right away without emptying what was already loaded. *Technical information* shows the saved reserve, stalls, reconnections and download speed.
 - Player menu with audio tracks, quality, aspect ratio, speed, technical channel info, favorites, picture-in-picture (PiP) and a channel list without leaving the video.
 
 ### 🧭 Navigation
@@ -258,7 +259,7 @@ run `node i18n/build.mjs` to update both the web app and Android.
 ## 🙏 Credits
 
 **Vibe IPTV** is developed and maintained by **[Carmelita Softworks](https://github.com/CarmelitaSoftworks)**. 🇨🇱
-It's a *vibe coded* project: the code was written in conversation with 🤖 **Claude**, by **[Anthropic](https://www.anthropic.com)**.
+It's a *vibe coded* project ([how it was made](CREDITS.md#made-with-vibe-coding)).
 
 It exists thanks to these open-source projects and services:
 

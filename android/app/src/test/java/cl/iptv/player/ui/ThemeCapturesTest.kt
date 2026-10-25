@@ -16,6 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -47,11 +48,37 @@ open class ThemeCapturesTest {
 
     private val out = "build/capturas"
 
+    /**
+     * Carátulas y logos de ejemplo dibujados aquí mismo (degradado de color con el nombre, sin marcas), para que las
+     * capturas muestren los temas con imágenes como en una lista real.
+     */
+    private fun demoImage(name: String, w: Int, h: Int, hue: Float): String {
+        val dir = java.io.File(ApplicationProvider.getApplicationContext<Application>().cacheDir, "demo").apply { mkdirs() }
+        val f = java.io.File(dir, name.replace(Regex("[^A-Za-z0-9]"), "_") + ".png")
+        if (!f.exists()) {
+            val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+            val cv = android.graphics.Canvas(bmp)
+            val c1 = android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.65f, 0.75f))
+            val c2 = android.graphics.Color.HSVToColor(floatArrayOf((hue + 40) % 360, 0.8f, 0.25f))
+            val paint = android.graphics.Paint().apply { shader = android.graphics.LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), c1, c2, android.graphics.Shader.TileMode.CLAMP) }
+            cv.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+            // Formas suaves de fondo y el nombre en grande
+            val soft = android.graphics.Paint().apply { color = android.graphics.Color.argb(50, 255, 255, 255); isAntiAlias = true }
+            cv.drawCircle(w * 0.78f, h * 0.28f, w * 0.32f, soft); cv.drawCircle(w * 0.15f, h * 0.85f, w * 0.25f, soft)
+            val text = android.graphics.Paint().apply { color = android.graphics.Color.WHITE; textSize = w / 9f; isAntiAlias = true; isFakeBoldText = true }
+            name.split(" ").chunked(2).map { it.joinToString(" ") }.forEachIndexed { i, line -> cv.drawText(line, w * 0.08f, h * 0.5f + i * text.textSize * 1.15f, text) }
+            f.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        return "file://" + f.absolutePath
+    }
+
     private fun demo(): List<Item> {
         val cats = listOf("CHILE | NOTICIAS", "CHILE | DEPORTES", "CHILE | ENTRETENCIÓN", "INFANTIL", "CINE", "DOCUMENTALES", "MÚSICA")
-        val live = (1..42).map { i -> Item("l$i", Kind.LIVE, "Canal ${listOf("Noticias", "Deportes", "Show", "Kids", "Cine", "Docu", "Música")[i % 7]} ${i}", group = cats[i % cats.size], num = i) }
-        val movies = (1..30).map { i -> Item("m$i", Kind.MOVIE, "Película de ejemplo $i (20${10 + i % 15})", group = listOf("ESTRENOS", "ACCIÓN", "COMEDIA", "DRAMA")[i % 4]) }
-        val series = (1..12).map { i -> Item("s$i", Kind.SERIES, "Serie de ejemplo $i", group = listOf("SERIES LATINO", "ANIME", "DOCUSERIES")[i % 3],
+        val live = (1..42).map { i -> Item("l$i", Kind.LIVE, "Canal ${listOf("Noticias", "Deportes", "Show", "Kids", "Cine", "Docu", "Música")[i % 7]} ${i}", group = cats[i % cats.size], num = i,
+            logo = demoImage("Canal ${listOf("Noticias", "Deportes", "Show", "Kids", "Cine", "Docu", "Música")[i % 7]} $i", 480, 300, (i * 47f) % 360)) }
+        val movies = (1..30).map { i -> Item("m$i", Kind.MOVIE, "Película de ejemplo $i (20${10 + i % 15})", group = listOf("ESTRENOS", "ACCIÓN", "COMEDIA", "DRAMA")[i % 4],
+            logo = demoImage("Película $i", 400, 600, (i * 61f) % 360)) }
+        val series = (1..12).map { i -> Item("s$i", Kind.SERIES, "Serie de ejemplo $i", group = listOf("SERIES LATINO", "ANIME", "DOCUSERIES")[i % 3], logo = demoImage("Serie $i", 400, 600, (i * 83f) % 360),
             episodes = (1..8).map { e -> Item("s${i}e$e", Kind.SERIES, "Episodio $e", season = 1, episode = e, seriesName = "Serie de ejemplo $i") }) }
         return live + movies + series
     }
@@ -68,6 +95,8 @@ open class ThemeCapturesTest {
         androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
         repeat(3) { compose.mainClock.advanceTimeByFrame() }
         compose.mainClock.advanceTimeBy(1500)
+        // Las imágenes se leen en otro hilo: darles tiempo real y dibujar de nuevo
+        repeat(6) { Thread.sleep(150); shadowOf(android.os.Looper.getMainLooper()).idle(); compose.mainClock.advanceTimeBy(100) }
         compose.onRoot().captureRoboImage("$out/$name${if (dispositivo.isEmpty()) "" else "_$dispositivo"}.png")
     }
 

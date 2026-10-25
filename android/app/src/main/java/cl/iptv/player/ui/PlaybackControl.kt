@@ -38,6 +38,8 @@ interface PlaybackControl {
     fun addExternalSubtitle(file: File) {}
     /** Datos técnicos para el panel de información. */
     fun info(): List<Pair<String, String>> = emptyList()
+    /** Video ya cargado por delante de lo que se ve (ms), o null si el motor no lo informa. */
+    val bufferedAheadMs: Long? get() = null
 }
 
 private fun lang(code: String?): String? = code?.takeIf { it.isNotBlank() && it != "und" }?.let {
@@ -67,6 +69,7 @@ private fun codecName(f: Format): String? {
 /** ExoPlayer como [PlaybackControl]. */
 @OptIn(UnstableApi::class)
 class ExoControl(private val p: ExoPlayer) : PlaybackControl {
+    override val bufferedAheadMs: Long get() = p.totalBufferedDuration
     override val isPlaying get() = p.isPlaying || (p.playWhenReady && p.playbackState == androidx.media3.common.Player.STATE_BUFFERING)
     override val position get() = p.currentPosition
     override val duration get() = if (p.isCurrentMediaItemLive || p.duration == C.TIME_UNSET) -1 else p.duration
