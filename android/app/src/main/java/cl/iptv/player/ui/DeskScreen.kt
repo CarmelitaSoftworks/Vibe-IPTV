@@ -136,7 +136,7 @@ fun DeskScreen(vm: AppViewModel) {
                     ToolButton("★ " + tr("Favoritos")) { if (ckind(tab) == null) ctl.goTab(1); vm.selectCategory(CAT_FAV) }
                     Text(tr("Dirección") + ":", color = Color(0xFF444444), fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
                     Box(Modifier.widthIn(min = if (tiny) 140.dp else 220.dp).background(Color.White).border(1.dp, Color(0xFF7F9DB9)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                        Text(listOfNotNull(tr("Inicio"), ckind(tab)?.let { tr(CTABS_DESK[tab]) }, vm.series?.name,
+                        Text(listOfNotNull(tr("Inicio"), (ckind(tab) != null || tab == 5).takeIf { it }?.let { tr(CTABS_DESK[tab]) }, vm.series?.name,
                             vm.title().takeIf { ckind(tab) != null && vm.category != CAT_ALL }).joinToString(" › "),
                             color = Color.Black, fontSize = 13.sp, maxLines = 1)
                     }
@@ -147,7 +147,11 @@ fun DeskScreen(vm: AppViewModel) {
                     if (showPane) TaskPane(vm, ctl, isTv, Modifier.width(if (narrow) 190.dp else 230.dp).fillMaxHeight()) { if (narrow) paneOpen = false }
                     Box(Modifier.weight(1f).fillMaxHeight().background(Color.White)) {
                         val k = ckind(tab)
-                        if (k == null) DeskHome(vm, ctl, isTv, compact, first) else DeskIcons(vm, ctl, k, compact, first)
+                        when {
+                            k != null -> DeskIcons(vm, ctl, k, compact, first)
+                            tab == 5 -> DeskSettings(vm, ctl, isTv, compact, first)
+                            else -> DeskHome(vm, ctl, isTv, compact, first)
+                        }
                     }
                 }
                 // Barra de estado
@@ -210,12 +214,18 @@ private fun ToolButton(label: String, onClick: () -> Unit) {
 @Composable
 private fun TaskPane(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, modifier: Modifier, onPicked: () -> Unit) {
     Column(modifier.background(XP_PANE).verticalScroll(rememberScrollState()).padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        PaneGroup(tr("Secciones")) {
-            PaneLink(tr("Mi Vibe"), TIcon.FOLDER) { onPicked(); ctl.goTab(0) }
-            PaneLink("${tr("TV en vivo")} (${vm.countOf(Kind.LIVE)})", TIcon.TV) { onPicked(); ctl.goTab(1) }
-            PaneLink("${tr("Películas")} (${vm.countOf(Kind.MOVIE)})", TIcon.MOVIE) { onPicked(); ctl.goTab(2) }
-            PaneLink("${tr("Series")} (${vm.countOf(Kind.SERIES)})", TIcon.SERIES) { onPicked(); ctl.goTab(3) }
-            PaneLink(tr("Guía"), TIcon.GUIDE) { onPicked(); vm.showGuide = true }
+        // Las secciones ya están como íconos del escritorio y en la barra de tareas: aquí van las categorías
+        val cats = remember(vm.items, vm.section, vm.hiddenCats, vm.catOrder) { vm.categories() }
+        val inSection = ckind(vm.shell.tab) != null
+        PaneGroup(tr("Categorías") + " · " + tr(vm.section.label)) {
+            PaneLink(tr("Todos") + " (${vm.countOf(vm.section)})", TIcon.FOLDER, selected = inSection && vm.category == CAT_ALL) {
+                onPicked(); openCategory(vm, ctl, CAT_ALL)
+            }
+            PaneLink(tr("Favoritos"), TIcon.LISTS, selected = inSection && vm.category == CAT_FAV) { onPicked(); openCategory(vm, ctl, CAT_FAV) }
+            cats.take(PANE_CATS).forEach { (g, n) ->
+                PaneLink("$g ($n)", TIcon.FOLDER, selected = inSection && vm.category == g) { onPicked(); openCategory(vm, ctl, g) }
+            }
+            if (cats.size > PANE_CATS) PaneLink(tr("Ver todas") + " (${cats.size})…", TIcon.LISTS) { openCategory(vm, ctl, null); ctl.dialog = "cats" }
         }
         PaneGroup(tr("Otros sitios")) {
             PaneLink(tr("Mis listas"), TIcon.LISTS) { vm.showWelcome = true }
@@ -236,45 +246,74 @@ private fun PaneGroup(title: String, content: @Composable ColumnScope.() -> Unit
         Row(Modifier.fillMaxWidth().background(XP_GROUP_HEAD).padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = Color(0xFF215DC6), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
             // Botoncito redondo del encabezado (adorno, como en los paneles de la época)
-            Box(Modifier.size(16.dp).clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFF8EA9E8), RoundedCornerShape(50)),
-                contentAlignment = Alignment.Center) { Text("▴", color = Color(0xFF215DC6), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+            Box(Modifier.size(16.dp).clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFF8EA9E8), RoundedCornerShape(50))
+                .drawBehind {
+                    // Dos ángulos hacia arriba (dibujados: no dependen de que la fuente tenga el símbolo)
+                    for (dy in listOf(-2.5f, 2f)) {
+                        val y = size.height / 2 + dy * density
+                        drawLine(Color(0xFF215DC6), androidx.compose.ui.geometry.Offset(size.width * 0.3f, y + 2f * density),
+                            androidx.compose.ui.geometry.Offset(size.width * 0.5f, y), strokeWidth = 1.6f * density)
+                        drawLine(Color(0xFF215DC6), androidx.compose.ui.geometry.Offset(size.width * 0.5f, y),
+                            androidx.compose.ui.geometry.Offset(size.width * 0.7f, y + 2f * density), strokeWidth = 1.6f * density)
+                    }
+                })
         }
         Column(Modifier.fillMaxWidth().background(Color(0xFFD6DFF7)).border(1.dp, Color.White).padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
 }
 
+private const val PANE_CATS = 40
+
+private fun kindTab(k: Kind) = when (k) { Kind.LIVE -> 1; Kind.MOVIE -> 2; else -> 3 }
+
+/** Abre la sección actual (si se está en Inicio o Ajustes) y, si se indica, una de sus categorías. */
+private fun openCategory(vm: AppViewModel, ctl: ConsoleCtl, cat: String?) {
+    if (ckind(vm.shell.tab) == null) ctl.goTab(kindTab(vm.section))
+    if (cat != null) vm.selectCategory(cat)
+}
+
 @Composable
-private fun PaneLink(label: String, icon: TIcon, onClick: () -> Unit) {
+private fun PaneLink(label: String, icon: TIcon, selected: Boolean = false, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val f by src.collectIsFocusedAsState()
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp)).background(if (f) Color.White else Color.Transparent)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp)).background(if (f) Color.White else if (selected) Color.White.copy(alpha = 0.55f) else Color.Transparent)
         .combinedClickable(interactionSource = src, indication = null, onClick = onClick).padding(horizontal = 4.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically) {
         TIconView(icon, XP_LINK, Modifier.size(16.dp))
-        Text(label, color = XP_LINK, fontSize = 13.sp, maxLines = 2, modifier = Modifier.padding(start = 6.dp),
+        Text(label, color = XP_LINK, fontSize = 13.sp, maxLines = 2, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp),
             style = TextStyle(textDecoration = if (f) androidx.compose.ui.text.style.TextDecoration.Underline else null))
     }
 }
 
-/** Inicio ("Mi Vibe"): accesos grandes, seguir viendo y favoritos, como íconos de escritorio. */
+private const val HOME_CATS = 17
+
+/** Inicio ("Mi Vibe"): categorías de la sección actual, seguir viendo y favoritos, como íconos de escritorio. */
 @Composable
 private fun DeskHome(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, compact: Boolean, first: FocusRequester) {
     val cont = remember(vm.items, vm.resume) { vm.continueWatching() }
     val favs = remember(vm.items, vm.favorites) { val byId = vm.items.associateBy { it.id }; vm.favorites.mapNotNull { byId[it] }.take(24) }
+    val cats = remember(vm.items, vm.section, vm.hiddenCats, vm.catOrder) { vm.categories() }
     LazyVerticalGrid(GridCells.Adaptive(if (compact) 150.dp else 190.dp), modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        item(span = { GridItemSpan(maxLineSpan) }) { GroupHeader(tr("Secciones")) }
-        val shortcuts = listOf(
-            Triple(tr("TV en vivo"), "${vm.countOf(Kind.LIVE)} " + tr("canales"), TIcon.TV) to { ctl.goTab(1) },
-            Triple(tr("Películas"), "${vm.countOf(Kind.MOVIE)}", TIcon.MOVIE) to { ctl.goTab(2) },
-            Triple(tr("Series"), "${vm.countOf(Kind.SERIES)}", TIcon.SERIES) to { ctl.goTab(3) },
-            Triple(tr("Guía"), tr("Programación"), TIcon.GUIDE) to { vm.showGuide = true },
-            Triple(tr("Mis listas"), vm.source?.name.orEmpty(), TIcon.LISTS) to { vm.showWelcome = true },
-            Triple(tr("Ajustes"), "", TIcon.SETTINGS) to { vm.showSettings = true },
-        )
-        itemsIndexed(shortcuts, key = { i, _ -> "s$i" }) { i, (t, onClick) ->
-            DeskIcon(t.first, t.second, null, t.third, Modifier.then(if (i == 0) Modifier.focusRequester(first) else Modifier), onClick = onClick)
+        // Las secciones ya están en el escritorio: aquí, las categorías de la sección actual (y un cambio rápido de sección)
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Box(Modifier.weight(1f)) { GroupHeader(tr("Categorías") + " · " + tr(vm.section.label)) }
+                vm.sectionsAvailable.filter { it != vm.section }.forEach { k ->
+                    ToolButton(tr(k.label)) { vm.selectSection(k); vm.goHome() }
+                }
+            }
+        }
+        item(key = "todos") {
+            DeskIcon(tr("Todos"), "${vm.countOf(vm.section)} " + tr(vm.section.many), null, TIcon.FOLDER, Modifier.focusRequester(first)) { openCategory(vm, ctl, CAT_ALL) }
+        }
+        itemsIndexed(cats.take(HOME_CATS), key = { i, c -> "k$i:${c.first}" }) { _, (g, n) ->
+            DeskIcon(g, "$n " + tr(if (n == 1) vm.section.one else vm.section.many), null, TIcon.FOLDER, Modifier) { openCategory(vm, ctl, g) }
+        }
+        if (cats.size > HOME_CATS) item(key = "mas") {
+            DeskIcon(tr("Ver todas"), "${cats.size} " + tr("categorías"), null, TIcon.LISTS, Modifier) { openCategory(vm, ctl, null); ctl.dialog = "cats" }
         }
         if (cont.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) { GroupHeader(tr("Seguir viendo")) }
@@ -287,6 +326,24 @@ private fun DeskHome(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, compact: 
             itemsIndexed(favs, key = { i, it0 -> "f$i:${it0.id}" }) { _, it0 ->
                 DeskIcon(it0.name, vm.nowNext(it0).first?.title.orEmpty(), it0, null, Modifier, onLong = { vm.toggleFavorite(it0) }) { ctl.open(it0, favs) }
             }
+        }
+    }
+}
+
+/** Ajustes: los accesos de configuración como íconos grandes. */
+@Composable
+private fun DeskSettings(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, compact: Boolean, first: FocusRequester) {
+    val items = listOf(
+        Triple(tr("Ajustes"), tr("Apariencia, reproducción y más"), TIcon.SETTINGS) to { vm.showSettings = true },
+        Triple(tr("Mis listas"), vm.source?.name.orEmpty(), TIcon.LISTS) to { vm.showWelcome = true },
+        Triple(tr("Perfil"), vm.profile.name, TIcon.PROFILE) to { ctl.dialog = "profiles" },
+        Triple(tr("Buscar actualizaciones"), "", TIcon.UPDATE) to { vm.checkUpdate(isTv, silent = false) },
+    )
+    LazyVerticalGrid(GridCells.Adaptive(if (compact) 150.dp else 190.dp), modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item(span = { GridItemSpan(maxLineSpan) }) { GroupHeader(tr("Ajustes")) }
+        itemsIndexed(items, key = { i, _ -> "a$i" }) { i, (t, onClick) ->
+            DeskIcon(t.first, t.second, null, t.third, if (i == 0) Modifier.focusRequester(first) else Modifier, onClick = onClick)
         }
     }
 }

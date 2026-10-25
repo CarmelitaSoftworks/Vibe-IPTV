@@ -63,6 +63,10 @@ open class ThemeCapturesTest {
     }
 
     private fun shot(name: String) {
+        // Con el reloj detenido, un cambio hecho desde la prueba (p. ej. de pestaña) no se dibujaba hasta la foto
+        // siguiente: se avisa del cambio y se avanzan unos cuadros antes de esperar las animaciones
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        repeat(3) { compose.mainClock.advanceTimeByFrame() }
         compose.mainClock.advanceTimeBy(1500)
         compose.onRoot().captureRoboImage("$out/$name${if (dispositivo.isEmpty()) "" else "_$dispositivo"}.png")
     }

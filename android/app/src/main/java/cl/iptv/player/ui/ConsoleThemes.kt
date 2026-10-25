@@ -356,6 +356,8 @@ private fun PulseCard(item: Item, progress: Float, onClick: () -> Unit) {
         .combinedClickable(interactionSource = src, indication = null, onClick = onClick)) {
         if (!failed) AsyncImage(item.logo, null, contentScale = if (item.kind == Kind.LIVE) ContentScale.Fit else ContentScale.Crop, onError = { failed = true },
             modifier = Modifier.fillMaxSize())
+        else androidx.compose.material3.Text(initials(item.name), color = c.inkSoft, fontWeight = FontWeight.Bold, fontSize = 20.sp,
+            modifier = Modifier.align(Alignment.TopStart).padding(10.dp))
         Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
             .padding(horizontal = 10.dp, vertical = 6.dp)) {
             androidx.compose.material3.Text(item.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -391,7 +393,7 @@ fun HorizonScreen(vm: AppViewModel) {
         val k = ckind(tab)
         // Arriba, la imagen grande de lo enfocado, fundida hacia abajo y hacia la izquierda
         val heroImg = hero?.logo.orEmpty()
-        if (heroImg.startsWith("http") && hero?.kind != Kind.LIVE && !Perf.lite) {
+        if (heroImg.startsWith("http") && hero?.kind != Kind.LIVE && !Perf.lite && (tab == 0 || k != null)) {
             Box(Modifier.fillMaxWidth().fillMaxHeight(if (k == null) 0.68f else 0.45f)) {
                 AsyncImage(heroImg, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (k == null) 0.6f else 0.3f })
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(c.bg2.copy(alpha = 0.9f), Color.Transparent))))
@@ -419,7 +421,7 @@ fun HorizonScreen(vm: AppViewModel) {
             }
             if (k == null) {
                 // Destacado: el nombre grande de lo enfocado, sobre su imagen
-                if (hero != null) Column(Modifier.padding(start = side, end = side, top = if (compact) 8.dp else 40.dp).height(if (compact) 40.dp else 76.dp).widthIn(max = 640.dp),
+                if (hero != null && tab == 0) Column(Modifier.padding(start = side, end = side, top = if (compact) 8.dp else 40.dp).height(if (compact) 40.dp else 76.dp).widthIn(max = 640.dp),
                     verticalArrangement = Arrangement.Bottom) {
                     hero?.let { h ->
                         androidx.compose.material3.Text(h.name, color = c.ink, fontWeight = FontWeight.Bold, fontSize = if (compact) 20.sp else 30.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
