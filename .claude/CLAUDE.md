@@ -105,12 +105,21 @@ docs/                      GUIA.md / GUIDE.md, servidor propio, Downloader, firm
   `SettingsScreen.kt` (+ `web/js/storage.js` y `web/js/settings.js` si aplica a la web).
 - Al terminar un grupo de cambios: README (es/en) y `docs/GUIA.md` / `docs/GUIDE.md` al día.
 
-## Trabajo en paralelo
+## Trabajo en paralelo (coordinación por GitHub)
 
-A veces hay **dos sesiones** trabajando en el repo. Para no pisarse:
-- `git pull` antes de empezar y antes de cada push.
-- Cambios grandes en una **rama propia** (los push a ramas que no son `main` no compilan ni cancelan nada);
-  se juntan con `main` al terminar.
+A veces hay **dos sesiones** trabajando en el repo. Se coordinan con los *issues* de GitHub:
+el issue **#3 "Tablero: quién trabaja en qué"** explica el procedimiento.
+
+- **Al empezar:** `git pull` y revisa los issues con la etiqueta **en curso**
+  (`gh api "repos/CarmelitaSoftworks/Vibe-IPTV/issues?labels=en%20curso" -q '.[] | "#\(.number) \(.title)"'`).
+  Cada uno dice la rama y los archivos que esa sesión está tocando: no toques esos archivos.
+- **Tu tarea:** crea (o toma) un issue con la etiqueta **en curso**, la rama y los archivos, y comenta en #3 qué tomaste.
+  Tareas acordadas sin dueño llevan la etiqueta **pendiente**.
+- Trabaja en **tu rama** (los push a ramas que no son `main` no compilan ni cancelan nada).
+- **Al terminar:** `git pull --rebase` de `main`, resuelve choques, un solo push a `main` (sin compilación con
+  `[publicar]` en curso), cierra tu issue y comenta en #3 qué versión salió.
+- Cambios que sólo tocan documentación o esta guía: commit con `[skip ci]` para no gatillar ni cancelar compilaciones.
+- Nota: desde estas sesiones GitHub sólo acepta la API REST (`gh api ...`), no `gh issue` / `gh pr` (usan GraphQL).
 - Avisa al usuario qué archivos estás tocando si otra sesión está activa.
 
 ## Cómo responder al usuario al terminar
