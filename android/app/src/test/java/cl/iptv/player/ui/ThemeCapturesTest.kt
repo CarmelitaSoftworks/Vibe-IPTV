@@ -90,6 +90,25 @@ class ThemeCapturesTest {
         shot("ondas_4_ajustes")
     }
 
+    /** Los dos temas de consola: Inicio (con algunos favoritos), TV en vivo, Películas y Ajustes. */
+    private fun consola(theme: String, nombre: String, screen: @androidx.compose.runtime.Composable (AppViewModel) -> Unit) {
+        compose.mainClock.autoAdvance = false
+        val vm = vm(theme)
+        listOf("m3", "s2", "l5", "m7").forEach { id -> vm.items.firstOrNull { it.id == id }?.let { vm.toggleFavorite(it) } }
+        compose.setContent { IptvTheme(theme) { screen(vm) } }
+        shot("${nombre}_1_inicio")
+        compose.runOnUiThread { vm.shell.tab = 1; vm.selectSection(Kind.LIVE) }
+        shot("${nombre}_2_tv")
+        compose.runOnUiThread { vm.shell.tab = 2; vm.selectSection(Kind.MOVIE) }
+        shot("${nombre}_3_peliculas")
+        compose.runOnUiThread { vm.shell.tab = 5 }
+        shot("${nombre}_4_ajustes")
+    }
+
+    @Test fun pulso() = consola("pulse", "pulso") { PulseScreen(it) }
+
+    @Test fun horizonte() = consola("horizon", "horizonte") { HorizonScreen(it) }
+
     @Test fun clasico() {
         compose.mainClock.autoAdvance = false
         val vm = vm("light")
