@@ -85,7 +85,7 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Choice("Idioma", "Idioma de la app", listOf("auto" to "Automático (idioma del sistema)", "es" to "Español", "en" to "English"), get = { it.lang }, set = { s, v -> s.copy(lang = v) }),
             Row.Choice("Tema", options = listOf("light" to "Claro", "dark" to "Oscuro", "system" to "Según el sistema",
                 "metro" to "Mosaicos (gris y verde, esquinas rectas)", "wave" to "Ondas (violeta)",
-                "pulse" to "Pulso (estilo consola: mosaicos redondeados, verde)", "horizon" to "Horizonte (estilo consola: fila de íconos y fondo grande)",
+                "pulse" to "Pulso (estilo consola: fila de íconos y fondo grande, azul)", "horizon" to "Horizonte (estilo consola: mosaicos y destacado, verde)",
                 "desk" to "Escritorio (estilo escritorio de 2001: ventana azul, panel lateral y barra de tareas)",
                 "custom" to "Personalizado"),
                 get = { it.theme }, set = { s, v -> s.copy(theme = v) }),

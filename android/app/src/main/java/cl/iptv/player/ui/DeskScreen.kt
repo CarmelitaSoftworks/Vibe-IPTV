@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -43,8 +44,9 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
 /*
- * Tema "Escritorio": inspirado en los escritorios de principios de los 2000 (ventana azul con botones redondeados,
- * panel de tareas a la izquierda, vista de íconos y barra de tareas con botón de inicio verde).
+ * Tema "Escritorio": inspirado en los escritorios de principios de los 2000 (fondo de cielo y colina, íconos de
+ * escritorio, ventana con marco azul y botones redondeados, panel de tareas a la izquierda, vista de íconos y barra
+ * de tareas con botón de inicio verde). En pantallas angostas (teléfono) la ventana ocupa todo y no hay íconos.
  * Diseño propio: sin logos, fondos, sonidos ni tipografías de ninguna marca.
  * Funciona con el control remoto (foco), el tacto y el mouse; la vista de íconos y el panel se desplazan solos.
  */
@@ -55,7 +57,7 @@ private val XP_TRAY = Brush.verticalGradient(listOf(Color(0xFF0C59B9), Color(0xF
 private val XP_START = Brush.verticalGradient(listOf(Color(0xFF3C9A3C), Color(0xFF5DC15D), Color(0xFF3C9A3C), Color(0xFF2F7F2F)))
 private val XP_PANE = Brush.verticalGradient(listOf(Color(0xFF7BA2E7), Color(0xFF6375D6)))
 private val XP_GROUP_HEAD = Brush.horizontalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFC6D3F7)))
-private val XP_DESKTOP = Brush.verticalGradient(listOf(Color(0xFF245EDC), Color(0xFF3A80F3), Color(0xFF2B6BE0)))
+private val XP_FRAME = Color(0xFF0054E3)
 private val XP_CREAM = Color(0xFFECE9D8)
 private val XP_SELECT = Color(0xFF316AC5)
 private val XP_LINK = Color(0xFF215DC6)
@@ -76,10 +78,13 @@ fun DeskScreen(vm: AppViewModel) {
         if (ctl.dialog == null) { delay(80); runCatching { (if (start) startFirst else first).requestFocus() } }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(XP_DESKTOP)) {
+    ScaledForWide { BoxWithConstraints(Modifier.fillMaxSize().deskWallpaper()) {
         val compact = maxHeight < 480.dp
         val narrow = maxWidth < 720.dp
+        val tiny = maxWidth < 480.dp
         val showPane = paneOpen ?: !narrow
+        // Íconos sueltos en el escritorio, sólo si hay espacio (TV, laptop, tableta en horizontal)
+        val showDesktop = !narrow && !compact
         val title = when {
             vm.series != null -> vm.series!!.name
             ckind(tab) != null -> vm.title()
@@ -87,11 +92,15 @@ fun DeskScreen(vm: AppViewModel) {
             else -> tr(CTABS_DESK[tab])
         }
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
-            // ---- Ventana ----
+          Row(Modifier.weight(1f).fillMaxWidth()) {
+            if (showDesktop) DesktopIcons(vm, ctl, Modifier.width(92.dp).fillMaxHeight())
+            // ---- Ventana: marco azul con la barra de título y, adentro, el cuerpo color crema ----
+            val winShape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)
             Column(
-                Modifier.weight(1f).fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = if (compact) 4.dp else 10.dp, bottom = 6.dp)
-                    .clip(RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)).background(XP_CREAM)
-                    .border(1.dp, Color(0xFF0831D9), RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)),
+                Modifier.weight(1f).fillMaxHeight()
+                    .padding(start = if (showDesktop) 2.dp else if (tiny) 0.dp else 8.dp, end = if (tiny) 0.dp else if (showDesktop) 14.dp else 8.dp,
+                        top = if (compact || tiny) 2.dp else 10.dp, bottom = if (tiny) 0.dp else 6.dp)
+                    .clip(winShape).background(XP_FRAME).border(1.dp, Color(0xFF00138C), winShape),
             ) {
                 // Barra de título
                 Row(Modifier.fillMaxWidth().height(if (compact) 28.dp else 32.dp).background(XP_TITLE).padding(start = 8.dp, end = 4.dp),
@@ -111,6 +120,7 @@ fun DeskScreen(vm: AppViewModel) {
                         }
                     }
                 }
+              Column(Modifier.weight(1f).fillMaxWidth().padding(start = 3.dp, end = 3.dp, bottom = 3.dp).background(XP_CREAM)) {
                 // Barra de herramientas y dirección
                 Row(Modifier.fillMaxWidth().background(XP_CREAM).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -125,8 +135,8 @@ fun DeskScreen(vm: AppViewModel) {
                     ToolButton("☰ " + tr("Categorías")) { if (ckind(tab) == null) ctl.goTab(1); ctl.dialog = "cats" }
                     ToolButton("★ " + tr("Favoritos")) { if (ckind(tab) == null) ctl.goTab(1); vm.selectCategory(CAT_FAV) }
                     Text(tr("Dirección") + ":", color = Color(0xFF444444), fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
-                    Box(Modifier.widthIn(min = 220.dp).background(Color.White).border(1.dp, Color(0xFF7F9DB9)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                        Text(listOfNotNull(tr("Inicio"), ckind(tab)?.let { tr(CTABS_DESK[tab]) }, vm.series?.name,
+                    Box(Modifier.widthIn(min = if (tiny) 140.dp else 220.dp).background(Color.White).border(1.dp, Color(0xFF7F9DB9)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                        Text(listOfNotNull(tr("Inicio"), (ckind(tab) != null || tab == 5).takeIf { it }?.let { tr(CTABS_DESK[tab]) }, vm.series?.name,
                             vm.title().takeIf { ckind(tab) != null && vm.category != CAT_ALL }).joinToString(" › "),
                             color = Color.Black, fontSize = 13.sp, maxLines = 1)
                     }
@@ -137,7 +147,11 @@ fun DeskScreen(vm: AppViewModel) {
                     if (showPane) TaskPane(vm, ctl, isTv, Modifier.width(if (narrow) 190.dp else 230.dp).fillMaxHeight()) { if (narrow) paneOpen = false }
                     Box(Modifier.weight(1f).fillMaxHeight().background(Color.White)) {
                         val k = ckind(tab)
-                        if (k == null) DeskHome(vm, ctl, isTv, compact, first) else DeskIcons(vm, ctl, k, compact, first)
+                        when {
+                            k != null -> DeskIcons(vm, ctl, k, compact, first)
+                            tab == 5 -> DeskSettings(vm, ctl, isTv, compact, first)
+                            else -> DeskHome(vm, ctl, isTv, compact, first)
+                        }
                     }
                 }
                 // Barra de estado
@@ -146,13 +160,16 @@ fun DeskScreen(vm: AppViewModel) {
                         color = Color(0xFF333333), fontSize = 12.sp, maxLines = 1, modifier = Modifier.weight(1f))
                     Text(vm.profile.name, color = Color(0xFF333333), fontSize = 12.sp)
                 }
+              }
             }
+          }
             // ---- Barra de tareas ----
             Row(Modifier.fillMaxWidth().height(if (compact) 34.dp else 40.dp).background(XP_TASKBAR), verticalAlignment = Alignment.CenterVertically) {
                 StartButton(start, compact) { start = !start }
                 Row(Modifier.weight(1f).padding(start = 8.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(1, 2, 3).forEach { t -> TaskButton(tr(CTABS_DESK[t]), deskIcon(t), selected = tab == t, compact) { start = false; ctl.goTab(t) } }
-                    TaskButton(tr("Guía"), TIcon.GUIDE, selected = false, compact) { start = false; vm.showGuide = true }
+                    // En el teléfono en vertical los botones muestran sólo el ícono para que quepan
+                    listOf(1, 2, 3).forEach { t -> TaskButton(tr(CTABS_DESK[t]), deskIcon(t), selected = tab == t, compact, iconOnly = tiny) { start = false; ctl.goTab(t) } }
+                    TaskButton(tr("Guía"), TIcon.GUIDE, selected = false, compact, iconOnly = tiny) { start = false; vm.showGuide = true }
                 }
                 Row(Modifier.fillMaxHeight().background(XP_TRAY).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Clock(Color.White, if (compact) 13 else 15)
@@ -161,7 +178,7 @@ fun DeskScreen(vm: AppViewModel) {
         }
         if (start) StartMenu(vm, ctl, isTv, compact, startFirst, Modifier.align(Alignment.BottomStart).systemBarsPadding()
             .padding(bottom = if (compact) 34.dp else 40.dp)) { start = false }
-    }
+    } }
     ConsoleDialogs(vm, ctl)
 }
 
@@ -174,7 +191,8 @@ private fun Caption(label: String, color: Color, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val f by src.collectIsFocusedAsState()
     Box(Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))
-        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.55f), color, color)))
+        .background(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.7f), color, color.copy(red = color.red * 0.8f, green = color.green * 0.8f, blue = color.blue * 0.8f)),
+            center = androidx.compose.ui.geometry.Offset(12f, 8f)))
         .border(if (f) 2.dp else 1.dp, if (f) Color(0xFFFFD25A) else Color.White, RoundedCornerShape(4.dp))
         .combinedClickable(interactionSource = src, indication = null, onClick = onClick), contentAlignment = Alignment.Center) {
         Text(label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -196,12 +214,18 @@ private fun ToolButton(label: String, onClick: () -> Unit) {
 @Composable
 private fun TaskPane(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, modifier: Modifier, onPicked: () -> Unit) {
     Column(modifier.background(XP_PANE).verticalScroll(rememberScrollState()).padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        PaneGroup(tr("Secciones")) {
-            PaneLink(tr("Mi Vibe"), TIcon.FOLDER) { onPicked(); ctl.goTab(0) }
-            PaneLink("${tr("TV en vivo")} (${vm.countOf(Kind.LIVE)})", TIcon.TV) { onPicked(); ctl.goTab(1) }
-            PaneLink("${tr("Películas")} (${vm.countOf(Kind.MOVIE)})", TIcon.MOVIE) { onPicked(); ctl.goTab(2) }
-            PaneLink("${tr("Series")} (${vm.countOf(Kind.SERIES)})", TIcon.SERIES) { onPicked(); ctl.goTab(3) }
-            PaneLink(tr("Guía"), TIcon.GUIDE) { onPicked(); vm.showGuide = true }
+        // Las secciones ya están como íconos del escritorio y en la barra de tareas: aquí van las categorías
+        val cats = remember(vm.items, vm.section, vm.hiddenCats, vm.catOrder) { vm.categories() }
+        val inSection = ckind(vm.shell.tab) != null
+        PaneGroup(tr("Categorías") + " · " + tr(vm.section.label)) {
+            PaneLink(tr("Todos") + " (${vm.countOf(vm.section)})", TIcon.FOLDER, selected = inSection && vm.category == CAT_ALL) {
+                onPicked(); openCategory(vm, ctl, CAT_ALL)
+            }
+            PaneLink(tr("Favoritos"), TIcon.LISTS, selected = inSection && vm.category == CAT_FAV) { onPicked(); openCategory(vm, ctl, CAT_FAV) }
+            cats.take(PANE_CATS).forEach { (g, n) ->
+                PaneLink("$g ($n)", TIcon.FOLDER, selected = inSection && vm.category == g) { onPicked(); openCategory(vm, ctl, g) }
+            }
+            if (cats.size > PANE_CATS) PaneLink(tr("Ver todas") + " (${cats.size})…", TIcon.LISTS) { openCategory(vm, ctl, null); ctl.dialog = "cats" }
         }
         PaneGroup(tr("Otros sitios")) {
             PaneLink(tr("Mis listas"), TIcon.LISTS) { vm.showWelcome = true }
@@ -219,45 +243,77 @@ private fun TaskPane(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, modifier:
 @Composable
 private fun PaneGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))) {
-        Box(Modifier.fillMaxWidth().background(XP_GROUP_HEAD).padding(horizontal = 10.dp, vertical = 5.dp)) {
-            Text(title, color = Color(0xFF215DC6), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Row(Modifier.fillMaxWidth().background(XP_GROUP_HEAD).padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = Color(0xFF215DC6), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            // Botoncito redondo del encabezado (adorno, como en los paneles de la época)
+            Box(Modifier.size(16.dp).clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFF8EA9E8), RoundedCornerShape(50))
+                .drawBehind {
+                    // Dos ángulos hacia arriba (dibujados: no dependen de que la fuente tenga el símbolo)
+                    for (dy in listOf(-2.5f, 2f)) {
+                        val y = size.height / 2 + dy * density
+                        drawLine(Color(0xFF215DC6), androidx.compose.ui.geometry.Offset(size.width * 0.3f, y + 2f * density),
+                            androidx.compose.ui.geometry.Offset(size.width * 0.5f, y), strokeWidth = 1.6f * density)
+                        drawLine(Color(0xFF215DC6), androidx.compose.ui.geometry.Offset(size.width * 0.5f, y),
+                            androidx.compose.ui.geometry.Offset(size.width * 0.7f, y + 2f * density), strokeWidth = 1.6f * density)
+                    }
+                })
         }
         Column(Modifier.fillMaxWidth().background(Color(0xFFD6DFF7)).border(1.dp, Color.White).padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
 }
 
+private const val PANE_CATS = 40
+
+private fun kindTab(k: Kind) = when (k) { Kind.LIVE -> 1; Kind.MOVIE -> 2; else -> 3 }
+
+/** Abre la sección actual (si se está en Inicio o Ajustes) y, si se indica, una de sus categorías. */
+private fun openCategory(vm: AppViewModel, ctl: ConsoleCtl, cat: String?) {
+    if (ckind(vm.shell.tab) == null) ctl.goTab(kindTab(vm.section))
+    if (cat != null) vm.selectCategory(cat)
+}
+
 @Composable
-private fun PaneLink(label: String, icon: TIcon, onClick: () -> Unit) {
+private fun PaneLink(label: String, icon: TIcon, selected: Boolean = false, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val f by src.collectIsFocusedAsState()
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp)).background(if (f) Color.White else Color.Transparent)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp)).background(if (f) Color.White else if (selected) Color.White.copy(alpha = 0.55f) else Color.Transparent)
         .combinedClickable(interactionSource = src, indication = null, onClick = onClick).padding(horizontal = 4.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically) {
         TIconView(icon, XP_LINK, Modifier.size(16.dp))
-        Text(label, color = XP_LINK, fontSize = 13.sp, maxLines = 2, modifier = Modifier.padding(start = 6.dp),
+        Text(label, color = XP_LINK, fontSize = 13.sp, maxLines = 2, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp),
             style = TextStyle(textDecoration = if (f) androidx.compose.ui.text.style.TextDecoration.Underline else null))
     }
 }
 
-/** Inicio ("Mi Vibe"): accesos grandes, seguir viendo y favoritos, como íconos de escritorio. */
+private const val HOME_CATS = 17
+
+/** Inicio ("Mi Vibe"): categorías de la sección actual, seguir viendo y favoritos, como íconos de escritorio. */
 @Composable
 private fun DeskHome(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, compact: Boolean, first: FocusRequester) {
     val cont = remember(vm.items, vm.resume) { vm.continueWatching() }
     val favs = remember(vm.items, vm.favorites) { val byId = vm.items.associateBy { it.id }; vm.favorites.mapNotNull { byId[it] }.take(24) }
+    val cats = remember(vm.items, vm.section, vm.hiddenCats, vm.catOrder) { vm.categories() }
     LazyVerticalGrid(GridCells.Adaptive(if (compact) 150.dp else 190.dp), modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        item(span = { GridItemSpan(maxLineSpan) }) { GroupHeader(tr("Secciones")) }
-        val shortcuts = listOf(
-            Triple(tr("TV en vivo"), "${vm.countOf(Kind.LIVE)} " + tr("canales"), TIcon.TV) to { ctl.goTab(1) },
-            Triple(tr("Películas"), "${vm.countOf(Kind.MOVIE)}", TIcon.MOVIE) to { ctl.goTab(2) },
-            Triple(tr("Series"), "${vm.countOf(Kind.SERIES)}", TIcon.SERIES) to { ctl.goTab(3) },
-            Triple(tr("Guía"), tr("Programación"), TIcon.GUIDE) to { vm.showGuide = true },
-            Triple(tr("Mis listas"), vm.source?.name.orEmpty(), TIcon.LISTS) to { vm.showWelcome = true },
-            Triple(tr("Ajustes"), "", TIcon.SETTINGS) to { vm.showSettings = true },
-        )
-        itemsIndexed(shortcuts, key = { i, _ -> "s$i" }) { i, (t, onClick) ->
-            DeskIcon(t.first, t.second, null, t.third, Modifier.then(if (i == 0) Modifier.focusRequester(first) else Modifier), onClick = onClick)
+        // Las secciones ya están en el escritorio: aquí, las categorías de la sección actual (y un cambio rápido de sección)
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Box(Modifier.weight(1f)) { GroupHeader(tr("Categorías") + " · " + tr(vm.section.label)) }
+                vm.sectionsAvailable.filter { it != vm.section }.forEach { k ->
+                    ToolButton(tr(k.label)) { vm.selectSection(k); vm.goHome() }
+                }
+            }
+        }
+        item(key = "todos") {
+            DeskIcon(tr("Todos"), "${vm.countOf(vm.section)} " + tr(vm.section.many), null, TIcon.FOLDER, Modifier.focusRequester(first)) { openCategory(vm, ctl, CAT_ALL) }
+        }
+        itemsIndexed(cats.take(HOME_CATS), key = { i, c -> "k$i:${c.first}" }) { _, (g, n) ->
+            DeskIcon(g, "$n " + tr(if (n == 1) vm.section.one else vm.section.many), null, TIcon.FOLDER, Modifier) { openCategory(vm, ctl, g) }
+        }
+        if (cats.size > HOME_CATS) item(key = "mas") {
+            DeskIcon(tr("Ver todas"), "${cats.size} " + tr("categorías"), null, TIcon.LISTS, Modifier) { openCategory(vm, ctl, null); ctl.dialog = "cats" }
         }
         if (cont.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) { GroupHeader(tr("Seguir viendo")) }
@@ -270,6 +326,24 @@ private fun DeskHome(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, compact: 
             itemsIndexed(favs, key = { i, it0 -> "f$i:${it0.id}" }) { _, it0 ->
                 DeskIcon(it0.name, vm.nowNext(it0).first?.title.orEmpty(), it0, null, Modifier, onLong = { vm.toggleFavorite(it0) }) { ctl.open(it0, favs) }
             }
+        }
+    }
+}
+
+/** Ajustes: los accesos de configuración como íconos grandes. */
+@Composable
+private fun DeskSettings(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, compact: Boolean, first: FocusRequester) {
+    val items = listOf(
+        Triple(tr("Ajustes"), tr("Apariencia, reproducción y más"), TIcon.SETTINGS) to { vm.showSettings = true },
+        Triple(tr("Mis listas"), vm.source?.name.orEmpty(), TIcon.LISTS) to { vm.showWelcome = true },
+        Triple(tr("Perfil"), vm.profile.name, TIcon.PROFILE) to { ctl.dialog = "profiles" },
+        Triple(tr("Buscar actualizaciones"), "", TIcon.UPDATE) to { vm.checkUpdate(isTv, silent = false) },
+    )
+    LazyVerticalGrid(GridCells.Adaptive(if (compact) 150.dp else 190.dp), modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item(span = { GridItemSpan(maxLineSpan) }) { GroupHeader(tr("Ajustes")) }
+        itemsIndexed(items, key = { i, _ -> "a$i" }) { i, (t, onClick) ->
+            DeskIcon(t.first, t.second, null, t.third, if (i == 0) Modifier.focusRequester(first) else Modifier, onClick = onClick)
         }
     }
 }
@@ -353,16 +427,16 @@ private fun StartButton(open: Boolean, compact: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun TaskButton(label: String, icon: TIcon, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun TaskButton(label: String, icon: TIcon, selected: Boolean, compact: Boolean, iconOnly: Boolean = false, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val f by src.collectIsFocusedAsState()
-    Row(Modifier.height(if (compact) 26.dp else 30.dp).widthIn(min = 120.dp).clip(RoundedCornerShape(3.dp))
-        .background(if (selected) Color(0xFF1E52B7) else Color(0xFF3C81F3))
+    Row(Modifier.height(if (compact) 26.dp else 30.dp).widthIn(min = if (iconOnly) 36.dp else 120.dp).clip(RoundedCornerShape(3.dp))
+        .background(Brush.verticalGradient(if (selected) listOf(Color(0xFF1A47A8), Color(0xFF1E52B7)) else listOf(Color(0xFF5A9AF8), Color(0xFF3C81F3), Color(0xFF3171E0))))
         .border(1.dp, if (f) Color(0xFFFFD25A) else Color(0x66FFFFFF), RoundedCornerShape(3.dp))
         .combinedClickable(interactionSource = src, indication = null, onClick = onClick).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically) {
         TIconView(icon, Color.White, Modifier.size(16.dp))
-        Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
+        if (!iconOnly) Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
     }
 }
 
@@ -370,7 +444,7 @@ private fun TaskButton(label: String, icon: TIcon, selected: Boolean, compact: B
 @Composable
 private fun StartMenu(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean, compact: Boolean, first: FocusRequester, modifier: Modifier, close: () -> Unit) {
     val recent = remember(vm.items, vm.recent) { val byId = vm.items.associateBy { it.id }; vm.recent.mapNotNull { byId[it] }.take(if (compact) 5 else 8) }
-    Column(modifier.padding(start = 2.dp).width(if (compact) 400.dp else 460.dp).heightIn(max = if (compact) 300.dp else 460.dp)
+    Column(modifier.padding(start = 2.dp).widthIn(max = if (compact) 400.dp else 460.dp).fillMaxWidth().heightIn(max = if (compact) 300.dp else 460.dp)
         .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).border(1.dp, Color(0xFF0831D9), RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))) {
         Row(Modifier.fillMaxWidth().background(XP_TITLE).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(36.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFFF2C14E)).border(2.dp, Color.White, RoundedCornerShape(5.dp)),
@@ -428,3 +502,50 @@ private fun ToolChip(label: String, onClick: () -> Unit) {
     }
 }
 
+/** Fondo propio del escritorio: cielo azul degradado con nubes suaves y una colina verde (no es la imagen de ninguna marca). */
+private fun Modifier.deskWallpaper(): Modifier = drawBehind {
+    drawRect(Brush.verticalGradient(listOf(Color(0xFF2F6FD8), Color(0xFF6FA8EE), Color(0xFFBFDCF5)), endY = size.height * 0.75f))
+    // Nubes: óvalos blancos muy transparentes
+    listOf(Triple(0.18f, 0.16f, 0.22f), Triple(0.62f, 0.10f, 0.28f), Triple(0.84f, 0.30f, 0.18f)).forEach { (x, y, w) ->
+        drawOval(Color.White.copy(alpha = 0.18f), topLeft = androidx.compose.ui.geometry.Offset(size.width * x, size.height * y),
+            size = androidx.compose.ui.geometry.Size(size.width * w, size.height * 0.07f))
+    }
+    val hill = androidx.compose.ui.graphics.Path().apply {
+        moveTo(0f, size.height * 0.66f)
+        cubicTo(size.width * 0.28f, size.height * 0.52f, size.width * 0.58f, size.height * 0.56f, size.width, size.height * 0.70f)
+        lineTo(size.width, size.height); lineTo(0f, size.height); close()
+    }
+    drawPath(hill, Brush.verticalGradient(listOf(Color(0xFF63B83D), Color(0xFF3A8F24), Color(0xFF2E7D1E)), startY = size.height * 0.55f, endY = size.height))
+}
+
+/** Columna de íconos sueltos en el escritorio, con el nombre en blanco y sombra. */
+@Composable
+private fun DesktopIcons(vm: AppViewModel, ctl: ConsoleCtl, modifier: Modifier) {
+    Column(modifier.verticalScroll(rememberScrollState()).padding(top = 10.dp, bottom = 10.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        DesktopIcon(tr("Mi Vibe"), TIcon.FOLDER, true) { ctl.goTab(0) }
+        DesktopIcon(tr("TV en vivo"), TIcon.TV, false) { ctl.goTab(1) }
+        DesktopIcon(tr("Películas"), TIcon.MOVIE, false) { ctl.goTab(2) }
+        DesktopIcon(tr("Series"), TIcon.SERIES, false) { ctl.goTab(3) }
+        DesktopIcon(tr("Mis listas"), TIcon.LISTS, true) { vm.showWelcome = true }
+        DesktopIcon(tr("Ajustes"), TIcon.SETTINGS, false) { vm.showSettings = true }
+    }
+}
+
+@Composable
+private fun DesktopIcon(label: String, icon: TIcon, folder: Boolean, onClick: () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val f by src.collectIsFocusedAsState()
+    Column(Modifier.width(84.dp).combinedClickable(interactionSource = src, indication = null, onClick = onClick).padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(6.dp))
+            .background(Brush.verticalGradient(if (folder) listOf(Color(0xFFFFF2B3), Color(0xFFF2C14E)) else listOf(Color(0xFFE6F0FF), Color(0xFF6FA0EA))))
+            .then(if (f) Modifier.background(XP_SELECT.copy(alpha = 0.45f)) else Modifier), contentAlignment = Alignment.Center) {
+            TIconView(icon, if (folder) Color(0xFF7A5A0A) else Color(0xFF123F96), Modifier.size(24.dp))
+        }
+        Box(Modifier.padding(top = 3.dp).background(if (f) XP_SELECT else Color.Transparent).padding(horizontal = 3.dp)) {
+            Text(label, color = Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = TextStyle(shadow = if (f) null else Shadow(Color.Black, androidx.compose.ui.geometry.Offset(1.5f, 1.5f), 2f)))
+        }
+    }
+}

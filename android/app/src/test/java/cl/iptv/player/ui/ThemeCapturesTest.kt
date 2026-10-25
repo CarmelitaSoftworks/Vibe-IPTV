@@ -26,7 +26,10 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w960dp-h540dp-land-xhdpi")
-class ThemeCapturesTest {
+open class ThemeCapturesTest {
+    /** Sufijo de los archivos: vacío en la TV; las subclases (otros equipos) ponen el suyo. */
+    protected open val dispositivo = ""
+
     // La regla de Compose abre una Activity; en las pruebas normales (release) no existe, así que
     // primero se comprueba si es el flujo de capturas y, si no, la prueba se salta antes de abrirla
     private val soloCapturas = org.junit.rules.TestRule { base, _ ->
@@ -60,8 +63,12 @@ class ThemeCapturesTest {
     }
 
     private fun shot(name: String) {
+        // Con el reloj detenido, un cambio hecho desde la prueba (p. ej. de pestaña) no se dibujaba hasta la foto
+        // siguiente: se avisa del cambio y se avanzan unos cuadros antes de esperar las animaciones
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        repeat(3) { compose.mainClock.advanceTimeByFrame() }
         compose.mainClock.advanceTimeBy(1500)
-        compose.onRoot().captureRoboImage("$out/$name.png")
+        compose.onRoot().captureRoboImage("$out/$name${if (dispositivo.isEmpty()) "" else "_$dispositivo"}.png")
     }
 
     @Test fun mosaicos() {
@@ -90,6 +97,27 @@ class ThemeCapturesTest {
         shot("ondas_4_ajustes")
     }
 
+    /** Los dos temas de consola: Inicio (con algunos favoritos), TV en vivo, Películas y Ajustes. */
+    private fun consola(theme: String, nombre: String, screen: @androidx.compose.runtime.Composable (AppViewModel) -> Unit) {
+        compose.mainClock.autoAdvance = false
+        val vm = vm(theme)
+        listOf("m3", "s2", "l5", "m7").forEach { id -> vm.items.firstOrNull { it.id == id }?.let { vm.toggleFavorite(it) } }
+        compose.setContent { IptvTheme(theme) { screen(vm) } }
+        shot("${nombre}_1_inicio")
+        compose.runOnUiThread { vm.shell.tab = 1; vm.selectSection(Kind.LIVE) }
+        shot("${nombre}_2_tv")
+        compose.runOnUiThread { vm.shell.tab = 2; vm.selectSection(Kind.MOVIE) }
+        shot("${nombre}_3_peliculas")
+        compose.runOnUiThread { vm.shell.tab = 5 }
+        shot("${nombre}_4_ajustes")
+    }
+
+    @Test fun pulso() = consola("pulse", "pulso") { PulseScreen(it) }
+
+    @Test fun horizonte() = consola("horizon", "horizonte") { HorizonScreen(it) }
+
+    @Test fun escritorio() = consola("desk", "escritorio") { DeskScreen(it) }
+
     @Test fun clasico() {
         compose.mainClock.autoAdvance = false
         val vm = vm("light")
@@ -97,3 +125,16 @@ class ThemeCapturesTest {
         shot("clasico_1_inicio")
     }
 }
+
+/** Las mismas capturas en otros equipos: teléfono en vertical y en horizontal, tableta y laptop. */
+@Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
+class ThemeCapturesTestTelefono : ThemeCapturesTest() { override val dispositivo = "telefono" }
+
+@Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+class ThemeCapturesTestTelefonoHorizontal : ThemeCapturesTest() { override val dispositivo = "telefono_horizontal" }
+
+@Config(sdk = [34], qualifiers = "w1280dp-h800dp-land-xhdpi")
+class ThemeCapturesTestTableta : ThemeCapturesTest() { override val dispositivo = "tableta" }
+
+@Config(sdk = [34], qualifiers = "w1366dp-h768dp-land-mdpi")
+class ThemeCapturesTestLaptop : ThemeCapturesTest() { override val dispositivo = "laptop" }

@@ -69,24 +69,24 @@ val Wave = Dark.copy(
     dock = Color(0x33140F2E), sheet = Color(0xFF2C2752), radius = 16f, dark = true,
 )
 
-/** Pulso: gris carbón con un brillo verde, mosaicos redondeados (estilo de los menús de consola actuales). */
+/** Pulso (como PS5): azul profundo, fila de íconos arriba y la imagen de lo elegido de fondo. */
 val Pulse = Dark.copy(
-    bg = Color(0xFF1C2620), bg2 = Color(0xFF0C0E10), bgLines = Color.Transparent, bgStyle = "metro",
-    tileA = Color(0xFF262B2F), tileB = Color(0xFF1C2024), tileEdge = Color(0x26FFFFFF), tileLines = Color.Transparent,
-    emptyA = Color(0x14FFFFFF), emptyB = Color(0x0AFFFFFF),
-    ink = Color(0xFFF2F4F5), inkSoft = Color(0xFFA9B2B7),
-    accent = Color(0xFF38B456), accentDeep = Color(0xFF8CE3A0), focus = Color(0xFFFFFFFF),
-    dock = Color(0xCC14171A), sheet = Color(0xFF1B1F22), radius = 10f, dark = true,
-)
-
-/** Horizonte: azul noche, fila de íconos arriba y la imagen de lo elegido de fondo. */
-val Horizon = Dark.copy(
-    bg = Color(0xFF0A1428), bg2 = Color(0xFF030712), bgLines = Color.Transparent, bgStyle = "gradient",
+    bg = Color(0xFF0A1A3F), bg2 = Color(0xFF02050D), bgLines = Color.Transparent, bgStyle = "gradient",
     tileA = Color(0x26FFFFFF), tileB = Color(0x12FFFFFF), tileEdge = Color(0x33FFFFFF), tileLines = Color.Transparent,
     emptyA = Color(0x14FFFFFF), emptyB = Color(0x0AFFFFFF),
-    ink = Color(0xFFFFFFFF), inkSoft = Color(0xCCD3DCEB),
-    accent = Color(0xFF3F7FF0), accentDeep = Color(0xFFB4CBFF), focus = Color(0xFFFFFFFF),
-    dock = Color(0x99040A16), sheet = Color(0xFF101A2D), radius = 14f, dark = true,
+    ink = Color(0xFFFFFFFF), inkSoft = Color(0xCCC9D6F2),
+    accent = Color(0xFF3F7FF0), accentDeep = Color(0xFF8FB2FF), focus = Color(0xFFFFFFFF),
+    dock = Color(0x99040A16), sheet = Color(0xFF0F1B33), radius = 14f, dark = true,
+)
+
+/** Horizonte (como Xbox Series): gris carbón, acento verde y mosaicos de esquinas casi rectas. */
+val Horizon = Dark.copy(
+    bg = Color(0xFF1C1F22), bg2 = Color(0xFF0D0E10), bgLines = Color.Transparent, bgStyle = "metro",
+    tileA = Color(0xFF2A2E33), tileB = Color(0xFF1E2124), tileEdge = Color(0x26FFFFFF), tileLines = Color.Transparent,
+    emptyA = Color(0x14FFFFFF), emptyB = Color(0x0AFFFFFF),
+    ink = Color(0xFFF2F4F5), inkSoft = Color(0xFFA9B0B6),
+    accent = Color(0xFF3BAA4A), accentDeep = Color(0xFF8CE3A0), focus = Color(0xFFFFFFFF),
+    dock = Color(0xCC14171A), sheet = Color(0xFF1B1F22), radius = 6f, dark = true,
 )
 
 /** Escritorio: ventana clásica de escritorio de principios de los 2000 (azul, crema y verde). Diseño propio. */
