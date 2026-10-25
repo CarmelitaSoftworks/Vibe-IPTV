@@ -47,6 +47,8 @@ class MpvHandle(private val mpv: MPVLib) : AltEngine {
 
     override fun addExternalSubtitle(file: java.io.File) { mpv.command(arrayOf("sub-add", file.absolutePath, "select")) }
 
+    override val bufferedAheadMs: Long? get() = mpv.getPropertyDouble("demuxer-cache-duration")?.let { (it * 1000).toLong() }
+
     override fun info(): List<Pair<String, String>> = listOfNotNull(
         mpv.getPropertyString("video-codec")?.let { c -> "Video" to listOfNotNull(c, mpv.getPropertyInt("width")?.let { "${it}×${mpv.getPropertyInt("height")}" }).joinToString(" · ") },
         mpv.getPropertyString("audio-codec-name")?.let { "Audio" to it },

@@ -122,6 +122,9 @@ internal fun ScaledForWide(content: @Composable () -> Unit) {
     }
 }
 
+/** Imagen que vale la pena poner de fondo: de internet o un archivo del equipo (las capturas de prueba usan archivos). */
+internal fun isImageUrl(s: String) = s.startsWith("http") || s.startsWith("file:")
+
 /** Un acceso de la pantalla de inicio o de Ajustes. */
 private class Shortcut(val label: String, val icon: TIcon, val onClick: () -> Unit)
 
@@ -188,7 +191,7 @@ fun PulseScreen(vm: AppViewModel) {
         val side = if (compact) 16.dp else 48.dp
         // Fondo: la imagen de lo elegido a pantalla completa, fundida hacia la izquierda y hacia abajo
         val img = cur?.image.orEmpty()
-        if (img.startsWith("http") && !Perf.lite) {
+        if (isImageUrl(img) && !Perf.lite) {
             AsyncImage(img, null, contentScale = if (cur?.item?.kind == Kind.LIVE) ContentScale.Fit else ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().then(if (cur?.item?.kind == Kind.LIVE) Modifier.padding(start = maxWidth * 0.45f, top = 60.dp, bottom = maxHeight * 0.35f, end = 40.dp) else Modifier)
                     .graphicsLayer { alpha = 0.6f })
@@ -393,7 +396,7 @@ fun HorizonScreen(vm: AppViewModel) {
         val k = ckind(tab)
         // Arriba, la imagen grande de lo enfocado, fundida hacia abajo y hacia la izquierda
         val heroImg = hero?.logo.orEmpty()
-        if (heroImg.startsWith("http") && hero?.kind != Kind.LIVE && !Perf.lite && (tab == 0 || k != null)) {
+        if (isImageUrl(heroImg) && hero?.kind != Kind.LIVE && !Perf.lite && (tab == 0 || k != null)) {
             Box(Modifier.fillMaxWidth().fillMaxHeight(if (k == null) 0.68f else 0.45f)) {
                 AsyncImage(heroImg, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (k == null) 0.6f else 0.3f })
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(c.bg2.copy(alpha = 0.9f), Color.Transparent))))

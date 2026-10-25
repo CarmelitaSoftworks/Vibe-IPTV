@@ -155,6 +155,10 @@ fun PlayerScreen(vm: AppViewModel) {
     var alt by remember { mutableStateOf<AltEngine?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
     var liveRetries by remember { mutableStateOf(0) }
+    // Diagnóstico (Más → Información técnica): cortes y reconexiones del canal actual y velocidad del colchón
+    var stalls by remember(item.id) { mutableStateOf(0) }
+    var reconnects by remember(item.id) { mutableStateOf(0) }
+    var cushionSpeed by remember { mutableStateOf(1f) }
     // true cuando el motor actual ya mostró imagen o sonido (lo usa el vigilante de arranque)
     var started by remember { mutableStateOf(false) }
     fun switchEngine(to: String, reason: String) {
@@ -189,6 +193,7 @@ fun PlayerScreen(vm: AppViewModel) {
     val buf = cl.iptv.player.data.BufferProfile.of(bufLevel, live, memMb)
     val rebuffers = remember { mutableStateMapOf<String, Int>() }      // veces que cada canal se quedó cargando
     fun countRebuffer(it0: Item) {
+        stalls++
         val n = (rebuffers[it0.id] ?: 0) + 1
         rebuffers[it0.id] = n
         if (n >= 3 && it0.kind == Kind.LIVE) {
@@ -198,7 +203,9 @@ fun PlayerScreen(vm: AppViewModel) {
     }
     val whisperOn = vm.whisperLang != null
     val aiOn = vm.aiSubs != null || whisperOn
-    val player = remember(bufLevel, live, aiOn, whisperOn) {
+    // El reproductor se arma una sola vez (no al cambiar de canal aunque cambie el nivel de búfer: rearmarlo sumaba una
+    // pausa al cambiar de canal); el colchón en vivo usa el nivel de cada canal
+    val player = remember(live, aiOn, whisperOn) {
         // Búfer medido en segundos (no en megas: con canales 1080p pesados el límite en megas lo dejaba en pocos
         // segundos) y velocidad fija en directo: evita cortes y saltos hacia adelante
         val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -230,6 +237,9 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
     val exo = remember(player) { ExoControl(player) }
+    val bandwidth = remember { androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(ctx) }
+    var infoTick by remember { mutableStateOf(0) }
+    LaunchedEffect(panel) { while (panel == PAction.INFO) { delay(1000); infoTick++ } }
     val ctl: PlaybackControl? = if (useAlt) alt else exo
 
     // Cargar el elemento actual (o recargar al añadir subtítulos conservando la posición)
@@ -329,18 +339,23 @@ fun PlayerScreen(vm: AppViewModel) {
     LaunchedEffect(item.id) { vm.logEvent("Reproducir: ${item.name} [${item.kind}] ${item.url}") }
     // Colchón en vivo (Ajustes → Reproducción): si queda poco video guardado, se reproduce un 2–4 % más lento hasta
     // rehacerlo. Sólo con ExoPlayer y sin Whisper (que ya retrasa el audio a propósito)
-    LaunchedEffect(item.id, engine, player, whisperOn, vm.settings.liveCushion) {
+    LaunchedEffect(item.id, engine, player, alt, whisperOn, vm.settings.liveCushion) {
         val c = cl.iptv.player.data.LiveCushion()
-        player.playbackParameters = androidx.media3.common.PlaybackParameters.DEFAULT
-        if (!live || useAlt || whisperOn || !vm.settings.liveCushion) return@LaunchedEffect
+        cushionSpeed = 1f
+        if (!useAlt) player.playbackParameters = androidx.media3.common.PlaybackParameters.DEFAULT
+        if (!live || whisperOn || !vm.settings.liveCushion) return@LaunchedEffect
         while (true) {
             delay(1000)
-            if (!player.isPlaying) continue
+            val k = ctlOf(useAlt, alt, exo) ?: continue
+            val ahead = k.bufferedAheadMs ?: continue                 // VLC no informa su reserva
+            if (!k.isPlaying || userPaused) continue
+            if (k.speed !in listOf(1f, cl.iptv.player.data.LiveCushion.SLOW, cl.iptv.player.data.LiveCushion.SLOWER)) continue   // velocidad elegida a mano
             val before = c.speed
-            val s = c.update(player.totalBufferedDuration, cl.iptv.player.data.LiveCushion.targetMs(vm.bufferLevel(item)))
+            val s = c.update(ahead, cl.iptv.player.data.LiveCushion.targetMs(vm.bufferLevel(item)))
             if (s != before) {
-                player.playbackParameters = androidx.media3.common.PlaybackParameters(s)
-                vm.logEvent("Colchón en vivo: ${player.totalBufferedDuration / 1000} s guardados → velocidad ${"%.2f".format(s)}")
+                k.speed = s
+                cushionSpeed = s
+                vm.logEvent("Colchón en vivo: ${ahead / 1000} s guardados → velocidad ${"%.2f".format(s)}")
             }
         }
     }
@@ -450,7 +465,12 @@ fun PlayerScreen(vm: AppViewModel) {
             }
         }
         player.addListener(listener)
-        onDispose { player.removeListener(listener); player.release() }
+        val analytics = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onLoadError(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, l: androidx.media3.exoplayer.source.LoadEventInfo,
+                                     m: androidx.media3.exoplayer.source.MediaLoadData, e: java.io.IOException, cancelled: Boolean) { reconnects++ }
+        }
+        player.addAnalyticsListener(analytics)
+        onDispose { player.removeListener(listener); player.removeAnalyticsListener(analytics); player.release() }
     }
 
     // Al salir del elemento (otro canal o volver al menú): guardar dónde quedó
@@ -951,8 +971,27 @@ fun PlayerScreen(vm: AppViewModel) {
                     val rec = a == PAction.RECORD && vm.recording?.item?.id == item.id
                     PanelRow(if (rec) "Detener grabación" else a.label, selected = rec, icon = a) { panel = null; onAction(a) }
                 }
-                PAction.INFO -> (listOf("Motor" to engineName[engine].orEmpty()) + k?.info().orEmpty() +
-                    listOfNotNull(Uri.parse(playUrl).host?.let { "Servidor del canal" to it })).map { (l, v) -> PanelRow(l, detail = v) {} }
+                PAction.INFO -> {
+                    infoTick                                                    // se vuelve a leer cada segundo
+                    val lvl = vm.bufferLevel(item)
+                    val learned = (vm.bufferBoosts[item.id] ?: 0) > 0
+                    val levelName = listOf("Rápido", "Equilibrado", "Estable", "Estable +")[lvl.coerceIn(0, 3)] + if (learned) " · aprendido" else ""
+                    val diag = buildList {
+                        k?.bufferedAheadMs?.let { add("Reserva guardada" to "%.1f s".format(it / 1000f)) }
+                        add("Nivel de búfer" to levelName)
+                        if (live) add("Colchón en vivo" to when {
+                            !vm.settings.liveCushion -> "Desactivado"
+                            k?.bufferedAheadMs == null -> "No disponible con este motor"
+                            cushionSpeed < 1f -> "Rehaciendo la reserva (${Math.round(cushionSpeed * 100)} %)"
+                            else -> "Reserva completa"
+                        })
+                        add("Cortes en este canal" to stalls.toString())
+                        if (!useAlt) add("Reconexiones" to reconnects.toString())
+                        if (!useAlt) bandwidth.bitrateEstimate.takeIf { it > 0 }?.let { add("Velocidad de descarga" to "%.1f Mb/s".format(it / 1e6)) }
+                    }
+                    (listOf("Motor" to engineName[engine].orEmpty()) + diag + k?.info().orEmpty().filter { it.first != "Búfer" } +
+                        listOfNotNull(Uri.parse(playUrl).host?.let { "Servidor del canal" to it })).map { (l, v) -> PanelRow(l, detail = v) {} }
+                }
                 else -> emptyList()
             }
             PlayerSidePanel(p.label, rows, onClose = { panel = null }, modifier = Modifier.align(Alignment.CenterEnd), wide = p == PAction.LIST)

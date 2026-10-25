@@ -51,6 +51,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Seguir viendo en el inicio**: tus películas y series a medias, con su barra de avance.
 - **Búfer ajustable** (Rápido / Equilibrado / Estable) en los tres motores, y **búfer aprendido**: si un canal se corta seguido, la app le sube el búfer sola y lo recuerda.
 - **Canales en vivo estables**: sin saltos hacia adelante ni parpadeos, con reconexión automática si la señal se corta.
+- **Colchón en vivo**: cuando un canal en vivo queda con poca reserva, se reproduce un poco más lento (no se nota) hasta rehacerla; y si la conexión se cae un momento, reconecta enseguida sin vaciar lo ya cargado. En *Información técnica* se ven la reserva guardada, los cortes, las reconexiones y la velocidad de descarga.
 - Menú del reproductor con pistas de audio, calidad, relación de aspecto, velocidad, información técnica del canal, favoritos, imagen en imagen (PiP) y lista de canales sin salir del video.
 
 ### 🧭 Navegación
