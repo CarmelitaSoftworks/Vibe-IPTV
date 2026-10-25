@@ -51,10 +51,10 @@ import kotlinx.coroutines.delay
 
 /*
  * Dos temas al estilo de los menús de las consolas actuales (diseño propio: sin logos, nombres ni recursos de marcas).
- *  · Pulso (como PS5): pestañas de texto arriba, una fila de íconos que se desplaza a la izquierda, el elegido grande
+ *  · Pulso: pestañas de texto arriba, una fila de íconos que se desplaza a la izquierda, el elegido grande
  *    con su nombre al lado, su imagen de fondo a pantalla completa, su información y botones debajo y, en Inicio,
  *    tarjetas anchas de lo que se estaba viendo.
- *  · Horizonte (como Xbox Series): perfil y pestañas arriba, la imagen grande de lo enfocado con su nombre, filas de
+ *  · Horizonte: perfil y pestañas arriba, la imagen grande de lo enfocado con su nombre, filas de
  *    mosaicos de esquinas casi rectas (el primero ancho) con borde blanco grueso al enfocar, y una cuadrícula.
  * Funcionan con el control remoto (foco), el tacto y el mouse; todas las listas se desplazan solas hasta lo enfocado.
  */
@@ -143,7 +143,7 @@ private fun settingsShortcuts(vm: AppViewModel, ctl: ConsoleCtl, isTv: Boolean) 
 )
 
 // ============================================================================================
-// Pulso (al estilo del menú de PS5)
+// Pulso
 // ============================================================================================
 
 /** Elemento de la fila de Pulso: contenido o acceso. */
@@ -369,7 +369,7 @@ private fun PulseCard(item: Item, progress: Float, onClick: () -> Unit) {
 }
 
 // ============================================================================================
-// Horizonte (al estilo del menú de Xbox Series)
+// Horizonte
 // ============================================================================================
 
 @Composable

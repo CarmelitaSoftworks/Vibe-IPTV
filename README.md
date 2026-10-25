@@ -258,7 +258,7 @@ ejecuta `node i18n/build.mjs` para actualizar la web y Android.
 ## 🙏 Créditos
 
 **Vibe IPTV** es desarrollado y mantenido por **[Carmelita Softworks](https://github.com/CarmelitaSoftworks)**. 🇨🇱
-Es un proyecto *vibe coded*: el código se escribió conversando con 🤖 **Claude**, de **[Anthropic](https://www.anthropic.com)**.
+Es un proyecto *vibe coded* ([cómo se hizo](CREDITOS.md#hecho-con-vibe-coding)).
 
 Y existe gracias a estos proyectos de código abierto y servicios:
 

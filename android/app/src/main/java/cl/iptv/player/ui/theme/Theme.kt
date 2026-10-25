@@ -69,7 +69,7 @@ val Wave = Dark.copy(
     dock = Color(0x33140F2E), sheet = Color(0xFF2C2752), radius = 16f, dark = true,
 )
 
-/** Pulso (como PS5): azul profundo, fila de íconos arriba y la imagen de lo elegido de fondo. */
+/** Pulso: azul profundo, fila de íconos arriba y la imagen de lo elegido de fondo. */
 val Pulse = Dark.copy(
     bg = Color(0xFF0A1A3F), bg2 = Color(0xFF02050D), bgLines = Color.Transparent, bgStyle = "gradient",
     tileA = Color(0x26FFFFFF), tileB = Color(0x12FFFFFF), tileEdge = Color(0x33FFFFFF), tileLines = Color.Transparent,
@@ -79,7 +79,7 @@ val Pulse = Dark.copy(
     dock = Color(0x99040A16), sheet = Color(0xFF0F1B33), radius = 14f, dark = true,
 )
 
-/** Horizonte (como Xbox Series): gris carbón, acento verde y mosaicos de esquinas casi rectas. */
+/** Horizonte: gris carbón, acento verde y mosaicos de esquinas casi rectas. */
 val Horizon = Dark.copy(
     bg = Color(0xFF1C1F22), bg2 = Color(0xFF0D0E10), bgLines = Color.Transparent, bgStyle = "metro",
     tileA = Color(0xFF2A2E33), tileB = Color(0xFF1E2124), tileEdge = Color(0x26FFFFFF), tileLines = Color.Transparent,
