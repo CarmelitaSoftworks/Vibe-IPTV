@@ -110,6 +110,18 @@ internal fun Clock(color: Color, size: Int) {
         color = color, fontSize = size.sp, fontWeight = FontWeight.SemiBold)
 }
 
+/** En pantallas grandes (laptop, tableta, monitor) todo se agranda en proporción para que se vea como en la TV y no diminuto. */
+@Composable
+internal fun ScaledForWide(content: @Composable () -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val k = minOf(maxWidth / 960.dp, maxHeight / 540.dp)
+        if (k > 1.1f) {
+            val d = androidx.compose.ui.platform.LocalDensity.current
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density * k, d.fontScale)) { content() }
+        } else content()
+    }
+}
+
 /** Un acceso de la pantalla de inicio o de Ajustes. */
 private class Shortcut(val label: String, val icon: TIcon, val onClick: () -> Unit)
 
@@ -171,8 +183,8 @@ fun PulseScreen(vm: AppViewModel) {
     LaunchedEffect(tab, vm.category, vm.series?.id, vm.query) { runCatching { state.scrollToItem(0) } }
     LaunchedEffect(ctl.dialog, tab) { if (ctl.dialog == null) { delay(80); runCatching { first.requestFocus() } } }
 
-    BoxWithConstraints(Modifier.fillMaxSize().themeBackground()) {
-        val compact = maxHeight < 480.dp
+    ScaledForWide { BoxWithConstraints(Modifier.fillMaxSize().themeBackground()) {
+        val compact = maxHeight < 480.dp || maxWidth < 600.dp
         val side = if (compact) 16.dp else 48.dp
         // Fondo: la imagen de lo elegido a pantalla completa, fundida hacia la izquierda y hacia abajo
         val img = cur?.image.orEmpty()
@@ -239,21 +251,25 @@ fun PulseScreen(vm: AppViewModel) {
                     cur.item?.let { it0 ->
                         val fav = it0.id in vm.favorites
                         PulseButton(if (fav) "★  " + tr("Quitar de favoritos") else "☆  " + tr("Favorito")) { vm.toggleFavorite(it0) }
-                        if (it0.kind != Kind.LIVE) PulseButton("ⓘ  " + tr("Detalles")) { vm.choose(it0) }
                     }
                     if (k != null) PulseButton("☰  " + tr("Categorías")) { ctl.dialog = "cats" }
                 }
             }
-            // Inicio: tarjetas anchas de lo que se estaba viendo, abajo
-            if (tab == 0 && cont.isNotEmpty() && !compact) {
+            // Inicio: tarjetas anchas abajo, de lo que se estaba viendo (o, si no hay, de los favoritos)
+            val favItems = remember(vm.items, vm.favorites) { vm.favorites.mapNotNull { id -> vm.items.firstOrNull { it.id == id } } }
+            val cards = if (cont.isNotEmpty()) cont else favItems.map { Triple(it, null, null) }
+            if (tab == 0 && cards.isNotEmpty() && !compact) {
                 Spacer(Modifier.weight(1f))
-                androidx.compose.material3.Text(tr("Seguir viendo"), color = c.ink, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(start = side, bottom = 8.dp))
+                androidx.compose.material3.Text(tr(if (cont.isNotEmpty()) "Seguir viendo" else "Favoritos"), color = c.ink, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                    modifier = Modifier.padding(start = side, bottom = 8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(start = side, end = side, bottom = 20.dp)) {
-                    itemsIndexed(cont, key = { i, t -> "$i:${t.first.id}" }) { _, (it0, r, ep) -> PulseCard(it0, r.fraction) { ctl.open(it0, vm.items, ep) } }
+                    itemsIndexed(cards, key = { i, t -> "$i:${t.first.id}" }) { _, (it0, r, ep) ->
+                        PulseCard(it0, r?.fraction ?: 0f) { ctl.open(it0, if (r == null) favItems else vm.items, ep) }
+                    }
                 }
             }
         }
-    }
+    } }
     ConsoleDialogs(vm, ctl)
 }
 
@@ -361,11 +377,16 @@ fun HorizonScreen(vm: AppViewModel) {
     val tab = vm.shell.tab
     val first = remember { FocusRequester() }
     val isTv = (androidx.compose.ui.platform.LocalContext.current as? cl.iptv.player.MainActivity)?.isTv == true
-    var hero by remember { mutableStateOf<Item?>(null) }
+    var focused by remember { mutableStateOf<Item?>(null) }
+    // Con el tacto nada queda enfocado: el destacado parte con lo que se estaba viendo o el primer favorito
+    val firstPick = remember(vm.items, vm.resume, vm.favorites) {
+        vm.continueWatching().firstOrNull()?.first ?: vm.favorites.firstNotNullOfOrNull { id -> vm.items.firstOrNull { it.id == id } }
+    }
+    val hero = focused ?: firstPick
     LaunchedEffect(ctl.dialog, tab) { if (ctl.dialog == null) { delay(80); runCatching { first.requestFocus() } } }
 
-    BoxWithConstraints(Modifier.fillMaxSize().themeBackground()) {
-        val compact = maxHeight < 480.dp
+    ScaledForWide { BoxWithConstraints(Modifier.fillMaxSize().themeBackground()) {
+        val compact = maxHeight < 480.dp || maxWidth < 600.dp
         val side = if (compact) 16.dp else 40.dp
         val k = ckind(tab)
         // Arriba, la imagen grande de lo enfocado, fundida hacia abajo y hacia la izquierda
@@ -398,7 +419,7 @@ fun HorizonScreen(vm: AppViewModel) {
             }
             if (k == null) {
                 // Destacado: el nombre grande de lo enfocado, sobre su imagen
-                Column(Modifier.padding(start = side, end = side, top = if (compact) 8.dp else 40.dp).height(if (compact) 40.dp else 76.dp).widthIn(max = 640.dp),
+                if (hero != null) Column(Modifier.padding(start = side, end = side, top = if (compact) 8.dp else 40.dp).height(if (compact) 40.dp else 76.dp).widthIn(max = 640.dp),
                     verticalArrangement = Arrangement.Bottom) {
                     hero?.let { h ->
                         androidx.compose.material3.Text(h.name, color = c.ink, fontWeight = FontWeight.Bold, fontSize = if (compact) 20.sp else 30.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -406,13 +427,13 @@ fun HorizonScreen(vm: AppViewModel) {
                         if (sub.isNotBlank() && !compact) androidx.compose.material3.Text(sub, color = c.inkSoft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                HorizonRows(vm, ctl, tab, isTv, side, compact, first) { hero = it }
+                HorizonRows(vm, ctl, tab, isTv, side, compact, first) { focused = it }
             } else {
                 Spacer(Modifier.height(if (compact) 8.dp else 16.dp))
-                HorizonGrid(vm, ctl, k, side, compact, first) { hero = it }
+                HorizonGrid(vm, ctl, k, side, compact, first) { focused = it }
             }
         }
-    }
+    } }
     ConsoleDialogs(vm, ctl)
 }
 
@@ -464,8 +485,8 @@ private fun HorizonRows(vm: AppViewModel, ctl: ConsoleCtl, tab: Int, isTv: Boole
                         }
                     }
                 }
-                if (favs.isNotEmpty()) item { HorizonRow("Favoritos", side) { itemsIndexed(favs) { _, it0 -> HorizonTile(it0, Modifier.height(tileH * 0.8f).width(tileH * 1.1f), onFocus = onHero, onLong = { vm.toggleFavorite(it0) }) { ctl.open(it0, favs) } } } }
-                if (recents.isNotEmpty()) item { HorizonRow("Recientes", side) { itemsIndexed(recents) { _, it0 -> HorizonTile(it0, Modifier.height(tileH * 0.8f).width(tileH * 1.1f), onFocus = onHero) { ctl.open(it0, recents) } } } }
+                if (favs.isNotEmpty()) item { HorizonRow("Favoritos", side) { itemsIndexed(favs) { _, it0 -> HorizonTile(it0, Modifier.height(if (compact) tileH else tileH * 0.8f).width(tileH * 1.1f), onFocus = onHero, onLong = { vm.toggleFavorite(it0) }) { ctl.open(it0, favs) } } } }
+                if (recents.isNotEmpty()) item { HorizonRow("Recientes", side) { itemsIndexed(recents) { _, it0 -> HorizonTile(it0, Modifier.height(if (compact) tileH else tileH * 0.8f).width(tileH * 1.1f), onFocus = onHero) { ctl.open(it0, recents) } } } }
             }
             4 -> item {
                 HorizonRow("Guía", side) {
@@ -557,7 +578,7 @@ private fun HorizonTile(item: Item, modifier: Modifier, progress: Float = 0f, su
     ) {
         if (!failed) AsyncImage(item.logo, null, contentScale = if (item.kind == Kind.LIVE) ContentScale.Fit else ContentScale.Crop, onError = { failed = true },
             modifier = Modifier.fillMaxSize().then(if (item.kind == Kind.LIVE) Modifier.padding(14.dp).padding(bottom = 16.dp) else Modifier))
-        else androidx.compose.material3.Text(initials(item.name), color = c.inkSoft, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
+        else androidx.compose.material3.Text(initials(item.name), color = c.inkSoft, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.TopStart).padding(10.dp))
         if (progress > 0f) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color(0x66000000))) {
             Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(c.accent))
         }
@@ -577,16 +598,19 @@ private fun HorizonIconTile(label: String, icon: TIcon, modifier: Modifier, onCl
     val f by src.collectIsFocusedAsState()
     val scale by animateFloatAsState(if (f && !Perf.lite) 1.04f else 1f, label = "horizonIcon")
     val shape = RoundedCornerShape(c.radius.dp)
-    Box(
+    BoxWithConstraints(
         modifier.zIndex(if (f) 1f else 0f).graphicsLayer { scaleX = scale; scaleY = scale }
             .then(if (f) Modifier.border(4.dp, c.focus, shape) else Modifier)
             .padding(if (f) 4.dp else 0.dp)
             .clip(shape).background(c.tileA).then(if (f) Modifier.background(Color.White.copy(alpha = 0.08f)) else Modifier)
             .combinedClickable(interactionSource = src, indication = null, onClick = onClick),
     ) {
-        TIconView(icon, c.accent, Modifier.align(Alignment.TopStart).padding(14.dp).size(34.dp))
+        // Mosaico chico (teléfono): ícono y texto más pequeños para que no se tapen
+        val small = maxHeight < 120.dp
+        val pad = if (small) 9.dp else 14.dp
+        TIconView(icon, c.accent, Modifier.align(Alignment.TopStart).padding(pad).size(if (small) 22.dp else 34.dp))
         androidx.compose.material3.Text(tr(label.substringBefore(" · ")) + (label.substringAfter(" · ", "").let { if (it.isBlank()) "" else " · $it" }),
-            color = c.ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomStart).padding(14.dp))
+            color = c.ink, fontWeight = FontWeight.SemiBold, fontSize = if (small) 11.sp else 14.sp, lineHeight = if (small) 13.sp else 18.sp,
+            maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(pad))
     }
 }
