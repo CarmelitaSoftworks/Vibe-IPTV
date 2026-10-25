@@ -67,6 +67,19 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 @OptIn(UnstableApi::class)
+/**
+ * En directo, una descarga que se cae se reintenta enseguida y muchas veces (antes eran pocas y luego se recargaba el
+ * canal entero, perdiendo lo ya guardado). Si el canal de verdad murió, los vigilantes de arranque y de imagen
+ * detenida actúan igual.
+ */
+private object LiveRetryPolicy : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy() {
+    override fun getMinimumLoadableRetryCount(dataType: Int) = 30
+    override fun getRetryDelayMsFor(info: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo): Long {
+        if (super.getRetryDelayMsFor(info) == C.TIME_UNSET) return C.TIME_UNSET   // errores que no sirve reintentar
+        return cl.iptv.player.data.LiveCushion.retryDelayMs(info.errorCount)
+    }
+}
+
 private fun mediaItemFor(item: Item, subtitle: File?): MediaItem {
     val path = item.url.substringBefore('?').lowercase()
     val b = MediaItem.Builder()
@@ -169,8 +182,9 @@ fun PlayerScreen(vm: AppViewModel) {
     }
 
     // Búfer según Ajustes → Reproducción, más lo aprendido para este canal (sube solo si se corta seguido)
-    val bumpTick = remember { mutableStateOf(0) }                         // cambia cuando se sube el búfer de un canal
-    val bufLevel = remember(item.id, bumpTick.value) { vm.bufferLevel(item) }
+    // El nivel se fija al abrir el canal: si se sube por cortes, no se reinicia el reproductor (eso cortaba la imagen
+    // justo cuando el canal ya andaba mal); el colchón en vivo sí usa el nivel nuevo de inmediato
+    val bufLevel = remember(item.id) { vm.bufferLevel(item) }
     val memMb = remember { (ctx.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).memoryClass }
     val buf = cl.iptv.player.data.BufferProfile.of(bufLevel, live, memMb)
     val rebuffers = remember { mutableStateMapOf<String, Int>() }      // veces que cada canal se quedó cargando
@@ -179,7 +193,7 @@ fun PlayerScreen(vm: AppViewModel) {
         rebuffers[it0.id] = n
         if (n >= 3 && it0.kind == Kind.LIVE) {
             rebuffers[it0.id] = 0
-            if (vm.bumpBuffer(it0)) bumpTick.value++
+            vm.bumpBuffer(it0)
         }
     }
     val whisperOn = vm.whisperLang != null
@@ -230,6 +244,7 @@ fun PlayerScreen(vm: AppViewModel) {
             .setUserAgent(item.userAgent.ifBlank { Http.DEFAULT_UA })
             .apply { if (item.referrer.isNotBlank()) setDefaultRequestProperties(mapOf("Referer" to item.referrer)) }
         val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, http))
+            .apply { if (item.kind == Kind.LIVE) setLoadErrorHandlingPolicy(LiveRetryPolicy) }
         val source = factory.createMediaSource(mediaItemFor(item.copy(url = playUrl), subtitle))
         if (pos != C.TIME_UNSET) player.setMediaSource(source, pos) else player.setMediaSource(source)
         player.prepare()
@@ -312,6 +327,23 @@ fun PlayerScreen(vm: AppViewModel) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { hosts.forEach { h -> runCatching { cl.iptv.player.data.Http.dns.lookup(h) } } }
     }
     LaunchedEffect(item.id) { vm.logEvent("Reproducir: ${item.name} [${item.kind}] ${item.url}") }
+    // Colchón en vivo (Ajustes → Reproducción): si queda poco video guardado, se reproduce un 2–4 % más lento hasta
+    // rehacerlo. Sólo con ExoPlayer y sin Whisper (que ya retrasa el audio a propósito)
+    LaunchedEffect(item.id, engine, player, whisperOn, vm.settings.liveCushion) {
+        val c = cl.iptv.player.data.LiveCushion()
+        player.playbackParameters = androidx.media3.common.PlaybackParameters.DEFAULT
+        if (!live || useAlt || whisperOn || !vm.settings.liveCushion) return@LaunchedEffect
+        while (true) {
+            delay(1000)
+            if (!player.isPlaying) continue
+            val before = c.speed
+            val s = c.update(player.totalBufferedDuration, cl.iptv.player.data.LiveCushion.targetMs(vm.bufferLevel(item)))
+            if (s != before) {
+                player.playbackParameters = androidx.media3.common.PlaybackParameters(s)
+                vm.logEvent("Colchón en vivo: ${player.totalBufferedDuration / 1000} s guardados → velocidad ${"%.2f".format(s)}")
+            }
+        }
+    }
     var gestureAt by remember { mutableStateOf(0L) }
     LaunchedEffect(item.id, engine, player) {
         val d = cl.iptv.player.data.StallDetector(firstStartMs = Long.MAX_VALUE / 4)   // el arranque lo vigila el bloque anterior

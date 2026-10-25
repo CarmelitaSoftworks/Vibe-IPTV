@@ -60,6 +60,8 @@ function transcodeUrl(url, item, full = false) {
 }
 
 // Búfer (Ajustes → Reproducción): segundos por adelantado (HLS), megas máximos y colchón inicial MPEG-TS (KB)
+import { cushionSpeed, cushionTarget, SLOW, SLOWER } from './cushion.js';
+
 const BUFFER = { fast: { hls: 12, mb: 40, stash: 192 }, balanced: { hls: 30, mb: 60, stash: 384 }, stable: { hls: 60, mb: 120, stash: 1024 } };
 
 export class Player {
@@ -77,6 +79,7 @@ export class Player {
 
   destroy() {
     clearTimeout(this.silentTimer);
+    clearInterval(this.cushionTimer);
     try { this.engine?.destroy(); } catch {}
     this.engine = null;
     this.kind = '';
@@ -164,7 +167,7 @@ export class Player {
     const v = this.video;
     return new Promise((resolve, reject) => {
       let settled = false;
-      const ok = () => { if (!settled) { settled = true; cleanup(); this.onInfo(); resolve(); } };
+      const ok = () => { if (!settled) { settled = true; cleanup(); this.onInfo(); if (live) this.startCushion(); resolve(); } };
       const fail = (msg) => { if (!settled) { settled = true; cleanup(); reject(new Error(msg)); } };
       // La conversión a HLS para iPhone tarda más en entregar los primeros trozos
       const timer = setTimeout(() => fail('Tiempo de espera agotado'), /iPhone/.test(kindOverride || '') ? 50000 : 25000);
@@ -235,6 +238,21 @@ export class Player {
         this.kind = kindOverride || 'Archivo'; v.src = url; start();
       }
     });
+  }
+
+  /** Colchón en vivo (Ajustes → Reproducción): reproducir un poco más lento mientras quede poco guardado. */
+  startCushion() {
+    clearInterval(this.cushionTimer);
+    const s = getSettings();
+    if (s.liveCushion === false) return;
+    const v = this.video;
+    this.cushionTimer = setInterval(() => {
+      if (v.paused || !v.buffered.length) return;
+      if (![1, SLOW, SLOWER].includes(v.playbackRate)) return;     // el usuario eligió otra velocidad
+      const ahead = v.buffered.end(v.buffered.length - 1) - v.currentTime;
+      const next = cushionSpeed(ahead, cushionTarget(s.buffer), v.playbackRate);
+      if (next !== v.playbackRate) { v.preservesPitch = true; v.playbackRate = next; }
+    }, 1000);
   }
 
   // ---- Pistas de audio y calidad (sólo HLS informa varias) ----

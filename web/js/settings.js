@@ -58,6 +58,7 @@ function sections() {
       { type: 'choice', key: 'convertQuality', label: 'Calidad de la conversión', desc: 'Sólo cuando hay que convertir el video', options: [['fast', 'Rápida (usa menos el PC)'], ['balanced', 'Mejor calidad']] },
       { type: 'info', label: 'Conversión (ffmpeg)', value: () => ctx.caps?.ffmpeg ? 'Disponible' : 'No instalada: abre la app con iniciar.bat' },
       { type: 'choice', key: 'buffer', label: 'Búfer', desc: 'Cuánto video se carga por adelantado', options: [['fast', 'Rápido: cambia de canal antes'], ['balanced', 'Equilibrado (recomendado)'], ['stable', 'Estable: para proveedores que se cortan']] },
+      { type: 'toggle', key: 'liveCushion', label: 'Colchón en vivo', desc: 'Si un canal en vivo queda con poco video guardado, se reproduce un poco más lento (no se nota) hasta rehacer la reserva. Así aguanta mejor los cortes, a cambio de ir unos segundos más atrás del directo' },
       { type: 'choice', key: 'liveFormat', label: 'Formato de canales en vivo (Xtream)', options: [['m3u8', 'HLS (.m3u8) — recomendado'], ['ts', 'MPEG-TS (.ts)']] },
       { type: 'toggle', key: 'autoNext', label: 'Siguiente episodio automático' },
     ] },
