@@ -82,6 +82,8 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - Tema claro (predeterminado), oscuro o del sistema, con colores de acento.
 - Al abrir la app puede volver directamente al último canal visto.
 - **Temas**: Claro, Oscuro, **Mosaicos** (gris y verde, esquinas rectas), **Ondas** (violeta) y **Personalizado** (colores, imagen de fondo, mosaicos translúcidos), que se puede exportar e importar para compartirlo.
+- **Temas estilo consola y escritorio** (Android): **Pulso** (fila de íconos, el elegido grande y su imagen de fondo, en azul), **Horizonte** (destacado grande y filas de mosaicos con borde blanco, en verde) y **Escritorio** (ventana azul de principios de los 2000, íconos de escritorio, categorías en el panel y barra de tareas con botón de inicio). Diseño propio: sin logos ni recursos de ninguna marca.
+- **Se adaptan a cada equipo**: TV, teléfono (vertical u horizontal), tableta y laptop; en pantallas grandes todo se agranda en proporción.
 - **En español y en inglés**: sigue el idioma del equipo o se elige en Ajustes → Apariencia → Idioma.
 
 ### 🔒 Privacidad
@@ -113,6 +115,20 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 | ![Tema Mosaicos](docs/img/tema-metro.jpg) | ![Tema Ondas](docs/img/tema-wave.jpg) |
 
 <sub>Capturas de la versión web con la lista de demostración. En Android además está el tema **Personalizado** (colores, imagen de fondo y mosaicos translúcidos).</sub>
+
+### Temas estilo consola y escritorio (Android)
+
+| Pulso | Horizonte |
+|---|---|
+| ![Tema Pulso](docs/img/tema-pulse.jpg) | ![Tema Horizonte](docs/img/tema-horizon.jpg) |
+| **Escritorio** | |
+| ![Tema Escritorio](docs/img/tema-desk.jpg) | |
+
+**En cada equipo** — teléfono vertical, teléfono horizontal y tableta:
+
+![Temas en teléfono y tableta](docs/img/temas-equipos.jpg)
+
+<sub>Capturas de la app Android con la lista de demostración (sin imágenes de canales ni películas). Todas las pantallas de cada tema y equipo están en la rama [`capturas`](../../tree/capturas).</sub>
 
 ---
 

@@ -82,6 +82,8 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - Light theme (default), dark or system, with accent colors.
 - It can jump straight back to the last watched channel when the app opens.
 - **Themes**: Light, Dark, **Tiles** (grey and green, square corners), **Waves** (purple) and **Custom** (colours, background image, translucent tiles), which can be exported and imported to share it.
+- **Console and desktop style themes** (Android): **Pulse** (icon row, the chosen one large with its background image, in blue), **Horizon** (big featured item and rows of tiles with a white border, in green) and **Desktop** (early-2000s blue window, desktop icons, categories in the side panel and a taskbar with a start button). Original design: no logos or assets from any brand.
+- **They fit every device**: TV, phone (portrait or landscape), tablet and laptop; on large screens everything scales up in proportion.
 - **In Spanish and English**: follows the device language or can be set in Settings → Appearance → Language.
 
 ### 🔒 Privacy
@@ -113,6 +115,20 @@ All the code is out in the open: you can review it, build it yourself, modify it
 | ![Tiles theme](docs/img/tema-metro.jpg) | ![Waves theme](docs/img/tema-wave.jpg) |
 
 <sub>Web app screenshots with the demo list. On Android there is also the **Custom** theme (colours, background image and translucent tiles).</sub>
+
+### Console and desktop style themes (Android)
+
+| Pulse | Horizon |
+|---|---|
+| ![Pulse theme](docs/img/tema-pulse.jpg) | ![Horizon theme](docs/img/tema-horizon.jpg) |
+| **Desktop** | |
+| ![Desktop theme](docs/img/tema-desk.jpg) | |
+
+**On every device** — phone portrait, phone landscape and tablet:
+
+![Themes on phone and tablet](docs/img/temas-equipos.jpg)
+
+<sub>Android app screenshots with the demo list (no channel or movie images). Every screen of each theme and device is in the [`capturas`](../../tree/capturas) branch.</sub>
 
 ---
 
