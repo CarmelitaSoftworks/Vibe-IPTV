@@ -86,6 +86,21 @@ class SystemHandle(private val mp: MediaPlayer) : AltEngine {
         }
     }
 
+    /** Ecualizador del sistema sobre el audio de este reproductor (el volumen parejo no está disponible aquí). */
+    private var eq: android.media.audiofx.Equalizer? = null
+    override fun setSound(preset: String, level: Boolean) = safe(Unit) {
+        if (preset == cl.iptv.player.data.Sound.NORMAL) { eq?.enabled = false; return@safe }
+        val e = eq ?: android.media.audiofx.Equalizer(0, mp.audioSessionId).also { eq = it }
+        val (lo, hi) = e.bandLevelRange.let { it[0] to it[1] }
+        for (b in 0 until e.numberOfBands) {
+            val hz = e.getCenterFreq(b.toShort()) / 1000.0                       // viene en milihertz
+            val mb = (cl.iptv.player.data.Sound.gainAt(preset, hz) * 100).toInt().coerceIn(lo.toInt(), hi.toInt())
+            e.setBandLevel(b.toShort(), mb.toShort())
+        }
+        e.enabled = true
+    }
+    fun releaseEffects() { runCatching { eq?.release() }; eq = null }
+
     override fun info(): List<Pair<String, String>> = listOfNotNull(
         safe<Pair<String, String>?>(null) { if (mp.videoWidth > 0) "Video" to "${mp.videoWidth}×${mp.videoHeight}" else null },
         "Decodificación" to "Reproductor del sistema (chip del equipo)",
@@ -173,6 +188,7 @@ fun SystemVideo(
         }
         mp.setOnCompletionListener { if (started && !reconnect("La transmisión terminó")) cbEnded() }
         onDispose {
+            handle.releaseEffects()
             handle.alive = false
             main.removeCallbacksAndMessages(null)
             // release() puede tardar si el canal está colgado: fuera del hilo principal

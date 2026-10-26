@@ -42,6 +42,17 @@ class VlcHandle(val player: MediaPlayer) : AltEngine {
         get() = player.rate
         set(v) { player.rate = v }
 
+    override fun setSound(preset: String, level: Boolean) {
+        // El volumen parejo de VLC es un filtro que se elige al abrir el canal (ver VlcVideo); aquí, el ecualizador
+        if (preset == cl.iptv.player.data.Sound.NORMAL) { player.setEqualizer(null); return }
+        val eq = MediaPlayer.Equalizer.create()
+        for (i in 0 until MediaPlayer.Equalizer.getBandCount())
+            eq.setAmp(i, cl.iptv.player.data.Sound.gainAt(preset, MediaPlayer.Equalizer.getBandFrequency(i).toDouble()).toFloat().coerceIn(-12f, 12f))
+        player.setEqualizer(eq)
+    }
+
+    override fun setSubtitleDelay(ms: Long) = player.setSpuDelay(ms * 1000)          // VLC lo mide en microsegundos
+
     override fun addExternalSubtitle(file: File) {
         player.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, Uri.fromFile(file), true)
     }
@@ -68,6 +79,8 @@ fun VlcVideo(
     referrer: String,
     aspect: String,
     cachingMs: Int = 2500,
+    /** Volumen parejo: "level" (normaliza), "night" (compresor) o "". */
+    audioFilter: String = "",
     modifier: Modifier = Modifier,
     onReady: (VlcHandle) -> Unit,
     onPlaying: () -> Unit,
@@ -81,7 +94,12 @@ fun VlcVideo(
             // La TV de cable suele venir entrelazada; en modo liviano, un desentrelazado más barato para el procesador
             "--deinterlace=1", if (cl.iptv.player.data.Perf.lite) "--deinterlace-mode=bob" else "--deinterlace-mode=yadif",
             "--http-reconnect", "--audio-time-stretch", "--no-stats", "--avcodec-skiploopfilter=1",
-        ))
+        ).apply {
+            when (audioFilter) {
+                "night" -> add("--audio-filter=compressor")
+                "level" -> { add("--audio-filter=normvol"); add("--norm-max-level=4.0") }
+            }
+        })
     }
     val mp = remember { MediaPlayer(libVlc) }
     val handle = remember { VlcHandle(mp) }

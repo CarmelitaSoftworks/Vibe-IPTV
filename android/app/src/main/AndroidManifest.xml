@@ -7,6 +7,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Ecualizador del motor del sistema (Ajustes → Sonido) -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Fila de canales en la pantalla de inicio de Android TV -->
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <!-- Grabaciones programadas: grabar a la hora del programa aunque la app esté cerrada -->

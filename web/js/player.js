@@ -62,14 +62,27 @@ function transcodeUrl(url, item, full = false) {
 // Búfer (Ajustes → Reproducción): segundos por adelantado (HLS), megas máximos y colchón inicial MPEG-TS (KB)
 import { cushionSpeed, cushionTarget, SLOW, SLOWER } from './cushion.js';
 
+/** Calidad en canales con varias calidades (Ajustes → Reproducción): automática, hasta 720p o siempre la mejor. */
+function applyQuality(hls) {
+  const q = getSettings().hlsQuality || 'auto';
+  if (q === 'saver') {
+    const ok = hls.levels.map((l, i) => [l.height || 0, i]).filter(([h]) => h && h <= 720);
+    if (ok.length) hls.autoLevelCapping = Math.max(...ok.map(([, i]) => i));
+  } else if (q === 'max' && hls.levels.length > 1) {
+    hls.autoLevelCapping = -1;
+    hls.startLevel = hls.levels.length - 1;
+  } else hls.autoLevelCapping = -1;
+}
+
 const BUFFER = { fast: { hls: 12, mb: 40, stash: 192 }, balanced: { hls: 30, mb: 60, stash: 384 }, stable: { hls: 60, mb: 120, stash: 1024 } };
 
 export class Player {
-  constructor(video, { onError, onStatus, onInfo } = {}) {
+  constructor(video, { onError, onStatus, onInfo, onNotice } = {}) {
     this.video = video;
     this.onError = onError || (() => {});
     this.onStatus = onStatus || (() => {});
     this.onInfo = onInfo || (() => {});   // cambia el motor, las pistas o la calidad
+    this.onNotice = onNotice || (() => {});   // avisos breves (p. ej. la calidad bajó por el internet)
     this.engine = null;
     this.kind = '';                         // 'HLS' | 'MPEG-TS' | 'Archivo' | 'Convertido (ffmpeg)'
     this.token = 0;
@@ -201,7 +214,17 @@ export class Player {
             if (settled && d.type === Hls.ErrorTypes.MEDIA_ERROR) { hls.recoverMediaError(); return; }
             fail(hlsError(d));
           });
-          hls.on(Hls.Events.MANIFEST_PARSED, start);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => { applyQuality(hls); start(); });
+          // Calidad automática: avisar cuando baja o sube por la velocidad del internet (como mucho cada 20 s)
+          let lastH = 0, lastNotice = 0;
+          hls.on(Hls.Events.LEVEL_SWITCHED, (_, d) => {
+            const h = hls.levels[d.level]?.height || 0;
+            if (h && lastH && h !== lastH && hls.autoLevelEnabled && Date.now() - lastNotice > 20000) {
+              lastNotice = Date.now();
+              this.onNotice(h < lastH ? `Calidad: ${h}p (tu internet va más lento)` : `Calidad: ${h}p`);
+            }
+            if (h) lastH = h;
+          });
           for (const ev of [Hls.Events.AUDIO_TRACKS_UPDATED, Hls.Events.LEVEL_SWITCHED]) hls.on(ev, () => this.onInfo());
           hls.loadSource(url);
           hls.attachMedia(v);

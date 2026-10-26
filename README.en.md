@@ -95,6 +95,13 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Profiles** (Android): favorites and "Continue watching" per person; the kids profile never shows adult content.
 - **Recording** (Android): the ● button in the player saves a live channel to *Downloads/VibeIPTV*.
 - **Scheduled recording** (Android): in the guide, pick a future show → *● Schedule recording*. It records at air time even with the app closed (2 min early, 3 min late) and saves to *Downloads/VibeIPTV*; the scheduled list can be viewed and cancelled in the guide.
+- **Pause and rewind live TV** (Android, ExoPlayer, .ts channels): the app keeps the last minutes of the channel on the device (10, 15 or 30, Settings → Playback). ◄ rewinds 10 s, ⏯ pauses and ► or *Back to live* returns. Uses a single connection to the provider.
+- **Sound** (Settings → Sound or *More → Sound*): *Clear voices*, *More bass* and *Night* equalizer, and **even volume** across channels and ads (Android).
+- **Sync subtitles**: *More → Sync subtitles*, in half-second steps, on every engine.
+- **Skip intro** in series: a button at the start of the episode; mark *Intro ends here* once and the other episodes jump right there (or automatically, if you turn it on).
+- **Recent channels**: a player button with the last 5 channels watched.
+- **Send to TV** (Android): with Vibe IPTV open on the phone and the TV, on the same Wi-Fi, *More → Send to TV* plays it there (movies continue from the same minute).
+- **Automatic quality with notice**: on channels with several qualities it goes up or down with your internet and tells you when it changes; also *Data saver (up to 720p)* or *Always the best*.
 - **Adjustable player controls size** (Settings → Playback).
 - **Full remote support**: number keys to jump to a channel, **previous channel**, and a sleep timer (15 to 120 min).
 - **Mini player on TV**: the video keeps playing in a corner while you browse the menu or the guide.

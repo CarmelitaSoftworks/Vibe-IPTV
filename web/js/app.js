@@ -839,6 +839,7 @@ const player = new Player(video, {
   onError: (m) => showPlayError(m),
   onStatus: (m) => { $('pStatus').hidden = !m; $('pStatus').textContent = m; },
   onInfo: () => refreshPlayerButtons(),
+  onNotice: (m) => toast(t(m)),
 });
 let osdTimer;
 
@@ -862,6 +863,9 @@ function playCurrent() {
   $('playerView').classList.toggle('is-live', item.kind === 'live');
   $('pPrev').hidden = $('pNext').hidden = state.playList.length < 2;
   $('pLast').hidden = $('pMulti').hidden = state.playList.length < 2 || item.kind !== 'live';
+  $('pRecent').hidden = item.kind !== 'live' || !recentChannels().filter((x) => x.id !== item.id).length;
+  $('pIntro').hidden = !isEpisode(item);
+  introDone = false; $('pSkip').hidden = true;
   closePlayerMenu();
   if (!$('pListPanel').hidden) renderChannelList();
   video.playbackRate = 1;
@@ -1040,6 +1044,50 @@ function openMultiview() {
   render();
   toast(t('Multivista: elige con OK qué canal suena'));
 }
+/* ---------- Canales recientes y saltar intro ---------- */
+function recentChannels() {
+  const by = new Map(state.items.map((i) => [i.id, i]));
+  return state.recent.filter((id) => id !== state.playing?.id).map((id) => by.get(id)).filter((i) => i && i.kind === 'live').slice(0, 5);
+}
+function menuRecent() {
+  const list = recentChannels();
+  openPlayerMenu('Canales recientes', list.map((it, i) => ({ label: it.name, active: false, value: i })), (i) => {
+    const it = list[i];
+    const j = state.playList.findIndex((x) => x.id === it.id);
+    if (j >= 0) return playIndexAt(j);
+    // No está en la lista que se está viendo: se abre con su categoría (▲▼ sigue funcionando)
+    savePosition(state.playing);
+    const l = state.items.filter((x) => x.kind === 'live' && x.group === it.group);
+    openPlayer(it, l, Math.max(0, l.findIndex((x) => x.id === it.id)));
+  });
+}
+// Saltar intro (series): el botón aparece al principio del episodio. Si ya se marcó dónde termina la intro de esta
+// serie (botón de la bandera), salta justo ahí; si no, avanza 85 s (lo que dura una intro típica).
+const isEpisode = (it) => !!it && it.kind !== 'live' && (it.episode > 0 || it.kind === 'episode');
+const introKey = (it) => `${state.source?.id}:${state.series?.id || it.seriesName || it.group || ''}`;
+let introDone = false;
+const introEnd = () => (isEpisode(state.playing) ? store.getIntroEnd(introKey(state.playing)) : 0);
+function updateSkip() {
+  const it = state.playing, p = video.currentTime, end = introEnd();
+  const show = isEpisode(it) && !introDone && !video.paused && (end ? p >= 1 && p < end - 3 : p >= 15 && p <= 240);
+  $('pSkip').hidden = !show;
+  // Automático (Ajustes → Reproducción): sólo si ya se sabe dónde termina y el episodio está empezando
+  if (show && end && cfg().autoSkipIntro && p >= 1.5 && p < end - 5 && p < 600) skipIntro();
+}
+function skipIntro() {
+  const end = introEnd();
+  introDone = true; $('pSkip').hidden = true;
+  if (end) { video.currentTime = end; toast(t('Intro saltada')); }
+  else { video.currentTime += 85; toast(t('Intro saltada (85 s). Si no calzó, márcala con el botón de la bandera')); }
+}
+function markIntro() {
+  const p = video.currentTime;
+  if (p < 10) return toast(t('Avanza hasta donde termina la intro y vuelve a elegir esta opción'));
+  store.saveIntroEnd(introKey(state.playing), p);
+  introDone = true; $('pSkip').hidden = true;
+  toast(t(`Listo: en los demás episodios, "Saltar intro" llegará hasta ${fmtDur(p)}`));
+}
+
 function previousChannel() {
   if (state.prevIndex == null) return toast(t('Todavía no hay un canal anterior'));
   playIndexAt(state.prevIndex);
@@ -1255,6 +1303,7 @@ video.addEventListener('ended', () => {
 let lastSave = 0;
 video.addEventListener('timeupdate', () => {
   if (Date.now() - lastSave > 10_000) { lastSave = Date.now(); savePosition(state.playing); }
+  updateSkip();
   if (!isFinite(video.duration)) return;
   if (document.activeElement !== $('pSeek')) $('pSeek').value = (video.currentTime / video.duration) * 1000 || 0;
   $('pTimeCur').textContent = fmtDur(video.currentTime);
@@ -1530,6 +1579,9 @@ video.addEventListener('dblclick', (e) => {
   toggleFullscreen();
 });
 $('pLast').onclick = () => { previousChannel(); showOsd(); };
+$('pRecent').onclick = menuRecent;
+$('pIntro').onclick = markIntro;
+$('pSkip').onclick = skipIntro;
 $('pSleep').onclick = menuSleep;
 $('pMulti').onclick = () => openMultiview();
 

@@ -46,12 +46,16 @@ enum class PAction(val label: String) {
     LIST("Lista de canales"), AUDIO("Audio"), SUBS("Subtítulos"), QUALITY("Calidad"), ASPECT("Formato de pantalla"),
     SPEED("Velocidad"), ENGINE("Motor de reproducción"), INFO("Información técnica"), FAV("Favorito"), PIP("Mini reproductor (ver el menú)"),
     EXTERNAL("Abrir en la app VLC"), RECORD("Grabar"), LASTCH("Canal anterior"), SLEEP("Temporizador para dormir"),
-    MULTI("Multivista"), MORE("Más opciones"),
+    MULTI("Multivista"), SOUND("Sonido"), SUBDELAY("Sincronizar subtítulos"), INTRO("Aquí termina la intro"),
+    RECENT("Canales recientes"), SEND("Enviar a la TV"), LIVE("Volver al directo"), MORE("Más opciones"),
 }
 
 /** Opciones que van dentro de "Más opciones" (las de uso frecuente quedan a la vista en la barra). */
-fun moreActions(live: Boolean, hasList: Boolean, showQuality: Boolean): List<PAction> = buildList {
+fun moreActions(live: Boolean, hasList: Boolean, showQuality: Boolean, episode: Boolean = false): List<PAction> = buildList {
+    add(PAction.SEND)
     if (showQuality) add(PAction.QUALITY)
+    add(PAction.SOUND); add(PAction.SUBDELAY)
+    if (episode) add(PAction.INTRO)
     add(PAction.ASPECT)
     if (!live) add(PAction.SPEED)
     if (live && hasList) add(PAction.LASTCH)
@@ -97,6 +101,18 @@ fun PlayerIcon(a: PAction, tint: Color, modifier: Modifier = Modifier, on: Boole
             PAction.SLEEP -> { drawArc(tint, 60f, 250f, false, p(4f, 4f), Size(16f * s, 16f * s), style = Stroke(w, cap = StrokeCap.Round)); line(12f, 8f, 12f, 12f, 15f, 14f) }
             PAction.MULTI -> { rect(3f, 5f, 8.2f, 6.2f, 1.5f); rect(12.8f, 5f, 8.2f, 6.2f, 1.5f); rect(3f, 12.8f, 8.2f, 6.2f, 1.5f); rect(12.8f, 12.8f, 8.2f, 6.2f, 1.5f) }
             PAction.MORE -> listOf(5f, 12f, 19f).forEach { x -> drawCircle(tint, 2f * s, p(x, 12f)) }
+            // Tres reguladores de ecualizador
+            PAction.SOUND -> { line(6f, 4f, 6f, 20f); line(12f, 4f, 12f, 20f); line(18f, 4f, 18f, 20f); line(4f, 14f, 8f, 14f); line(10f, 8f, 14f, 8f); line(16f, 16f, 20f, 16f) }
+            // Subtítulo con flechas: moverlo antes o después
+            PAction.SUBDELAY -> { rect(3f, 9f, 18f, 10f); line(7f, 15f, 17f, 15f); line(4f, 5f, 9f, 5f); line(6f, 3f, 4f, 5f, 6f, 7f); line(15f, 5f, 20f, 5f); line(18f, 3f, 20f, 5f, 18f, 7f) }
+            // Bandera: aquí termina la intro
+            PAction.INTRO -> { line(6f, 3f, 6f, 21f); poly(false, 6f, 4f, 18f, 4f, 15f, 8f, 18f, 12f, 6f, 12f) }
+            // Reloj con lista: canales recientes
+            PAction.RECENT -> { drawArc(tint, 0f, 360f, false, p(3f, 3f), Size(13f * s, 13f * s), style = Stroke(w)); line(9.5f, 6f, 9.5f, 9.5f, 12f, 11f); line(14f, 19f, 21f, 19f); line(18f, 15f, 21f, 15f) }
+            // Pantalla con ondas: enviar a la TV
+            PAction.SEND -> { rect(3f, 5f, 18f, 13f); line(9f, 21f, 15f, 21f); drawArc(tint, 200f, 50f, false, p(-1f, 12f), Size(10f * s, 10f * s), style = Stroke(w, cap = StrokeCap.Round)); drawCircle(tint, 1.4f * s, p(4.5f, 15.5f)) }
+            // Punto rojo: volver al directo
+            PAction.LIVE -> { drawCircle(Color(0xFFE53935), 4f * s, p(7f, 12f)); line(13f, 8f, 19f, 12f, 13f, 16f) }
         }
     }
 }
@@ -138,6 +154,11 @@ fun PlayerControlsBar(
     fav: Boolean,
     showQuality: Boolean,
     recording: Boolean = false,
+    /** Hay otros canales vistos hace poco (botón Recientes). */
+    recents: Boolean = false,
+    /** Pausa en vivo disponible: se puede retroceder; [behindMs] = cuánto va atrás del directo. */
+    timeshift: Boolean = false,
+    behindMs: Long = 0,
     playFocus: FocusRequester,
     onAction: (PAction) -> Unit,
     onInteract: () -> Unit,
@@ -172,9 +193,13 @@ fun PlayerControlsBar(
             }
         } else if (live) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 6.dp)) {
-                Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFFD9363E)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                    Text("EN VIVO", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                val behind = timeshift && behindMs >= 3_000
+                // Atrás del directo (pausa en vivo): gris con cuánto va atrás; en directo, rojo
+                Box(Modifier.clip(RoundedCornerShape(6.dp)).background(if (behind) Color(0xFF5A6066) else Color(0xFFD9363E)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                    Text(if (behind) "−${fmtDur(behindMs)}" else "EN VIVO", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                 }
+                if (timeshift) Text(if (behind) "► adelanta · ● vuelve al directo" else "◄ retrocede · ⏯ pausa",
+                    color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, modifier = Modifier.padding(start = 10.dp))
             }
         }
         Text(caption?.label ?: " ", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, fontWeight = FontWeight.Bold,
@@ -183,15 +208,17 @@ fun PlayerControlsBar(
             CtlButton(PAction.BACK, onFocused = focused) { onAction(PAction.BACK) }
             Spacer(Modifier.width(8.dp))
             if (hasList) CtlButton(PAction.PREV, onFocused = focused) { onAction(PAction.PREV) }
-            if (!live) CtlButton(PAction.REW, onFocused = focused) { onAction(PAction.REW) }
+            if (!live || timeshift) CtlButton(PAction.REW, onFocused = focused) { onAction(PAction.REW) }
             CtlButton(PAction.PLAY, size = 60, on = playing, modifier = Modifier.focusRequester(playFocus), onFocused = focused) { onAction(PAction.PLAY) }
-            if (!live) CtlButton(PAction.FWD, onFocused = focused) { onAction(PAction.FWD) }
+            if (!live || (timeshift && behindMs >= 3_000)) CtlButton(PAction.FWD, onFocused = focused) { onAction(PAction.FWD) }
+            if (live && timeshift && behindMs >= 3_000) CtlButton(PAction.LIVE, onFocused = focused) { onAction(PAction.LIVE) }
             if (hasList) CtlButton(PAction.NEXT, onFocused = focused) { onAction(PAction.NEXT) }
             Spacer(Modifier.width(12.dp))
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.End) {
                 // A la vista sólo lo más usado; el resto en "Más opciones"
                 val extra = buildList {
                     if (hasList) add(PAction.LIST)
+                    if (live && recents) add(PAction.RECENT)
                     add(PAction.AUDIO); add(PAction.SUBS); add(PAction.FAV)
                     if (recording) add(PAction.RECORD)      // grabando: el botón para detenerla queda visible
                     add(PAction.PIP)                        // mini reproductor: seguir viendo mientras se usa el menú

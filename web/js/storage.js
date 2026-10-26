@@ -37,6 +37,10 @@ export const DEFAULT_SETTINGS = {
   buffer: 'balanced',
   // Colchón en vivo: reproducir un poco más lento cuando queda poco guardado, hasta rehacerlo
   liveCushion: true,
+  // Calidad en canales con varias calidades (HLS): auto | saver (hasta 720p) | max
+  hlsQuality: 'auto',
+  // Series: saltar la intro sola cuando ya se marcó dónde termina
+  autoSkipIntro: false,
   // Subtítulos automáticos en películas y series
   autoSubs: true,
   // Fichas: mostrar antes de reproducir películas; clave opcional de TMDB
@@ -46,6 +50,10 @@ export const DEFAULT_SETTINGS = {
 export const getSettings = () => ({ ...DEFAULT_SETTINGS, ...read(K.settings, {}) });
 export const saveSettings = (s) => write(K.settings, { ...getSettings(), ...s });
 export const resetSettings = () => write(K.settings, {});
+
+// Saltar intro: dónde termina la intro de cada serie (segundos)
+export const getIntroEnd = (key) => read(`iptv.intro.${key}`, 0);
+export const saveIntroEnd = (key, sec) => write(`iptv.intro.${key}`, sec);
 
 export const getSources = () => read(K.sources, []);
 export const saveSources = (list) => write(K.sources, list);

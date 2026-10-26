@@ -261,7 +261,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else resume + (item.id to Resume(pos, dur, System.currentTimeMillis(), series?.id.orEmpty()))
         if (next != resume) { resume = next; store.saveResume(src.id, next); if (category == CAT_RESUME) recompute(false) }
     }
-    fun resumeFor(item: Item): Resume? = resume[item.id]
+    fun resumeFor(item: Item): Resume? =
+        remoteStart?.takeIf { it.first == item.id && it.second > 0 }?.let { Resume(it.second, 0, System.currentTimeMillis()) } ?: resume[item.id]
 
     /** Inicio → "Seguir viendo": películas y series a medias, la más reciente primero (episodios → su serie). */
     fun continueWatching(): List<Triple<Item, Resume, String?>> {
@@ -533,6 +534,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         applyLite()
         if (pinChanged) { adultUnlocked = false; applyParental() }
         if (formatChanged) source?.takeIf { it.type == SourceType.XTREAM }?.let { open(it) }
+        if (s.castReceive) startCastReceiver() else stopCastReceiver()
     }
 
     // ---------- navegación / filtros ----------
@@ -759,6 +761,59 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         recent = (listOf(item.id) + recent.filter { it != item.id }).take(40)
         store.saveRecent(src.id, recent)
     }
+    /** Canales en vivo vistos hace poco (sin [exclude]): botón "Recientes" del reproductor. */
+    fun recentChannels(exclude: String?, n: Int = 5): List<Item> {
+        val byId = items.associateBy { it.id }
+        return recent.asSequence().filter { it != exclude }.mapNotNull { byId[it] }.filter { it.kind == Kind.LIVE }.take(n).toList()
+    }
+    /** Ir a un canal reciente: si está en la lista que se está viendo, ahí mismo (▲▼ sigue igual); si no, con su categoría. */
+    fun playRecent(item: Item) {
+        val i = playList.indexOfFirst { it.id == item.id }
+        if (i >= 0) playAt(i) else activate(item, items.filter { it.kind == Kind.LIVE && it.group == item.group })
+    }
+
+    // ---------- Saltar intro ----------
+    /** Serie a la que pertenece un episodio (para recordar dónde termina su intro). */
+    private fun introKey(item: Item): String? {
+        val src = source ?: return null
+        val s = item.seriesId?.toString() ?: resume[item.id]?.parent?.ifBlank { null } ?: series?.id ?: item.seriesName.ifBlank { null } ?: return null
+        return "${src.id}:$s"
+    }
+    fun introEnd(item: Item): Long = introKey(item)?.let { store.introEnd(it) } ?: 0L
+    fun markIntroEnd(item: Item, pos: Long): Boolean {
+        val k = introKey(item) ?: return false
+        store.saveIntroEnd(k, pos); return true
+    }
+
+    // ---------- Enviar del celular a la TV ----------
+    /** Nombre con que este equipo aparece en "Enviar a la TV" de los otros. */
+    val deviceName: String = "Vibe IPTV · " + (android.os.Build.MODEL ?: "Android").take(40)
+    private var castReceiver: cl.iptv.player.data.CastReceiver? = null
+    /** Película enviada desde el celular: empieza donde iba allá. */
+    private var remoteStart: Pair<String, Long>? = null
+    fun startCastReceiver() {
+        if (!settings.castReceive || castReceiver != null) return
+        castReceiver = cl.iptv.player.data.CastReceiver(getApplication(), deviceName) { item, pos, from -> playRemote(item, pos, from) }.also { it.start() }
+    }
+    fun stopCastReceiver() { castReceiver?.stop(); castReceiver = null }
+    private fun playRemote(item: Item, pos: Long, from: String) {
+        // Si este equipo tiene la misma lista, se usa el canal de aquí: así se puede seguir cambiando con ▲▼
+        val local = items.firstOrNull { it.id == item.id && it.url == item.url } ?: items.firstOrNull { it.url == item.url }
+        val it0 = local ?: item
+        remoteStart = it0.id to pos
+        logEvent("Recibido desde $from: ${it0.name}")
+        message = "Recibido desde $from: ${it0.name}"
+        activate(it0, if (local != null) items.filter { it.kind == local.kind && it.group == local.group } else listOf(it0))
+    }
+
+    // ---------- Calidad automática ----------
+    /** Medidor de velocidad de internet compartido: parte de lo medido la última vez (no de un valor fijo bajo). */
+    val bandwidth: androidx.media3.exoplayer.upstream.DefaultBandwidthMeter by lazy {
+        androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(getApplication())
+            .apply { store.lastBitrate.takeIf { it > 0 }?.let { setInitialBitrateEstimate(it) } }.build()
+    }
+    fun saveBitrate() { bandwidth.bitrateEstimate.takeIf { it > 0 }?.let { store.lastBitrate = it } }
+
     fun recentInSection() = recent.count { id -> items.any { it.id == id && it.kind == section } }
 
     // ---------- Temporizador para dormir ----------
