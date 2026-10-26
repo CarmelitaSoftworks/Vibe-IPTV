@@ -1,0 +1,31 @@
+# Borra una versión en BORRADOR (draft) por su etiqueta. Sólo borradores: nunca toca una versión publicada
+# ni la versión "prueba" a la que apuntan Downloader y la página.
+#   gh workflow run borrar-borrador.yml --ref main -f etiqueta=v0.1.94
+name: Borrar borrador de versión
+
+on:
+  workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: "Etiqueta del borrador (ej. v0.1.94)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  borrar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Borrar el borrador
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ETIQUETA: ${{ inputs.etiqueta }}
+        run: |
+          ids=$(gh api "repos/${{ github.repository }}/releases?per_page=100" \
+            --jq ".[] | select(.draft == true and .tag_name == env.ETIQUETA) | .id")
+          if [ -z "$ids" ]; then echo "No hay un borrador con la etiqueta $ETIQUETA"; exit 1; fi
+          for id in $ids; do
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+            echo "Borrador $ETIQUETA ($id) borrado"
+          done
