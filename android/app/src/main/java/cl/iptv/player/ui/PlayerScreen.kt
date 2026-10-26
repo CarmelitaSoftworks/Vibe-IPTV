@@ -714,9 +714,10 @@ fun PlayerScreen(vm: AppViewModel) {
         } else if (engine == "system") {
             key(item.id, "system", playUrl, reloadKey) {
                 SystemVideo(
-                    url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
+                    url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect, live = live,
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
+                    onStatus = { vm.message = it },
                     onPlaying = { started = true; error = null },
                     onError = { error = it },
                     onEnded = onAltEnded,

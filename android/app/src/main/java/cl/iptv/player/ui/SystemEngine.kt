@@ -18,11 +18,19 @@ import java.io.File
  * Motor del sistema: el reproductor que trae Android (MediaPlayer). No agrega peso a la app y usa directamente el chip
  * del equipo; en algunos TV box maneja mejor la imagen entrelazada y el audio Dolby porque lo resuelve el fabricante.
  * Cómo funciona depende de cada marca, por eso queda como último recurso (o elegible a mano).
+ *
+ * El reproductor en sí no se puede cambiar (es parte del sistema del equipo); lo que se mejora es cómo se usa:
+ * reconexión automática cuando la señal en vivo se corta (el del sistema se rinde al primer corte), y datos para
+ * el diagnóstico (reserva cargada en películas, esperas de carga y reconexiones).
  */
 class SystemHandle(private val mp: MediaPlayer) : AltEngine {
     /** false en cuanto se libera: desde ahí nadie lo toca (MediaPlayer se cae si se usa después de liberarlo). */
     @Volatile var alive = true
     @Volatile var prepared = false
+    /** Diagnóstico: % cargado (películas y series), veces que se quedó cargando y reconexiones. */
+    @Volatile var bufferPercent = 0
+    @Volatile var stalls = 0
+    @Volatile var reconnects = 0
 
     private inline fun <T> safe(default: T, f: () -> T): T = if (!alive) default else runCatching(f).getOrDefault(default)
 
@@ -61,7 +69,14 @@ class SystemHandle(private val mp: MediaPlayer) : AltEngine {
 
     override var speed: Float
         get() = safe(1f) { if (prepared) mp.playbackParams.speed else 1f }
-        set(v) = safe(Unit) { if (prepared) mp.playbackParams = mp.playbackParams.setSpeed(v) }
+        // En pausa no: en varios equipos cambiar la velocidad vuelve a reproducir
+        set(v) = safe(Unit) { if (prepared && mp.isPlaying) mp.playbackParams = mp.playbackParams.setSpeed(v) }
+
+    /** Sólo en películas y series (el del sistema informa cuánto lleva cargado del archivo; en vivo no). */
+    override val bufferedAheadMs: Long? get() = safe(null) {
+        val d = duration
+        if (d > 0 && bufferPercent in 1..100) (d * bufferPercent / 100 - position).coerceAtLeast(0) else null
+    }
 
     /** Sólo .srt (lo único que el reproductor del sistema acepta como subtítulo externo). */
     override fun addExternalSubtitle(file: File) = safe(Unit) {
@@ -74,6 +89,8 @@ class SystemHandle(private val mp: MediaPlayer) : AltEngine {
     override fun info(): List<Pair<String, String>> = listOfNotNull(
         safe<Pair<String, String>?>(null) { if (mp.videoWidth > 0) "Video" to "${mp.videoWidth}×${mp.videoHeight}" else null },
         "Decodificación" to "Reproductor del sistema (chip del equipo)",
+        "Esperas de carga" to stalls.toString(),
+        "Reconexiones" to reconnects.toString(),
     )
 }
 
@@ -89,8 +106,11 @@ fun SystemVideo(
     userAgent: String,
     referrer: String,
     aspect: String,
+    live: Boolean,
     modifier: Modifier = Modifier,
     onReady: (SystemHandle) -> Unit,
+    /** Avisos breves para la persona (p. ej. "reconectando"). */
+    onStatus: (String) -> Unit = {},
     onPlaying: () -> Unit,
     onError: (String) -> Unit,
     onEnded: () -> Unit,
@@ -99,24 +119,62 @@ fun SystemVideo(
     val cbPlaying by rememberUpdatedState(onPlaying)
     val cbError by rememberUpdatedState(onError)
     val cbEnded by rememberUpdatedState(onEnded)
+    val cbStatus by rememberUpdatedState(onStatus)
     val mp = remember { MediaPlayer() }
     val handle = remember { SystemHandle(mp) }
     var frame by remember { mutableStateOf<AspectRatioFrameLayout?>(null) }
 
+    var surfaceHolder by remember { mutableStateOf<SurfaceHolder?>(null) }
+    val main = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
+    val headers = remember(userAgent, referrer) {
+        buildMap {
+            put("User-Agent", userAgent.ifBlank { Http.DEFAULT_UA })
+            if (referrer.isNotBlank()) put("Referer", referrer)
+        }
+    }
+    fun open() {
+        handle.prepared = false; handle.bufferPercent = 0
+        mp.setDataSource(ctx, Uri.parse(url), headers)
+        surfaceHolder?.let { runCatching { mp.setDisplay(it) } }
+        mp.prepareAsync()
+    }
+
     DisposableEffect(Unit) {
         var started = false
+        // En vivo, un corte de la señal termina la transmisión (error o "fin"): se reconecta solo unas veces,
+        // con esperas cada vez más largas, antes de darse por vencido. Si vuelve a andar, se reinicia la cuenta.
+        var tries = 0
+        fun reconnect(why: String): Boolean {
+            if (!live || !handle.alive || tries >= 5) return false
+            tries++; handle.reconnects++
+            cbStatus("Señal cortada: reconectando (${tries}/5)…")
+            main.postDelayed({
+                if (handle.alive) runCatching { mp.reset(); open() }.onFailure { cbError("$why: ${it.message}") }
+            }, 1_000L * tries)
+            return true
+        }
         mp.setOnPreparedListener { handle.prepared = true; if (handle.alive) it.start() }
         mp.setOnInfoListener { _, what, _ ->
-            if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START || (what == MediaPlayer.MEDIA_INFO_BUFFERING_END && !started)) {
-                if (!started) { started = true; cbPlaying() }
+            when (what) {
+                MediaPlayer.MEDIA_INFO_BUFFERING_START -> if (started) handle.stalls++
+                MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START, MediaPlayer.MEDIA_INFO_BUFFERING_END -> {
+                    tries = 0
+                    if (!started) { started = true; cbPlaying() }
+                }
             }
             false
         }
+        mp.setOnBufferingUpdateListener { _, pct -> handle.bufferPercent = pct }
         mp.setOnVideoSizeChangedListener { _, w, h -> if (w > 0 && h > 0) frame?.setAspectRatio(w.toFloat() / h) }
-        mp.setOnErrorListener { _, what, extra -> cbError("El reproductor del sistema no pudo abrir el canal ($what/$extra)"); true }
-        mp.setOnCompletionListener { if (started) cbEnded() }
+        mp.setOnErrorListener { _, what, extra ->
+            val why = "El reproductor del sistema no pudo abrir el canal ($what/$extra)"
+            if (!(started && reconnect(why))) cbError(why)
+            true
+        }
+        mp.setOnCompletionListener { if (started && !reconnect("La transmisión terminó")) cbEnded() }
         onDispose {
             handle.alive = false
+            main.removeCallbacksAndMessages(null)
             // release() puede tardar si el canal está colgado: fuera del hilo principal
             EngineReleaser.release { runCatching { mp.reset() }; runCatching { mp.release() } }
         }
@@ -131,9 +189,9 @@ fun SystemVideo(
                 frame = this
                 addView(SurfaceView(context).apply {
                     holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(h: SurfaceHolder) { if (handle.alive) runCatching { mp.setDisplay(h) } }
+                        override fun surfaceCreated(h: SurfaceHolder) { surfaceHolder = h; if (handle.alive) runCatching { mp.setDisplay(h) } }
                         override fun surfaceChanged(h: SurfaceHolder, format: Int, w: Int, hgt: Int) {}
-                        override fun surfaceDestroyed(h: SurfaceHolder) { if (handle.alive) runCatching { mp.setDisplay(null) } }
+                        override fun surfaceDestroyed(h: SurfaceHolder) { surfaceHolder = null; if (handle.alive) runCatching { mp.setDisplay(null) } }
                     })
                 }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, android.view.Gravity.CENTER))
             }
@@ -143,14 +201,7 @@ fun SystemVideo(
 
     LaunchedEffect(url) {
         if (!handle.alive) return@LaunchedEffect
-        runCatching {
-            val headers = buildMap {
-                put("User-Agent", userAgent.ifBlank { Http.DEFAULT_UA })
-                if (referrer.isNotBlank()) put("Referer", referrer)
-            }
-            mp.setDataSource(ctx, Uri.parse(url), headers)
-            mp.prepareAsync()
-            onReady(handle)
-        }.onFailure { cbError("El reproductor del sistema no pudo abrir el canal: ${it.message}") }
+        runCatching { open(); onReady(handle) }
+            .onFailure { cbError("El reproductor del sistema no pudo abrir el canal: ${it.message}") }
     }
 }
