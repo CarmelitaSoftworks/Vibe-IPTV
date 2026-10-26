@@ -147,6 +147,13 @@ open class ThemeCapturesTest {
 
     @Test fun escritorio() = consola("desk", "escritorio") { DeskScreen(it) }
 
+    @Test fun oscuro() {
+        compose.mainClock.autoAdvance = false
+        val vm = vm("dark")
+        compose.setContent { IptvTheme("dark") { MenuScreen(vm) } }
+        shot("oscuro_1_inicio")
+    }
+
     @Test fun clasico() {
         compose.mainClock.autoAdvance = false
         val vm = vm("light")

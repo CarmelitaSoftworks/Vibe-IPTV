@@ -45,7 +45,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ### ▶️ Playback
 - **Four engines on Android** that take over from each other automatically: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv) → **the system one** (Android's built-in player). If one can't handle a channel, the next one tries; you can also pin one in Settings.
-- **FFmpeg video inside ExoPlayer**: if the device can't decode a video (cable-TV MPEG-2 and others), ExoPlayer does it in software without switching to VLC, keeping the live cushion and diagnostics. The device chip's decoder is always preferred; software stays as a fallback.
+- **FFmpeg video inside ExoPlayer**: if the device can't decode a video (cable-TV MPEG-2 and others), ExoPlayer does it in software without switching to VLC, keeping the live cushion and diagnostics. The device chip's decoder is always preferred; software stays as a fallback. If the chip can't handle cable-TV MPEG-2, the automatic engine switches to VLC for a picture without combing (changeable in Settings → Playback).
 - Optional **tunnel mode** for Android TV (Settings → Playback): video and audio go straight to the TV chip.
 - **Cable-TV formats**: interlaced MPEG-2 video and AC-3 / E-AC-3 / MP2 audio, with automatic deinterlacing.
 - **In the browser**: hls.js and mpegts.js, plus on-the-fly **ffmpeg** conversion through the local server when the browser can't play a format.
@@ -85,7 +85,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - Light theme (default), dark or system, with accent colors.
 - It can jump straight back to the last watched channel when the app opens.
 - **Themes**: Light, Dark, **Tiles** (grey and green, square corners), **Waves** (purple) and **Custom** (colours, background image, translucent tiles), which can be exported and imported to share it.
-- **Console and desktop style themes** (Android): **Pulse** (icon row, the chosen one large with its background image, in blue), **Horizon** (big featured item and rows of tiles with a white border, in green) and **Desktop** (early-2000s blue window, desktop icons, categories in the side panel and a taskbar with a start button). Original design: no logos or assets from any brand.
+- **Console and desktop style themes** (Android and web): **Pulse** (icon row, the chosen one large with its background image, in blue), **Horizon** (big featured item and rows of tiles with a white border, in green) and **Desktop** (early-2000s blue window, desktop icons, categories in the side panel and a taskbar with a start button). Original design: no logos or assets from any brand.
 - **They fit every device**: TV, phone (portrait or landscape), tablet and laptop; on large screens everything scales up in proportion.
 - **In Spanish and English**: follows the device language or can be set in Settings → Appearance → Language.
 
@@ -94,6 +94,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Parental control:** with a PIN, adult categories are hidden.
 - **Profiles** (Android): favorites and "Continue watching" per person; the kids profile never shows adult content.
 - **Recording** (Android): the ● button in the player saves a live channel to *Downloads/VibeIPTV*.
+- **Scheduled recording** (Android): in the guide, pick a future show → *● Schedule recording*. It records at air time even with the app closed (2 min early, 3 min late) and saves to *Downloads/VibeIPTV*; the scheduled list can be viewed and cancelled in the guide.
 - **Adjustable player controls size** (Settings → Playback).
 - **Full remote support**: number keys to jump to a channel, **previous channel**, and a sleep timer (15 to 120 min).
 - **Mini player on TV**: the video keeps playing in a corner while you browse the menu or the guide.
@@ -109,29 +110,27 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ## 🖼️ Screenshots
 
-### Themes
+Android app on a TV (1920×1080) with the demo list and sample artwork.
 
 | Light | Dark |
 |---|---|
-| ![Light theme](docs/img/tema-light.jpg) | ![Dark theme](docs/img/tema-dark.jpg) |
+| ![Light theme](docs/img/tema-claro.jpg) | ![Dark theme](docs/img/tema-oscuro.jpg) |
 | **Tiles** | **Waves** |
-| ![Tiles theme](docs/img/tema-metro.jpg) | ![Waves theme](docs/img/tema-wave.jpg) |
-
-<sub>Web app screenshots with the demo list. On Android there is also the **Custom** theme (colours, background image and translucent tiles).</sub>
-
-### Console and desktop style themes (Android)
-
-| Pulse | Horizon |
-|---|---|
-| ![Pulse theme](docs/img/tema-pulse.jpg) | ![Horizon theme](docs/img/tema-horizon.jpg) |
-| **Desktop** | |
-| ![Desktop theme](docs/img/tema-desk.jpg) | |
+| ![Tiles theme](docs/img/tema-mosaicos.jpg) | ![Waves theme](docs/img/tema-ondas.jpg) |
+| **Pulse** (console style) | **Horizon** (console style) |
+| ![Pulse theme](docs/img/tema-pulso.jpg) | ![Horizon theme](docs/img/tema-horizonte.jpg) |
+| **Desktop** (2001 desktop) | |
+| ![Desktop theme](docs/img/tema-escritorio.jpg) | |
 
 **On every device** — phone portrait, phone landscape and tablet:
 
 ![Themes on phone and tablet](docs/img/temas-equipos.jpg)
 
-<sub>Android app screenshots with the demo list (no channel or movie images). Every screen of each theme and device is in the [`capturas`](../../tree/capturas) branch.</sub>
+**In the browser** — Pulse, Horizon and Desktop in the web app:
+
+![Themes in the web app](docs/img/temas-web.jpg)
+
+<sub>Original design, no logos or assets from any brand. On Android there is also the **Custom** theme (colours, background image and translucent tiles). Every screen of each theme and device is in the [`capturas`](../../tree/capturas) branch.</sub>
 
 ---
 

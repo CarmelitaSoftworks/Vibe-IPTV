@@ -45,7 +45,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ### ▶️ Reproducción
 - **Cuatro motores en Android** que se relevan solos: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv) → **el del sistema** (el reproductor que trae Android). Si uno no puede con un canal, prueba el siguiente; también puedes elegir uno fijo en Ajustes.
-- **Video con FFmpeg dentro de ExoPlayer**: si el equipo no decodifica un video (MPEG-2 de la TV de cable y otros), ExoPlayer lo hace por software sin pasar a VLC, y se mantienen el colchón en vivo y el diagnóstico. Siempre se prefiere el decodificador del chip del equipo; el de software queda de respaldo.
+- **Video con FFmpeg dentro de ExoPlayer**: si el equipo no decodifica un video (MPEG-2 de la TV de cable y otros), ExoPlayer lo hace por software sin pasar a VLC, y se mantienen el colchón en vivo y el diagnóstico. Siempre se prefiere el decodificador del chip del equipo; el de software queda de respaldo. Si el chip no puede con el MPEG-2 de la TV de cable, en automático pasa a VLC para ver la imagen sin rayas (se puede cambiar en Ajustes → Reproducción).
 - **Modo túnel** opcional para Android TV (Ajustes → Reproducción): el video y el audio van directo al chip de la TV.
 - **Formatos de la TV de cable**: video MPEG-2 entrelazado y audio AC-3 / E-AC-3 / MP2, con desentrelazado automático.
 - **En el navegador**: hls.js y mpegts.js, y si el navegador no soporta el formato, conversión al vuelo con **ffmpeg** a través del servidor local.
@@ -85,7 +85,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - Tema claro (predeterminado), oscuro o del sistema, con colores de acento.
 - Al abrir la app puede volver directamente al último canal visto.
 - **Temas**: Claro, Oscuro, **Mosaicos** (gris y verde, esquinas rectas), **Ondas** (violeta) y **Personalizado** (colores, imagen de fondo, mosaicos translúcidos), que se puede exportar e importar para compartirlo.
-- **Temas estilo consola y escritorio** (Android): **Pulso** (fila de íconos, el elegido grande y su imagen de fondo, en azul), **Horizonte** (destacado grande y filas de mosaicos con borde blanco, en verde) y **Escritorio** (ventana azul de principios de los 2000, íconos de escritorio, categorías en el panel y barra de tareas con botón de inicio). Diseño propio: sin logos ni recursos de ninguna marca.
+- **Temas estilo consola y escritorio** (Android y web): **Pulso** (fila de íconos, el elegido grande y su imagen de fondo, en azul), **Horizonte** (destacado grande y filas de mosaicos con borde blanco, en verde) y **Escritorio** (ventana azul de principios de los 2000, íconos de escritorio, categorías en el panel y barra de tareas con botón de inicio). Diseño propio: sin logos ni recursos de ninguna marca.
 - **Se adaptan a cada equipo**: TV, teléfono (vertical u horizontal), tableta y laptop; en pantallas grandes todo se agranda en proporción.
 - **En español y en inglés**: sigue el idioma del equipo o se elige en Ajustes → Apariencia → Idioma.
 
@@ -94,6 +94,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Control parental:** con un PIN, las categorías para adultos quedan ocultas.
 - **Perfiles** (Android): favoritos y «Seguir viendo» por persona; el perfil infantil nunca muestra contenido para adultos.
 - **Grabación** (Android): botón ● en el reproductor para guardar un canal en vivo en *Descargas/VibeIPTV*.
+- **Grabación programada** (Android): en la guía, elige un programa futuro → *● Programar grabación*. Se graba a su hora aunque la app esté cerrada (2 min antes y 3 después) y se guarda en *Descargas/VibeIPTV*; la lista de programadas se ve y cancela en la guía.
 - **Tamaño de los controles del reproductor** ajustable (Ajustes → Reproducción).
 - **Control remoto completo**: teclas numéricas para ir a un canal, **canal anterior**, y temporizador para dormir (15 a 120 min).
 - **Mini reproductor en TV**: el video sigue en una esquina mientras recorres el menú o la guía.
@@ -109,29 +110,27 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ## 🖼️ Capturas
 
-### Temas
+Capturas de la app Android en una TV (1920×1080) con la lista de demostración y carátulas de ejemplo.
 
 | Claro | Oscuro |
 |---|---|
-| ![Tema Claro](docs/img/tema-light.jpg) | ![Tema Oscuro](docs/img/tema-dark.jpg) |
+| ![Tema Claro](docs/img/tema-claro.jpg) | ![Tema Oscuro](docs/img/tema-oscuro.jpg) |
 | **Mosaicos** | **Ondas** |
-| ![Tema Mosaicos](docs/img/tema-metro.jpg) | ![Tema Ondas](docs/img/tema-wave.jpg) |
-
-<sub>Capturas de la versión web con la lista de demostración. En Android además está el tema **Personalizado** (colores, imagen de fondo y mosaicos translúcidos).</sub>
-
-### Temas estilo consola y escritorio (Android)
-
-| Pulso | Horizonte |
-|---|---|
-| ![Tema Pulso](docs/img/tema-pulse.jpg) | ![Tema Horizonte](docs/img/tema-horizon.jpg) |
-| **Escritorio** | |
-| ![Tema Escritorio](docs/img/tema-desk.jpg) | |
+| ![Tema Mosaicos](docs/img/tema-mosaicos.jpg) | ![Tema Ondas](docs/img/tema-ondas.jpg) |
+| **Pulso** (estilo consola) | **Horizonte** (estilo consola) |
+| ![Tema Pulso](docs/img/tema-pulso.jpg) | ![Tema Horizonte](docs/img/tema-horizonte.jpg) |
+| **Escritorio** (escritorio de 2001) | |
+| ![Tema Escritorio](docs/img/tema-escritorio.jpg) | |
 
 **En cada equipo** — teléfono vertical, teléfono horizontal y tableta:
 
 ![Temas en teléfono y tableta](docs/img/temas-equipos.jpg)
 
-<sub>Capturas de la app Android con la lista de demostración (sin imágenes de canales ni películas). Todas las pantallas de cada tema y equipo están en la rama [`capturas`](../../tree/capturas).</sub>
+**En el navegador** — Pulso, Horizonte y Escritorio en la app web:
+
+![Temas en la app web](docs/img/temas-web.jpg)
+
+<sub>Diseño propio, sin logos ni recursos de ninguna marca. En Android además está el tema **Personalizado** (colores, imagen de fondo y mosaicos translúcidos). Todas las pantallas de cada tema y equipo están en la rama [`capturas`](../../tree/capturas).</sub>
 
 ---
 
