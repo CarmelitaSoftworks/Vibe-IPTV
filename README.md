@@ -68,7 +68,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Listas M3U / M3U8** desde URL o archivo, y **cuentas Xtream Codes** (con detección automática de puertos y formatos).
 - **Desde una captura de pantalla**: sube la foto o captura del mensaje de tu proveedor y el servidor, usuario, contraseña, enlace M3U y guía se rellenan solos. La lectura se hace en tu equipo (ML Kit en Android, Tesseract.js en la web): la imagen no se envía a ningún servidor.
 - **Varias listas guardadas** y cambio rápido entre ellas.
-- **Guía de programación XMLTV** (también comprimida en .gz) que se **actualiza sola** al agregar una lista y al abrir la app. Admite varias guías combinadas y ajuste de horario.
+- **Guía de programación XMLTV** (también comprimida en .gz) que se **actualiza sola** al agregar una lista y al abrir la app. Admite varias guías combinadas y ajuste de horario. Sólo se descarga si cambió, abre al instante desde una copia compacta, reconoce canales aunque traigan país o *HD* en el nombre y, en Xtream, completa los canales sin guía pidiéndola al proveedor.
 - **Guía en grilla** (Android y web): canales y programas en una línea de tiempo, navegable con el control.
 - **TV en diferido** (catch-up de Xtream): los programas ya emitidos se ven desde el inicio, si tu cuenta lo permite.
 - Compatible con guías generadas con el proyecto libre [iptv-org/epg](https://github.com/iptv-org/epg).

@@ -147,6 +147,8 @@ fun GuideScreen(vm: AppViewModel) {
 
         LazyColumn(Modifier.fillMaxSize().padding(start = 16.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             itemsIndexed(channels, key = { i, ch -> "$i:${ch.id}" }) { i, ch ->
+                // Canal sin programación en el XMLTV: se pide al proveedor si queda a la vista un momento
+                LaunchedEffect(ch.id) { kotlinx.coroutines.delay(600); vm.ensureGuide(ch) }
                 GuideRow(
                     ch = ch, progs = remember(vm.epg, ch.id) { vm.epg.listFor(ch) }, sh = sh, now = now,
                     winStart = winStart, winEnd = winEnd, dpPerMin = dpPerMin, chanW = chanW, rowH = rowH,

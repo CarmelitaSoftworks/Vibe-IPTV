@@ -47,4 +47,34 @@ class EpgParserTest {
         val r = runCatching { EpgParser.parse(xml.take(xml.length / 2).byteInputStream(), now) }
         assertNull(r.exceptionOrNull() as? Error)
     }
+
+    @Test fun idSinDistinguirMayusculas() {
+        val epg = EpgParser.parse(xml.byteInputStream(), now)
+        assertEquals("Noticiero", epg.nowNext(Item("x", Kind.LIVE, "Otro nombre", tvgId = "C1"), now).first?.title)
+    }
+
+    @Test fun nombreConPaisYCalidad() {
+        val epg = EpgParser.parse(xml.byteInputStream(), now)
+        for (n in listOf("CL: Canal Uno HD", "|CL| Canal Uno FHD", "Canal Uno 4K", "AR - Canal Uno"))
+            assertEquals(n, "Noticiero", epg.nowNext(Item("x", Kind.LIVE, n), now).first?.title)
+        assertNull(epg.nowNext(Item("x", Kind.LIVE, "Canal Dos HD"), now).first)
+    }
+
+    @Test fun guardadaCompactaSeLeeIgual() {
+        val epg = EpgParser.parse(xml.byteInputStream(), now)
+        val f = java.io.File.createTempFile("guia", ".bin")
+        epg.save(f)
+        val back = Epg.load(f)!!
+        assertEquals(epg.byId, back.byId)
+        assertEquals("Película", back.nowNext(Item("x", Kind.LIVE, "Canal Uno"), now).second?.title)
+        f.writeBytes(byteArrayOf(1, 2, 3))
+        assertNull(Epg.load(f))                                           // archivo dañado: se vuelve a leer el XML
+    }
+
+    @Test fun guiaPedidaCanalPorCanal() {
+        val item = Item("l9", Kind.LIVE, "Canal sin guía")
+        val epg = Epg.EMPTY.withExtra("l9", listOf(Programme(now - 60_000, now + 60_000, "En vivo", "")))
+        assertEquals("En vivo", epg.nowNext(item, now).first?.title)
+        assertEquals(true, epg.has(item))
+    }
 }

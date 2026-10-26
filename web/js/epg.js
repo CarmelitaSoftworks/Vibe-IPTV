@@ -23,10 +23,21 @@ export function parseXmltvTime(t) {
 }
 
 const attr = (s, name) => (new RegExp(`${name}\\s*=\\s*"([^"]*)"`).exec(s) || [])[1] || '';
-const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Sin tildes ni signos: "Señal Uno" = "senal uno" (antes se borraban las letras con tilde y no calzaban)
+const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const QUALITY = /(uhd|fhd|hd|sd|4k|8k|hevc|h265|h264|1080p?|720p?|2160p?|backup|bkp)+$/;
+/** Nombre "suelto": sin país al principio ("CL: ", "|AR| ") ni calidad al final ("HD", "4K"). */
+export function loose(s) {
+  const raw = String(s || '').trim();
+  const noCountry = raw.replace(/^\W*[A-Za-z]{2,3}\s*[:|\]\-]+\s*/, '') || raw;
+  let n = norm(noCountry);
+  for (let i = 0; i < 2; i++) n = n.replace(QUALITY, '');
+  return n || norm(raw);
+}
 
 // Conserva sólo una ventana de tiempo útil para no llenar la memoria
-export function parseXmltv(xml, now = Date.now(), pastMs = 3 * 3600e3, futureMs = 36 * 3600e3) {
+// 24 h hacia atrás (para ver en diferido lo de hoy) y 48 h hacia adelante
+export function parseXmltv(xml, now = Date.now(), pastMs = 24 * 3600e3, futureMs = 48 * 3600e3) {
   const byId = new Map();
   const nameToId = new Map();
   const chRe = /<channel\b([^>]*)>([\s\S]*?)<\/channel>/g;
@@ -44,7 +55,7 @@ export function parseXmltv(xml, now = Date.now(), pastMs = 3 * 3600e3, futureMs 
     if (!(stop > now - pastMs && start < now + futureMs)) continue;
     const ch = decode(attr(m[1], 'channel'));
     const title = decode((/<title[^>]*>([\s\S]*?)<\/title>/.exec(m[2]) || [])[1] || '');
-    const desc = decode((/<desc[^>]*>([\s\S]*?)<\/desc>/.exec(m[2]) || [])[1] || '');
+    const desc = decode((/<desc[^>]*>([\s\S]*?)<\/desc>/.exec(m[2]) || [])[1] || '').slice(0, 600);
     if (!byId.has(ch)) byId.set(ch, []);
     byId.get(ch).push({ start, stop, title, desc });
   }
@@ -54,11 +65,26 @@ export function parseXmltv(xml, now = Date.now(), pastMs = 3 * 3600e3, futureMs 
 
 export class Epg {
   constructor(byId = new Map(), nameToId = new Map()) { this.byId = byId; this.nameToId = nameToId; }
+  /** Índices extra (se arman la primera vez): id sin mayúsculas y nombres sin país ni calidad. */
+  index() {
+    if (this._lower) return;
+    this._lower = new Map([...this.byId.keys()].map((k) => [k.toLowerCase(), k]));
+    this._loose = new Map();
+    for (const [n, id] of this.nameToId) if (!this._loose.has(loose(n))) this._loose.set(loose(n), id);
+    for (const id of this.byId.keys()) { const k = loose(id.replace(/\.[^.]*$/, '')); if (!this._loose.has(k)) this._loose.set(k, id); }
+  }
   listFor(item) {
     if (!item) return [];
     if (item.tvgId && this.byId.has(item.tvgId)) return this.byId.get(item.tvgId);
+    this.index();
+    if (item.tvgId) { const id = this._lower.get(item.tvgId.toLowerCase()); if (id) return this.byId.get(id); }
     for (const n of [item.tvgName, item.name]) {
       const id = this.nameToId.get(norm(n));
+      if (id && this.byId.has(id)) return this.byId.get(id);
+    }
+    for (const n of [item.tvgName, item.name, (item.tvgId || '').replace(/\.[^.]*$/, '')]) {
+      if (!n) continue;
+      const id = this._loose.get(loose(n));
       if (id && this.byId.has(id)) return this.byId.get(id);
     }
     return [];
@@ -89,7 +115,8 @@ async function gunzipIfNeeded(buf, url) {
 }
 
 async function loadOne(url) {
-  const buf = await fetchSmart(url, 'buffer');
+  // Un reintento si el servidor de la guía falla (suelen estar saturados a la hora en punto)
+  const buf = await fetchSmart(url, 'buffer').catch(() => new Promise((r) => setTimeout(r, 3000)).then(() => fetchSmart(url, 'buffer')));
   return parseXmltv(await gunzipIfNeeded(buf, url));
 }
 

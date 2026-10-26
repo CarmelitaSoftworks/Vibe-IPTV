@@ -7,19 +7,50 @@ import java.io.InputStream
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 
-class Epg(internal val byId: Map<String, List<Programme>>, internal val nameToId: Map<String, String>) {
+class Epg(
+    internal val byId: Map<String, List<Programme>>,
+    internal val nameToId: Map<String, String>,
+    /** Guía pedida canal por canal al proveedor (Xtream) para los que no salen en el XMLTV: id del elemento → programas. */
+    internal val extra: Map<String, List<Programme>> = emptyMap(),
+) {
 
-    val channelCount: Int get() = byId.size
+    val channelCount: Int get() = byId.size + extra.size
+
+    /** El id del XMLTV sin distinguir mayúsculas (muchas listas escriben "Canal13.cl" y la guía "canal13.cl"). */
+    private val idLower: Map<String, String> by lazy { byId.keys.associateBy { it.lowercase() } }
+    /** Nombres "sueltos": sin país al principio ni HD / FHD / 4K al final ("CL: Canal 13 HD" = "Canal 13"). */
+    private val looseToId: Map<String, String> by lazy {
+        val m = HashMap<String, String>()
+        nameToId.forEach { (k, v) -> m.putIfAbsent(loose(k), v) }
+        byId.keys.forEach { id -> m.putIfAbsent(loose(id.substringBeforeLast('.')), id) }
+        m
+    }
 
     fun listFor(item: Item): List<Programme> {
-        if (item.tvgId.isNotEmpty()) byId[item.tvgId]?.let { return it }
+        extra[item.id]?.let { if (it.isNotEmpty()) return it }
+        if (item.tvgId.isNotEmpty()) {
+            byId[item.tvgId]?.let { return it }
+            idLower[item.tvgId.lowercase()]?.let { id -> byId[id]?.let { return it } }
+        }
         for (n in listOf(item.tvgName, item.name)) {
+            if (n.isBlank()) continue
             val id = nameToId[norm(n)] ?: continue
+            byId[id]?.let { return it }
+        }
+        for (n in listOf(item.tvgName, item.name, item.tvgId.substringBeforeLast('.'))) {
+            if (n.isBlank()) continue
+            val id = looseToId[loose(n)] ?: continue
             byId[id]?.let { return it }
         }
         return emptyList()
     }
+
+    /** true si este canal ya tiene programación (para no pedirla de nuevo al proveedor). */
+    fun has(item: Item) = listFor(item).isNotEmpty()
+
+    fun withExtra(itemId: String, list: List<Programme>) = Epg(byId, nameToId, extra + (itemId to list))
 
     fun nowNext(item: Item, now: Long = System.currentTimeMillis()): Pair<Programme?, Programme?> {
         val list = listFor(item)
@@ -27,8 +58,30 @@ class Epg(internal val byId: Map<String, List<Programme>>, internal val nameToId
         return if (i < 0) null to list.firstOrNull { it.start > now } else list[i] to list.getOrNull(i + 1)
     }
 
+    /**
+     * Guarda la guía ya leída en un archivo compacto: al abrir la app se carga en un par de segundos en vez de volver a
+     * leer el XML completo (que en un TV box modesto puede tardar casi un minuto).
+     */
+    fun save(f: java.io.File) {
+        val tmp = java.io.File(f.parentFile, f.name + ".part")
+        java.io.DataOutputStream(java.io.BufferedOutputStream(GZIPOutputStream(tmp.outputStream()), 64 * 1024)).use { o ->
+            o.writeInt(CACHE_VERSION)
+            o.writeInt(byId.size)
+            byId.forEach { (id, list) ->
+                o.writeUTF(id); o.writeInt(list.size)
+                list.forEach { p -> o.writeLong(p.start); o.writeLong(p.stop); o.writeUTF(p.title.take(300)); o.writeUTF(p.desc.take(MAX_DESC)) }
+            }
+            o.writeInt(nameToId.size)
+            nameToId.forEach { (k, v) -> o.writeUTF(k); o.writeUTF(v) }
+        }
+        if (!tmp.renameTo(f)) { tmp.copyTo(f, overwrite = true); tmp.delete() }
+    }
+
     companion object {
         val EMPTY = Epg(emptyMap(), emptyMap())
+        private const val CACHE_VERSION = 1
+        /** Descripciones más largas se cortan: es lo que más memoria ocupa y en la ficha no se lee más. */
+        const val MAX_DESC = 600
 
         /** Combina varias guías; ante canales repetidos manda la primera. */
         fun merge(list: List<Epg>): Epg {
@@ -41,6 +94,34 @@ class Epg(internal val byId: Map<String, List<Programme>>, internal val nameToId
             return Epg(byId, names)
         }
         fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+
+        private val QUALITY = Regex("(uhd|fhd|hd|sd|4k|8k|hevc|h265|h264|1080p?|720p?|2160p?|backup|bkp)+$")
+        /** Nombre normalizado sin calidad al final. Recibe un nombre ya pasado por [norm] o uno original. */
+        fun loose(s: String): String {
+            // País al principio: "CL: Canal 13", "|AR| TN", "MX - Azteca" (se mira el original, antes de quitar signos)
+            val raw = s.trim()
+            val noCountry = Regex("^\\W*[A-Za-z]{2,3}\\s*[:|\\]\\-]+\\s*").replace(raw, "").ifBlank { raw }
+            var n = norm(noCountry)
+            repeat(2) { n = QUALITY.replace(n, "") }
+            return n.ifBlank { norm(raw) }
+        }
+
+        /** Lee la guía guardada con [save]. null si el archivo no sirve (versión vieja o cortado). */
+        fun load(f: java.io.File): Epg? = runCatching {
+            java.io.DataInputStream(java.io.BufferedInputStream(GZIPInputStream(f.inputStream()), 64 * 1024)).use { i ->
+                if (i.readInt() != CACHE_VERSION) return null
+                val n = i.readInt()
+                val byId = HashMap<String, List<Programme>>(n * 2)
+                repeat(n) {
+                    val id = i.readUTF(); val c = i.readInt()
+                    byId[id] = List(c) { Programme(i.readLong(), i.readLong(), i.readUTF(), i.readUTF()) }
+                }
+                val m = i.readInt()
+                val names = HashMap<String, String>(m * 2)
+                repeat(m) { names[i.readUTF()] = i.readUTF() }
+                Epg(byId, names)
+            }
+        }.getOrNull()
     }
 }
 
@@ -54,8 +135,10 @@ object EpgParser {
         bis.reset()
         val stream: InputStream = if (b1 == 0x1f && b2 == 0x8b) GZIPInputStream(bis, 64 * 1024) else bis
 
-        val from = now - 3 * 3600_000L
-        val to = now + 36 * 3600_000L
+        // Ventana útil: 24 h hacia atrás (para ver en diferido lo de hoy) y 48 h hacia adelante; en modo liviano, menos
+        // (la memoria de los TV box modestos es poca y una guía grande tiene cientos de miles de programas)
+        val from = now - (if (Perf.lite) 8 else 24) * 3600_000L
+        val to = now + (if (Perf.lite) 30 else 48) * 3600_000L
         val byId = HashMap<String, MutableList<Programme>>()
         val nameToId = HashMap<String, String>()
 
@@ -80,7 +163,7 @@ object EpgParser {
                         title = ""; desc = ""
                     }
                     "title" -> if (inProg && title.isEmpty()) title = safeText(xp)
-                    "desc" -> if (inProg && desc.isEmpty()) desc = safeText(xp)
+                    "desc" -> if (inProg && desc.isEmpty()) desc = safeText(xp).take(Epg.MAX_DESC)
                 }
             } else if (ev == XmlPullParser.END_TAG) {
                 when (xp.name) {

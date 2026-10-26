@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cl.iptv.player.data.*
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -311,7 +312,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun open(src: Source) {
         loadJob?.cancel()
         source = src; allItems = emptyList(); items = emptyList(); epg = Epg.EMPTY; series = null; episodes = emptyList(); home = true
-        epgJob?.cancel(); epgAt = 0; epgUrls = ""; epgStatus = ""
+        epgJob?.cancel(); epgAt = 0; epgUrls = ""; epgStatus = ""; guideTried.clear()
         showWelcome = false
         favorites = store.favorites(src.id)
         resume = store.resume(src.id)
@@ -442,8 +443,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- guía EPG: caché en disco + actualización ----------
     private fun epgDir() = File(getApplication<Application>().filesDir, "epg").apply { mkdirs() }
-    private fun epgFiles(srcId: String) = epgDir().listFiles { f -> f.name.startsWith("${srcId}_") && !f.name.endsWith(".part") }
+    private fun epgFiles(srcId: String) = epgDir().listFiles { f -> f.name.startsWith("${srcId}_") && f.name.endsWith(".xml") }
         ?.sortedBy { it.name }.orEmpty()
+    /** La guía ya leída, en formato compacto (ver Epg.save): se carga mucho más rápido que el XML. */
+    private fun epgBin(srcId: String) = File(epgDir(), "$srcId.bin")
+    /** Pasado este tiempo se vuelve a leer el XML aunque no haya cambiado (para correr la ventana de horas). */
+    private val EPG_BIN_MAX_AGE = 12 * 3600_000L
+
+    /** Lee los XML y guarda la versión compacta. */
+    private fun parseAndSave(srcId: String, files: List<File>): Epg? {
+        val e = parseFiles(files) ?: return null
+        runCatching { e.save(epgBin(srcId)) }.onFailure { epgBin(srcId).delete() }
+        return e
+    }
+    /** Al reemplazar la guía se conservan los canales pedidos uno a uno al proveedor. */
+    private fun replaceEpg(e: Epg) { epg = if (epg.extra.isEmpty()) e else Epg(e.byId, e.nameToId, epg.extra) }
 
     private fun parseFiles(files: List<File>): Epg? {
         val parsed = files.mapNotNull { f -> runCatching { f.inputStream().use { EpgParser.parse(it) } }.getOrNull() }
@@ -453,11 +467,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun loadCachedEpg(src: Source) {
         val files = epgFiles(src.id)
         if (files.isEmpty()) return
-        val e = withContext(Dispatchers.IO) { parseFiles(files) } ?: return
+        val bin = epgBin(src.id)
+        val e = withContext(Dispatchers.IO) {
+            (if (bin.exists() && System.currentTimeMillis() - bin.lastModified() < EPG_BIN_MAX_AGE) Epg.load(bin) else null)
+                ?: parseAndSave(src.id, files)
+        } ?: return
         if (source?.id != src.id || epgAt > 0) return     // ya llegó una más nueva
-        epg = e
+        replaceEpg(e)
         epgAt = files.maxOf { it.lastModified() }
         epgStatus = "Guía guardada del ${java.text.SimpleDateFormat("dd/MM HH:mm", I18n.locale).format(java.util.Date(epgAt))} · actualizando…"
+    }
+
+    // ---------- Guía canal por canal (Xtream) ----------
+    // Canales que no salen en el XMLTV (o listas sin XMLTV): se pide su programación directo al proveedor, de a pocos
+    private val guideTried = HashSet<String>()
+    private val guideLimit = kotlinx.coroutines.sync.Semaphore(3)
+    fun ensureGuide(item: Item) {
+        val x = xtream ?: return
+        if (item.kind != Kind.LIVE || item.id in guideTried || epg.has(item)) return
+        val sid = Regex("/live/[^/]+/[^/]+/(\\d+)").find(item.url)?.groupValues?.get(1) ?: return
+        guideTried += item.id
+        val srcId = source?.id
+        viewModelScope.launch {
+            val list = guideLimit.withPermit { runCatching { x.shortEpg(sid) }.getOrDefault(emptyList()) }
+            if (list.isNotEmpty() && source?.id == srcId) epg = epg.withExtra(item.id, list)
+        }
     }
 
     /** Descarga una o varias guías (separadas por coma o espacio), las guarda y las combina. */
@@ -469,23 +503,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         epgJob = viewModelScope.launch {
             epgStatus = "Actualizando guía…"
             val list = urls.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
-            val files = list.mapIndexed { i, url ->
+            // Cada guía se baja sólo si cambió (y con reintentos); las que no cambiaron no se vuelven a leer
+            val results = list.mapIndexed { i, url ->
                 async {
-                    runCatching { Http.download(url, File(epgDir(), "${src.id}_$i.xml")) }
-                        .onFailure { android.util.Log.w("IPTV", "EPG: ${it.message}") }.getOrNull()
+                    runCatching { File(epgDir(), "${src.id}_$i.xml").let { f -> f to Http.downloadIfChanged(url, f) } }
+                        .onFailure { logEvent("Guía: no se pudo bajar ${url.substringBefore('?')}: ${it.message}") }.getOrNull()
                 }
             }.awaitAll()
             if (source?.id != src.id) return@launch
-            val ok = files.filterNotNull()
+            val ok = results.filterNotNull()
             if (ok.isEmpty()) {
                 epgStatus = "No se pudo actualizar la guía (sin respuesta del servidor)." + if (epgAt > 0) " Se mantiene la última guardada." else ""
                 return@launch
             }
+            val files = ok.map { it.first }
             // Descartar guías viejas de URLs que ya no están en la lista
-            epgFiles(src.id).filter { f -> f !in ok }.forEach { it.delete() }
-            val e = withContext(Dispatchers.IO) { parseFiles(ok) }
+            epgFiles(src.id).filter { f -> f !in files }.forEach { it.delete(); File(it.parentFile, it.name + ".meta").delete() }
+            val bin = epgBin(src.id)
+            val fresh = bin.exists() && System.currentTimeMillis() - bin.lastModified() < EPG_BIN_MAX_AGE
+            if (ok.none { it.second } && epg.byId.isNotEmpty() && fresh && files.size == list.size) {
+                epgAt = System.currentTimeMillis()
+                epgStatus = "Guía al día (sin cambios) · revisada a las ${fmtTime(epgAt)} · ${epg.channelCount} canales con programación"
+                return@launch
+            }
+            val e = withContext(Dispatchers.IO) { parseAndSave(src.id, files) }
             if (e == null) { epgStatus = "La guía descargada no es un XMLTV válido."; return@launch }
-            epg = e
+            replaceEpg(e)
             epgAt = System.currentTimeMillis()
             epgStatus = "Guía actualizada a las ${fmtTime(epgAt)} · ${e.channelCount} canales con programación"
         }
@@ -518,7 +561,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteSource(src: Source) {
         store.remove(src.id)
-        epgFiles(src.id).forEach { it.delete() }
+        epgFiles(src.id).forEach { it.delete(); File(it.parentFile, it.name + ".meta").delete() }
+        epgBin(src.id).delete()
         sources = store.sources()
         if (source?.id == src.id) {
             source = null; allItems = emptyList(); items = emptyList(); recompute(true)

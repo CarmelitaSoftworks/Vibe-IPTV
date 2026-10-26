@@ -448,6 +448,8 @@ fun PlayerScreen(vm: AppViewModel) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { hosts.forEach { h -> runCatching { cl.iptv.player.data.Http.dns.lookup(h) } } }
     }
     LaunchedEffect(item.id) { vm.logEvent("Reproducir: ${item.name} [${item.kind}] ${item.url}") }
+    // Guía del canal: si no sale en el XMLTV, se pide al proveedor (Xtream)
+    LaunchedEffect(item.id) { if (live) vm.ensureGuide(item) }
     // Colchón en vivo (Ajustes → Reproducción): si queda poco video guardado, se reproduce un 2–4 % más lento hasta
     // rehacerlo (ExoPlayer y MPV, que informan cuánto tienen guardado)
     LaunchedEffect(item.id, engine, player, alt, vm.settings.liveCushion) {

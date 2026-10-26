@@ -75,6 +75,9 @@ When a list opens you get **Home** with three big tiles (Live TV, Movies, Series
 
 - It uses the guide named by the list (`x-tvg-url`), the Xtream one (`xmltv.php`) or the one you enter when editing the list. You can enter **several separated by commas**: they are merged.
 - **It updates itself**: when you add a list, every time you open the app, when you return after 30 minutes and every 4 hours while the app is open. While downloading, the last saved guide is shown, and it's kept if the connection fails. In **Settings** you can see when it was updated and use "Update guide now".
+- **Lighter downloads and fast opening (Android):** the guide is only downloaded again if it changed on the server (otherwise the saved one is kept) and it retries by itself if the server fails. The guide already read is saved in a compact format, so when you open the app it appears in a couple of seconds even if the XML weighs tens of megabytes.
+- **More channels with a guide:** channels are matched to their guide even if the name includes the country (*CL: Canal 13*), the quality (*HD*, *FHD*, *4K*), accents or different capitalization. On Xtream accounts, if a channel isn't in the XMLTV guide, the app asks the provider for its listings when you watch it or move over it in the Guide.
+- **More hours:** 24 h back (to watch today's shows on catch-up) and 48 h ahead (8 and 30 in light mode).
 - To build your own guide with free software: [iptv-org/epg](https://github.com/iptv-org/epg) (for Chile, `mi.tv`, `gatotv.com` and `directv.com` work well):
 
   ```bash

@@ -483,6 +483,7 @@ export default {
   "Guía actualizada": "Guide updated",
   "Guía actualizada a las {}": "Guide updated at {}",
   "Guía actualizada a las {} · {} canales con programación": "Guide updated at {} · {} channels with listings",
+  "Guía al día (sin cambios) · revisada a las {} · {} canales con programación": "Guide up to date (no changes) · checked at {} · {} channels with listings",
   "Guía bajo los mosaicos": "Guide below the tiles",
   "Guía de demostración": "Demo guide",
   "Guía de programación": "TV guide",

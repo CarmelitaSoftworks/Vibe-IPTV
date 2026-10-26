@@ -75,6 +75,9 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
 
 - Se usa la guía que indique la lista (`x-tvg-url`), la de Xtream (`xmltv.php`) o la que escribas al editar la lista. Puedes poner **varias separadas por coma**: se combinan.
 - **Se actualiza sola**: al añadir una lista, cada vez que abres la app, al volver a la app tras 30 minutos y cada 4 horas con la app abierta. Mientras descarga se muestra la última guía guardada, y si falla la conexión se mantiene esa. En **Ajustes** ves cuándo se actualizó y tienes "Actualizar guía ahora".
+- **Descarga más liviana y apertura rápida (Android):** la guía sólo se vuelve a bajar si cambió en el servidor (si no, se mantiene la guardada) y reintenta sola si el servidor falla. La guía ya leída queda guardada en un formato compacto, así que al abrir la app aparece en un par de segundos aunque el XML pese decenas de megas.
+- **Más canales con guía:** los canales se asocian a su guía aunque el nombre traiga el país (*CL: Canal 13*), la calidad (*HD*, *FHD*, *4K*), tildes o mayúsculas distintas. En cuentas Xtream, si un canal no sale en la guía XMLTV, la app pide su programación directo al proveedor al verlo o al pasar por él en la Guía.
+- **Más horas:** se guardan 24 h hacia atrás (para ver en diferido lo de hoy) y 48 h hacia adelante (8 y 30 en modo liviano).
 - Para generar tu propia guía con software libre: [iptv-org/epg](https://github.com/iptv-org/epg) (para Chile sirven `mi.tv`, `gatotv.com` y `directv.com`):
 
   ```bash

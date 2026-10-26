@@ -95,3 +95,14 @@ test('Grupos: categoría y subcategoría', async () => {
   assert.deepEqual(splitGroup('Series » Drama » Turcas'), { cat: 'Drama', sub: 'Turcas' });
   assert.deepEqual(splitGroup(''), { cat: 'Sin categoría', sub: '' });
 });
+
+test('guía: calza canales con país, calidad, tildes o mayúsculas distintas', () => {
+  const now = Date.UTC(2026, 9, 20, 12);
+  const xml = `<tv><channel id="Senal.cl"><display-name>Señal Uno</display-name></channel>
+    <programme start="20261020110000 +0000" stop="20261020130000 +0000" channel="Senal.cl"><title>Noticias</title></programme></tv>`;
+  const epg = parseXmltv(xml, now);
+  for (const name of ['CL: Señal Uno HD', '|CL| Señal Uno FHD', 'Senal Uno 4K'])
+    assert.equal(epg.nowNext({ name }, now).now?.title, 'Noticias', name);
+  assert.equal(epg.nowNext({ name: 'x', tvgId: 'senal.CL' }, now).now?.title, 'Noticias');
+  assert.equal(epg.nowNext({ name: 'Señal Dos HD' }, now).now, null);
+});
