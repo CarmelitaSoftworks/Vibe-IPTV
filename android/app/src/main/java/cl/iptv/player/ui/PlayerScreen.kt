@@ -159,6 +159,7 @@ fun PlayerScreen(vm: AppViewModel) {
     var stalls by remember(item.id) { mutableStateOf(0) }
     var reconnects by remember(item.id) { mutableStateOf(0) }
     var cushionSpeed by remember { mutableStateOf(1f) }
+    var videoDecoder by remember { mutableStateOf("") }
     // true cuando el motor actual ya mostró imagen o sonido (lo usa el vigilante de arranque)
     var started by remember { mutableStateOf(false) }
     fun switchEngine(to: String, reason: String) {
@@ -241,6 +242,11 @@ fun PlayerScreen(vm: AppViewModel) {
             }
         }
             .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            // Siempre primero el decodificador del chip; el de software (y luego FFmpeg) sólo si el del chip no puede
+            .setMediaCodecSelector { mime, secure, tunneling ->
+                val all = androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(mime, secure, tunneling)
+                cl.iptv.player.data.Decoders.hardwareFirst(all) { it.hardwareAccelerated && !it.softwareOnly && !cl.iptv.player.data.Decoders.isSoftwareName(it.name) }
+            }
             .setEnableDecoderFallback(true)
         val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(ctx).apply {
             if (tunnel) setParameters(buildUponParameters().setTunnelingEnabled(true))
@@ -482,6 +488,10 @@ fun PlayerScreen(vm: AppViewModel) {
         val analytics = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onLoadError(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, l: androidx.media3.exoplayer.source.LoadEventInfo,
                                      m: androidx.media3.exoplayer.source.MediaLoadData, e: java.io.IOException, cancelled: Boolean) { reconnects++ }
+            override fun onVideoDecoderInitialized(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, name: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
+                videoDecoder = name
+                vm.logEvent("Decodificador de video: $name")
+            }
         }
         player.addAnalyticsListener(analytics)
         onDispose { player.removeListener(listener); player.removeAnalyticsListener(analytics); player.release() }
@@ -990,6 +1000,11 @@ fun PlayerScreen(vm: AppViewModel) {
                         })
                         add("Cortes en este canal" to stalls.toString())
                         if (!useAlt) add("Reconexiones" to reconnects.toString())
+                        if (!useAlt && videoDecoder.isNotEmpty()) add("Decodificador de video" to when {
+                            videoDecoder.contains("ffmpeg", true) || videoDecoder.startsWith("lib") -> "FFmpeg (software) · $videoDecoder"
+                            cl.iptv.player.data.Decoders.isSoftwareName(videoDecoder) -> "Software · $videoDecoder"
+                            else -> "Chip del equipo · $videoDecoder"
+                        })
                         if (!useAlt) bandwidth.bitrateEstimate.takeIf { it > 0 }?.let { add("Velocidad de descarga" to "%.1f Mb/s".format(it / 1e6)) }
                     }
                     (listOf("Motor" to engineName[engine].orEmpty()) + diag + k?.info().orEmpty().filter { it.first != "Búfer" } +

@@ -45,7 +45,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ### ▶️ Playback
 - **Four engines on Android** that take over from each other automatically: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv) → **the system one** (Android's built-in player). If one can't handle a channel, the next one tries; you can also pin one in Settings.
-- **FFmpeg video inside ExoPlayer**: if the device can't decode a video (cable-TV MPEG-2 and others), ExoPlayer does it in software without switching to VLC, keeping the live cushion and diagnostics.
+- **FFmpeg video inside ExoPlayer**: if the device can't decode a video (cable-TV MPEG-2 and others), ExoPlayer does it in software without switching to VLC, keeping the live cushion and diagnostics. The device chip's decoder is always preferred; software stays as a fallback.
 - Optional **tunnel mode** for Android TV (Settings → Playback): video and audio go straight to the TV chip.
 - **Cable-TV formats**: interlaced MPEG-2 video and AC-3 / E-AC-3 / MP2 audio, with automatic deinterlacing.
 - **In the browser**: hls.js and mpegts.js, plus on-the-fly **ffmpeg** conversion through the local server when the browser can't play a format.

@@ -45,7 +45,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 
 ### ▶️ Reproducción
 - **Cuatro motores en Android** que se relevan solos: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv) → **el del sistema** (el reproductor que trae Android). Si uno no puede con un canal, prueba el siguiente; también puedes elegir uno fijo en Ajustes.
-- **Video con FFmpeg dentro de ExoPlayer**: si el equipo no decodifica un video (MPEG-2 de la TV de cable y otros), ExoPlayer lo hace por software sin pasar a VLC, y se mantienen el colchón en vivo y el diagnóstico.
+- **Video con FFmpeg dentro de ExoPlayer**: si el equipo no decodifica un video (MPEG-2 de la TV de cable y otros), ExoPlayer lo hace por software sin pasar a VLC, y se mantienen el colchón en vivo y el diagnóstico. Siempre se prefiere el decodificador del chip del equipo; el de software queda de respaldo.
 - **Modo túnel** opcional para Android TV (Ajustes → Reproducción): el video y el audio van directo al chip de la TV.
 - **Formatos de la TV de cable**: video MPEG-2 entrelazado y audio AC-3 / E-AC-3 / MP2, con desentrelazado automático.
 - **En el navegador**: hls.js y mpegts.js, y si el navegador no soporta el formato, conversión al vuelo con **ffmpeg** a través del servidor local.
