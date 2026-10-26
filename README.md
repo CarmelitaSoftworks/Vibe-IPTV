@@ -175,6 +175,13 @@ o descarga el APK desde **[Releases → versión de prueba](../../releases/tag/p
 Al instalar, permite **“Instalar apps desconocidas”**. Requiere **Android 7.0 (API 24)** o superior (el motor MPV, desde Android 8.0).
 Para actualizar, instala la nueva versión encima: se conservan tus listas y ajustes.
 
+### Windows portable (sin instalar nada)
+1. Descarga **[vibe-iptv-windows.zip](https://github.com/CarmelitaSoftworks/Vibe-IPTV/releases/download/prueba/vibe-iptv-windows.zip)** (unos 90 MB).
+2. Descomprímelo donde quieras (Escritorio, un pendrive…) y abre la carpeta **VibeIPTV**.
+3. Doble clic en **Abrir Vibe IPTV.bat**: se abre en el navegador. Trae todo incluido (Node.js, ffmpeg para los canales de cable y el lector de capturas).
+4. Para verla también desde la TV o el celular de tu casa: **Abrir Vibe IPTV (TV y celulares).bat**.
+5. Si Windows muestra *Windows protegió su PC*: *Más información → Ejecutar de todas formas*.
+
 ### Navegador (PC, Mac, celular)
 1. Descarga el repositorio (**Code → Download ZIP**) y descomprímelo.
 2. Instala [Node.js](https://nodejs.org) (versión 18 o superior).
