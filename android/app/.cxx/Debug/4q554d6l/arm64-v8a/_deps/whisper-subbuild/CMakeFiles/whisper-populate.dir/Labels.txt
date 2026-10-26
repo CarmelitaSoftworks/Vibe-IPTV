@@ -1,0 +1,14 @@
+# Target labels
+ whisper-populate
+# Source files and their labels
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/CMakeFiles/whisper-populate
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/CMakeFiles/whisper-populate.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/CMakeFiles/whisper-populate-complete.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-build.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-configure.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-download.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-install.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-mkdir.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-patch.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-test.rule
+/home/user/Vibe-IPTV/android/app/.cxx/Debug/4q554d6l/arm64-v8a/_deps/whisper-subbuild/whisper-populate-prefix/src/whisper-populate-stamp/whisper-populate-update.rule

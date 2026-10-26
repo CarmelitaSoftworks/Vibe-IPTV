@@ -83,6 +83,8 @@ data class Settings(
     val buffer: String = "balanced",
     /** Colchón en vivo: reproducir un poco más lento cuando queda poco video guardado, hasta rehacerlo. */
     val liveCushion: Boolean = true,
+    /** Modo túnel (Android TV): el video y el audio van directo al chip de la TV. Apagado por defecto: depende del equipo. */
+    val tunneling: Boolean = false,
     /** Buscar y cargar subtítulos solos en películas y series (fuentes sin clave: OpenSubtitles y Podnapisi). */
     val autoSubs: Boolean = true,
     /** Modo liviano para TV boxes modestos (Xiaomi Mi Box / Mi TV Stick): auto | on | off. */

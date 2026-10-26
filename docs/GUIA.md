@@ -100,7 +100,7 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
 
 **Formatos de la TV de cable:** muchos canales en vivo traen audio **AC-3 / MP2** o video **MPEG-2 entrelazado**, que los navegadores no reproducen.
 - **Web:** el servidor local los convierte al vuelo con **ffmpeg** (sólo lo necesario: copia el video H.264 y convierte el audio a AAC; si el video es MPEG-2 lo desentrelaza y lo pasa a H.264 a 720p). `iniciar.bat` instala ffmpeg sola la primera vez (`npm install`, unos 70 MB). En Ajustes → Reproducción: *Automático* (cuando el canal falla o queda sin sonido), *Siempre en TV en vivo* o *Nunca*, y la calidad de conversión.
-- **Android / TV:** tres motores: **ExoPlayer**, **VLC (LibVLC)** y **MPV (libmpv, el mismo de OwnTV)**. En *Automático* cada canal parte con **ExoPlayer** y sólo si ese canal falla pasa a VLC y luego a MPV (Android 8.0+). En el menú del reproductor (tecla MENÚ) se puede cambiar de motor, el formato de pantalla y la pista de audio.
+- **Android / TV:** cuatro motores: **ExoPlayer**, **VLC (LibVLC)**, **MPV (libmpv, el mismo de OwnTV)** y el **motor del sistema** (el reproductor que trae Android, que usa el chip del equipo). En *Automático* cada canal parte con **ExoPlayer** y sólo si ese canal falla pasa a VLC, luego a MPV (Android 8.0+) y por último al del sistema. ExoPlayer trae FFmpeg también para el video: si el equipo no decodifica un video (por ejemplo MPEG-2 de la TV de cable), lo hace por software sin cambiar de motor. **Modo túnel (TV)** en Ajustes → Reproducción (apagado): el video y el audio van directo al chip de la TV; si ves la imagen negra o cortes, apágalo. En el menú del reproductor (tecla MENÚ) se puede cambiar de motor, el formato de pantalla y la pista de audio.
 
 **Controles (Android):** a la vista sólo lo más usado — lista de canales, audio, subtítulos, favorito, mini reproductor y **⋯ Más opciones**. Dentro de *Más opciones* (con íconos): calidad, formato, velocidad, canal anterior, grabar, multivista, imagen en imagen, temporizador, motor, información técnica y abrir en VLC. Los paneles muestran el texto completo y marcan con ✓ la opción elegida.
 
@@ -216,6 +216,7 @@ android/
     ui/MenuScreen.kt         cuadrícula de mosaicos + barra inferior
     ui/PlayerScreen.kt       reproductor, guía, opciones, subtítulos
     ui/VlcEngine.kt, ui/MpvEngine.kt   motores VLC y MPV
+    ui/SystemEngine.kt                 motor del sistema (MediaPlayer de Android)
     ui/SettingsScreen.kt     ajustes
     ui/I18n.kt               traducción al inglés
 ```

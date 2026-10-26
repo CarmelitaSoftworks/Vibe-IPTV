@@ -1,3 +1,4 @@
+import java.util.zip.ZipFile
 import java.time.Duration
 
 plugins {
@@ -92,6 +93,51 @@ android {
     }
 }
 
+/*
+ * NextLib trae su propio FFmpeg 6 (libavcodec.so, libavutil.so, …) y MPV trae FFmpeg 8 con los mismos nombres de
+ * archivo: en un APK no pueden convivir dos archivos iguales. Se toman las librerías de NextLib y se les cambia el
+ * nombre por otro del mismo largo (dentro de los archivos también, para que se encuentren entre sí). Las funciones de
+ * cada FFmpeg llevan su versión (LIBAVCODEC_60 / _62), así que no se mezclan aunque las dos estén cargadas.
+ */
+val nextlib by configurations.creating
+val nextlibDir = layout.buildDirectory.dir("nextlib")
+val prepararNextlib by tasks.registering {
+    inputs.files(nextlib)
+    outputs.dir(nextlibDir)
+    doLast {
+        val out = nextlibDir.get().asFile
+        out.deleteRecursively(); out.mkdirs()
+        val nombres = mapOf(
+            "libavcodec.so" to "libnxavcod.so", "libavutil.so" to "libnxavut.so",
+            "libswscale.so" to "libnxswsca.so", "libswresample.so" to "libnxswresamp.so",
+        )
+        fun reemplazar(b: ByteArray, de: ByteArray, a: ByteArray) {
+            var i = 0
+            while (i <= b.size - de.size) {
+                var igual = true
+                for (j in de.indices) if (b[i + j] != de[j]) { igual = false; break }
+                if (igual) { a.copyInto(b, i); i += de.size } else i++
+            }
+        }
+        ZipFile(nextlib.singleFile).use { zip ->
+            for (e in zip.entries()) {
+                val bytes = zip.getInputStream(e).use { it.readBytes() }
+                when {
+                    e.name == "classes.jar" -> File(out, "classes.jar").writeBytes(bytes)
+                    e.name.startsWith("jni/") && e.name.endsWith(".so") -> {
+                        val abi = e.name.split('/')[1]
+                        val nombre = e.name.substringAfterLast('/')
+                        nombres.forEach { (de, a) -> require(de.length == a.length); reemplazar(bytes, de.toByteArray(), a.toByteArray()) }
+                        File(out, "jni/$abi/${nombres[nombre] ?: nombre}").apply { parentFile.mkdirs(); writeBytes(bytes) }
+                    }
+                }
+            }
+        }
+    }
+}
+android.sourceSets["main"].jniLibs.srcDir(nextlibDir.map { it.dir("jni") })
+tasks.named("preBuild") { dependsOn(prepararNextlib) }
+
 // Kotlin 2.2+: jvmTarget va aquí (kotlinOptions ya no se acepta)
 kotlin {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
@@ -118,6 +164,10 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:$media3")
     // FFmpeg para ExoPlayer (compilado por Jellyfin): audio AC-3 / E-AC-3 / DTS aunque el equipo no lo traiga
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
+    // FFmpeg de VIDEO para ExoPlayer (NextLib): MPEG-2 y otros que el equipo no decodifica, sin pasar a VLC.
+    // Sus librerías nativas se renombran al compilar (ver prepararNextlib) para no chocar con las de MPV
+    nextlib("io.github.anilbeesetti:nextlib-media3ext:1.9.3-0.12.0@aar")
+    implementation(files(layout.buildDirectory.file("nextlib/classes.jar")).builtBy(prepararNextlib))
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Motor VLC: MPEG-2, AC-3, E-AC-3, MP2… (formatos habituales de la TV de cable)

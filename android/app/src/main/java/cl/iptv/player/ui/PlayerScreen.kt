@@ -143,15 +143,15 @@ fun PlayerScreen(vm: AppViewModel) {
     var altFor by remember { mutableStateOf<String?>(null) }
     val playUrl = if (altFor == item.id) altFormat(item.url) ?: item.url else item.url
     val currentItem by rememberUpdatedState(item)
-    // Motor: "exo" (ExoPlayer), "vlc" o "mpv". engineFor = (id del elemento, motor) cuando se cambió para este canal.
-    // En automático cada canal parte con ExoPlayer; VLC y luego MPV sólo si ese canal falla.
+    // Motor: "exo" (ExoPlayer), "vlc", "mpv" o "system" (el del sistema). engineFor = (id del elemento, motor) cuando se
+    // cambió para este canal. En automático cada canal parte con ExoPlayer; VLC, MPV y el del sistema sólo si ese canal falla.
     var engineFor by remember { mutableStateOf<Pair<String, String>?>(null) }
     val defaultEngine = when (vm.settings.engine) {
-        "vlc", "mpv", "exo" -> vm.settings.engine
+        "vlc", "mpv", "exo", "system" -> vm.settings.engine
         else -> "exo"
     }
     val engine = engineFor?.takeIf { it.first == item.id }?.second ?: defaultEngine
-    val useAlt = engine != "exo"          // motor alternativo (VLC o MPV) en vez de ExoPlayer
+    val useAlt = engine != "exo"          // motor alternativo (VLC, MPV o el del sistema) en vez de ExoPlayer
     var alt by remember { mutableStateOf<AltEngine?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
     var liveRetries by remember { mutableStateOf(0) }
@@ -168,7 +168,7 @@ fun PlayerScreen(vm: AppViewModel) {
         vm.logEvent("Cambio de motor → $to (${it0.name}): $reason")
         vm.message = reason
     }
-    val engineName = mapOf("exo" to "ExoPlayer", "vlc" to "VLC", "mpv" to "MPV")
+    val engineName = mapOf("exo" to "ExoPlayer", "vlc" to "VLC", "mpv" to "MPV", "system" to tr("Motor del sistema"))
     var showSubs by remember { mutableStateOf(false) }
     var panel by remember { mutableStateOf<PAction?>(null) }
     val live = item.kind == Kind.LIVE
@@ -205,7 +205,9 @@ fun PlayerScreen(vm: AppViewModel) {
     val aiOn = vm.aiSubs != null || whisperOn
     // El reproductor se arma una sola vez (no al cambiar de canal aunque cambie el nivel de búfer: rearmarlo sumaba una
     // pausa al cambiar de canal); el colchón en vivo usa el nivel de cada canal
-    val player = remember(live, aiOn, whisperOn) {
+    // Modo túnel sólo con ExoPlayer y sin subtítulos IA (necesitan el audio decodificado en la app)
+    val tunnel = vm.settings.tunneling && !aiOn
+    val player = remember(live, aiOn, whisperOn, tunnel) {
         // Búfer medido en segundos (no en megas: con canales 1080p pesados el límite en megas lo dejaba en pocos
         // segundos) y velocidad fija en directo: evita cortes y saltos hacia adelante
         val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -228,10 +230,25 @@ fun PlayerScreen(vm: AppViewModel) {
                     .build()
                     // Whisper: se juntan unos segundos de audio antes de sonar, para reconocerlo con adelanto
                     .let { if (whisperOn) cl.iptv.player.data.DelayAudioSink(it, vm.whisper) else it }
+
+            // Video con FFmpeg (NextLib) después de los decodificadores del equipo: sólo se usa si el equipo no puede
+            // con el video (MPEG-2 de la TV de cable y otros), y así no hace falta pasar a VLC
+            override fun buildVideoRenderers(context: android.content.Context, mode: Int, selector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
+                                             fallback: Boolean, handler: android.os.Handler, listener: androidx.media3.exoplayer.video.VideoRendererEventListener,
+                                             joiningMs: Long, out: java.util.ArrayList<androidx.media3.exoplayer.Renderer>) {
+                super.buildVideoRenderers(context, mode, selector, fallback, handler, listener, joiningMs, out)
+                runCatching {
+                    if (io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegLibrary.isAvailable())
+                        out.add(io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegVideoRenderer(joiningMs, handler, listener, 50))
+                }.onFailure { vm.logEvent("FFmpeg de video no disponible: ${it.message}") }
+            }
         }
             .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
-        ExoPlayer.Builder(ctx, renderers).setLoadControl(load).setLivePlaybackSpeedControl(liveSpeed).build().apply {
+        val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(ctx).apply {
+            if (tunnel) setParameters(buildUponParameters().setTunnelingEnabled(true))
+        }
+        ExoPlayer.Builder(ctx, renderers).setTrackSelector(selector).setLoadControl(load).setLivePlaybackSpeedControl(liveSpeed).build().apply {
             playWhenReady = true
             setHandleAudioBecomingNoisy(true)
         }
@@ -277,9 +294,7 @@ fun PlayerScreen(vm: AppViewModel) {
                 vm.message = "El canal no responde: probando otro formato…"
                 altFor = it0.id
             }
-            engine == "exo" && auto -> switchEngine("vlc", "El canal no responde: probando con el motor VLC…")
-            engine == "vlc" && auto && android.os.Build.VERSION.SDK_INT >= 26 ->
-                switchEngine("mpv", "El canal no responde: probando con el motor MPV…")
+            auto && nextEngine(engine) != null -> nextEngine(engine)!!.let { n -> switchEngine(n, "El canal no responde: probando con ${engineName[n]}…") }
             else -> {
                 if (engine == "exo") player.stop()     // soltar la conexión colgada
                 else alt?.pause()
@@ -369,7 +384,7 @@ fun PlayerScreen(vm: AppViewModel) {
             if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) { d.reset(System.currentTimeMillis()); continue }
             val k = if (useAlt) alt else exo
             if (k == null) continue
-            val next = when (engine) { "exo" -> "vlc"; "vlc" -> if (android.os.Build.VERSION.SDK_INT >= 26) "mpv" else null; else -> null }
+            val next = nextEngine(engine)
             val canSwitch = vm.settings.engine == "auto" && next != null
             when (d.check(System.currentTimeMillis(), k.position, !userPaused, canSwitch)) {
                 cl.iptv.player.data.StallDetector.Action.RELOAD -> { vm.message = "La imagen se detuvo: reconectando…"; countRebuffer(item); reloadKey++ }
@@ -677,8 +692,8 @@ fun PlayerScreen(vm: AppViewModel) {
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
                     onPlaying = { started = true; error = null },
-                    // VLC tampoco pudo: en automático, último intento con MPV
-                    onError = { msg -> if (vm.settings.engine == "auto" && android.os.Build.VERSION.SDK_INT >= 26) switchEngine("mpv", "Probando con el motor MPV…") else { error = msg } },
+                    // VLC tampoco pudo: en automático, el siguiente motor (MPV o el del sistema)
+                    onError = { msg -> val n = nextEngine("vlc"); if (vm.settings.engine == "auto" && n != null) switchEngine(n, "Probando con ${engineName[n]}…") else { error = msg } },
                     onEnded = onAltEnded,
                 )
             }
@@ -688,6 +703,19 @@ fun PlayerScreen(vm: AppViewModel) {
                 MpvVideo(
                     url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
                     cacheSecs = buf.mpvSecs, maxMiB = buf.mpvMaxMiB,
+                    modifier = Modifier.fillMaxSize(),
+                    onReady = { alt = it },
+                    onPlaying = { started = true; error = null },
+                    // MPV tampoco pudo: en automático, último intento con el reproductor del sistema
+                    onError = { msg -> if (vm.settings.engine == "auto") switchEngine("system", "Probando con ${engineName["system"]}…") else { error = msg } },
+                    onEnded = onAltEnded,
+                )
+            }
+            DisposableEffect(Unit) { onDispose { alt = null } }
+        } else if (engine == "system") {
+            key(item.id, "system", playUrl, reloadKey) {
+                SystemVideo(
+                    url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect,
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
                     onPlaying = { started = true; error = null },
@@ -885,9 +913,8 @@ fun PlayerScreen(vm: AppViewModel) {
                 Text(msg, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ActionButton("Reintentar") { error = null; altFor = null; reloadKey++ }
-                    val other = if (engine == "vlc") "mpv" else if (engine == "mpv") "exo" else "vlc"
-                    if (other != "mpv" || android.os.Build.VERSION.SDK_INT >= 26)
-                        ActionButton("Probar con ${engineName[other]}", ghost = true) { error = null; engineFor = item.id to other }
+                    val other = nextEngine(engine) ?: "exo"
+                    ActionButton("Probar con ${engineName[other]}", ghost = true) { error = null; engineFor = item.id to other }
                 }
             }
         }
@@ -961,6 +988,7 @@ fun PlayerScreen(vm: AppViewModel) {
                     add(PanelRow("VLC", engine == "vlc", "TV de cable: MPEG-2, AC-3, MP2 (incluido en la app)") { engineFor = item.id to "vlc"; panel = null })
                     if (android.os.Build.VERSION.SDK_INT >= 26)
                         add(PanelRow("MPV", engine == "mpv", "Casi cualquier formato, buena tolerancia a cortes") { engineFor = item.id to "mpv"; panel = null })
+                    add(PanelRow(engineName["system"].orEmpty(), engine == "system", "El reproductor que trae Android: usa el chip del equipo") { engineFor = item.id to "system"; panel = null })
                 }
                 PAction.SLEEP -> listOf(0, 15, 30, 60, 90, 120).map { m ->
                     val left = if (vm.sleepAt > 0) ((vm.sleepAt - now) / 60_000 + 1) else 0
@@ -1010,6 +1038,14 @@ fun PlayerScreen(vm: AppViewModel) {
 }
 
 private fun ctlOf(useAlt: Boolean, alt: AltEngine?, exo: ExoControl): PlaybackControl? = if (useAlt) alt else exo
+
+/** Siguiente motor a probar en automático: ExoPlayer → VLC → MPV (Android 8+) → el del sistema. */
+internal fun nextEngine(engine: String): String? = when (engine) {
+    "exo" -> "vlc"
+    "vlc" -> if (android.os.Build.VERSION.SDK_INT >= 26) "mpv" else "system"
+    "mpv" -> "system"
+    else -> null
+}
 
 @Composable
 private fun SubtitlesDialog(

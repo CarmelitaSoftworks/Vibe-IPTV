@@ -100,7 +100,7 @@ When a list opens you get **Home** with three big tiles (Live TV, Movies, Series
 
 **Cable-TV formats:** many live channels carry **AC-3 / MP2** audio or **interlaced MPEG-2** video, which browsers can't play.
 - **Web:** the local server converts them on the fly with **ffmpeg** (only what's needed: H.264 video is copied and audio converted to AAC; MPEG-2 video is deinterlaced and converted to 720p H.264). `iniciar.bat` installs ffmpeg by itself the first time (`npm install`, about 70 MB). In Settings → Playback: *Automatic* (when the channel fails or has no sound), *Always on Live TV* or *Never*, plus the conversion quality.
-- **Android / TV:** three engines: **ExoPlayer**, **VLC (LibVLC)** and **MPV (libmpv, the same one OwnTV uses)**. In *Automatic* every channel starts with **ExoPlayer** and only moves to VLC, then MPV (Android 8.0+), if that channel fails. In the player menu (MENU key) you can switch engine, aspect ratio and audio track.
+- **Android / TV:** four engines: **ExoPlayer**, **VLC (LibVLC)**, **MPV (libmpv, the same one OwnTV uses)** and the **system engine** (Android's built-in player, which uses the device chip). In *Automatic* every channel starts with **ExoPlayer** and only moves to VLC, then MPV (Android 8.0+) and finally the system one, if that channel fails. ExoPlayer also brings FFmpeg for video: if the device can't decode a video (for example cable-TV MPEG-2), it does it in software without switching engine. **Tunnel mode (TV)** in Settings → Playback (off): video and audio go straight to the TV chip; if you see a black picture or dropouts, turn it off. In the player menu (MENU key) you can switch engine, aspect ratio and audio track.
 
 **Controls (Android):** only the most used ones are visible — channel list, audio, subtitles, favorite, mini player and **⋯ More options**. Inside *More options* (with icons): quality, aspect ratio, speed, previous channel, record, multiview, picture-in-picture, sleep timer, engine, technical info and open in VLC. Panels show the full text and mark the chosen option with ✓.
 
@@ -216,6 +216,7 @@ android/
     ui/MenuScreen.kt         tile grid + bottom bar
     ui/PlayerScreen.kt       player, guide, options, subtitles
     ui/VlcEngine.kt, ui/MpvEngine.kt   VLC and MPV engines
+    ui/SystemEngine.kt                 system engine (Android MediaPlayer)
     ui/SettingsScreen.kt     settings
     ui/I18n.kt               English translation
 ```

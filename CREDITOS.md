@@ -27,6 +27,7 @@ También existe gracias a estos proyectos y servicios:
 | [mpv / libmpv para Android](https://github.com/jarnedemeulemeester/libmpv-android) | Segundo motor alternativo | ![ver repositorio](https://img.shields.io/badge/licencia-ver%20repositorio-6e7781) |
 | [FFmpeg](https://ffmpeg.org) | Decodificación de audio y video | ![LGPL 2.1+](https://img.shields.io/badge/licencia-LGPL%202.1%2B-8250df) |
 | [Decodificador FFmpeg de Jellyfin](https://github.com/jellyfin/jellyfin-androidx-media) | Audio AC-3, E-AC-3 y DTS en ExoPlayer | ![ver repositorio](https://img.shields.io/badge/licencia-ver%20repositorio-6e7781) |
+| [NextLib (FFmpeg para Media3)](https://github.com/anilbeesetti/nextlib) | Video MPEG-2 y otros en ExoPlayer sin cambiar de motor | ![GPL 3.0](https://img.shields.io/badge/licencia-GPL%203.0-blue) |
 | [hls.js](https://github.com/video-dev/hls.js) | Reproducción HLS en la versión web | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 | [mpegts.js](https://github.com/xqq/mpegts.js) | Reproducción MPEG-TS en la versión web | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 
