@@ -49,7 +49,7 @@ private sealed class Row(val label: String, val desc: String = "") {
                  val format: (Float) -> String, val get: (Settings) -> Float, val set: (Settings, Float) -> Settings) : Row(label, desc)
 }
 
-private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SUBS, STARTUP, LOCK, DATA, ABOUT }
+private enum class SecIcon { QUICK, SOURCES, LOOK, PLAY, SOUND, SUBS, STARTUP, LOCK, DATA, ABOUT }
 private class Section(val id: String, val name: String, val icon: SecIcon, val rows: List<Row>)
 
 private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boolean, onExport: () -> Unit = {}, onImport: () -> Unit = {}, onProfiles: () -> Unit = {}, onSaveLog: () -> Unit = {}, onTheme: (String) -> Unit = {}): List<Section> {
@@ -126,6 +126,22 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
                 get = { it.aspect }, set = { s, v -> s.copy(aspect = v) }),
             Row.Choice("Formato de canales en vivo (Xtream)", options = listOf("ts" to "MPEG-TS (.ts) — recomendado", "m3u8" to "HLS (.m3u8)"), get = { it.liveFormat }, set = { s, v -> s.copy(liveFormat = v) }),
             Row.Toggle("Siguiente episodio automático", get = { it.autoNext }, set = { s, v -> s.copy(autoNext = v) }),
+            Row.Toggle("Saltar la intro sola", "En series, cuando ya marcaste dónde termina la intro (Más → Aquí termina la intro). Si no, aparece el botón \"Saltar intro\"",
+                get = { it.autoSkipIntro }, set = { s, v -> s.copy(autoSkipIntro = v) }),
+            Row.Choice("Pausar y retroceder la TV en vivo", "Guarda en el equipo los últimos minutos del canal: ◄ retrocede, OK pausa y ► vuelve al directo. Usa espacio del equipo (unos 30 MB por minuto en HD) y sólo funciona con ExoPlayer",
+                listOf("0" to "Desactivado", "10" to "10 minutos", "15" to "15 minutos", "30" to "30 minutos"),
+                get = { it.timeshiftMin.toString() }, set = { s, v -> s.copy(timeshiftMin = v.toIntOrNull() ?: 0) }),
+            Row.Choice("Calidad en canales con varias calidades", "Automática: sube o baja según la velocidad de tu internet y avisa cuando cambia",
+                listOf("auto" to "Automática (según el internet)", "saver" to "Ahorro de datos (hasta 720p)", "max" to "Siempre la mejor"),
+                get = { it.hlsQuality }, set = { s, v -> s.copy(hlsQuality = v) }),
+            Row.Toggle("Recibir videos desde el celular", "Con Vibe IPTV abierto en los dos y en la misma red Wi-Fi: en el celular, Más → Enviar a la TV",
+                get = { it.castReceive }, set = { s, v -> s.copy(castReceive = v) }),
+        )),
+        Section("sound", "Sonido", SecIcon.SOUND, listOf(
+            Row.Choice("Ecualizador", "Voces claras: diálogos más nítidos · Más graves · Noche: graves suaves y todo a un volumen parejo",
+                cl.iptv.player.data.Sound.presets, get = { it.soundEq }, set = { s, v -> s.copy(soundEq = v) }),
+            Row.Toggle("Volumen parejo", "Iguala el volumen entre canales y comerciales: sube lo que está bajo y baja lo que está fuerte. No funciona con el audio que va directo al equipo de sonido (AC-3) ni con el motor del sistema",
+                get = { it.soundLevel }, set = { s, v -> s.copy(soundLevel = v) }),
         )),
         Section("subs", "Subtítulos", SecIcon.SUBS, listOf(
             Row.Choice("Tamaño del texto", options = listOf("small" to "Pequeño", "normal" to "Normal", "large" to "Grande", "xlarge" to "Muy grande"), get = { it.subSize }, set = { s, v -> s.copy(subSize = v) }),
@@ -486,6 +502,8 @@ private fun SectionIcon(icon: SecIcon, color: Color, modifier: Modifier) {
             SecIcon.SOURCES -> { line(4f, 6f, 20f, 6f); line(4f, 12f, 20f, 12f); line(4f, 18f, 14f, 18f); drawCircle(color, 2f * s, Offset(19 * s, 18 * s), style = st) }
             SecIcon.LOOK -> { drawCircle(color, 9 * s, Offset(12 * s, 12 * s), style = st); drawArc(color, 90f, 180f, true, Offset(3 * s, 3 * s), Size(18 * s, 18 * s)) }
             SecIcon.PLAY -> { rect(3f, 5f, 18f, 14f); drawPath(Path().apply { moveTo(10 * s, 9 * s); lineTo(15 * s, 12 * s); lineTo(10 * s, 15 * s); close() }, color) }
+            // Ecualizador: tres reguladores
+            SecIcon.SOUND -> { line(6f, 4f, 6f, 20f); line(12f, 4f, 12f, 20f); line(18f, 4f, 18f, 20f); line(4f, 14f, 8f, 14f); line(10f, 8f, 14f, 8f); line(16f, 16f, 20f, 16f) }
             SecIcon.SUBS -> { rect(3f, 5f, 18f, 14f); line(7f, 15f, 11f, 15f); line(13f, 15f, 17f, 15f); line(7f, 11f, 17f, 11f) }
             SecIcon.STARTUP -> { line(12f, 3f, 12f, 12f); drawArc(color, -50f, 280f, false, Offset(4 * s, 5 * s), Size(16 * s, 16 * s), style = st) }
             SecIcon.LOCK -> { drawRoundRect(color, Offset(5 * s, 11 * s), Size(14 * s, 10 * s), androidx.compose.ui.geometry.CornerRadius(2 * s), style = st); drawArc(color, 180f, 180f, false, Offset(8 * s, 4 * s), Size(8 * s, 10 * s), style = st); line(8f, 9f, 8f, 11f); line(16f, 9f, 16f, 11f) }

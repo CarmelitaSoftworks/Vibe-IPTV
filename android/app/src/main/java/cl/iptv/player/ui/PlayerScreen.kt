@@ -139,6 +139,11 @@ fun PlayerScreen(vm: AppViewModel) {
     var bannerUntil by remember { mutableStateOf(0L) }
     var error by remember { mutableStateOf<String?>(null) }
     var subtitle by remember(item.id) { mutableStateOf<File?>(null) }
+    // Sincronizar subtítulos (ms, + = aparecen después). En ExoPlayer con los subtítulos del canal se muestran con
+    // retraso desde aquí (cueQueue → delayedCues); con un archivo se corre el archivo; VLC y MPV lo hacen ellos.
+    var subDelay by remember(item.id) { mutableStateOf(0L) }
+    val cueQueue = remember { java.util.ArrayDeque<Pair<Long, List<androidx.media3.common.text.Cue>>>() }
+    var delayedCues by remember { mutableStateOf<List<androidx.media3.common.text.Cue>>(emptyList()) }
     // Formato alternativo (.m3u8 ↔ .ts) si el primero falla: id del elemento que lo está usando
     var altFor by remember { mutableStateOf<String?>(null) }
     val playUrl = if (altFor == item.id) altFormat(item.url) ?: item.url else item.url
@@ -162,6 +167,7 @@ fun PlayerScreen(vm: AppViewModel) {
     var videoDecoder by remember { mutableStateOf("") }
     // true cuando el motor actual ya mostró imagen o sonido (lo usa el vigilante de arranque)
     var started by remember { mutableStateOf(false) }
+    var userPaused by remember(item.id) { mutableStateOf(false) }
     fun switchEngine(to: String, reason: String) {
         val it0 = currentItem
         if (engineFor?.first == it0.id && engineFor?.second == to) return
@@ -207,6 +213,8 @@ fun PlayerScreen(vm: AppViewModel) {
     // pausa al cambiar de canal); el colchón en vivo usa el nivel de cada canal
     // Modo túnel sólo con ExoPlayer y sin subtítulos IA (necesitan el audio decodificado en la app)
     val tunnel = vm.settings.tunneling && !aiOn
+    // Ecualizador y volumen parejo de ExoPlayer: uno por reproductor (dos reproductores no pueden compartirlo)
+    val soundProc = remember(live, aiOn, tunnel) { cl.iptv.player.data.SoundProcessor() }
     val player = remember(live, aiOn, tunnel) {
         // Búfer medido en segundos (no en megas: con canales 1080p pesados el límite en megas lo dejaba en pocos
         // segundos) y velocidad fija en directo: evita cortes y saltos hacia adelante
@@ -225,7 +233,7 @@ fun PlayerScreen(vm: AppViewModel) {
             override fun buildAudioSink(context: android.content.Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): androidx.media3.exoplayer.audio.AudioSink =
                 androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
                     .apply { @Suppress("DEPRECATION") setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams) }
-                    .setAudioProcessors(arrayOf(androidx.media3.exoplayer.audio.TeeAudioProcessor(vm.captioner.sink)))
+                    .setAudioProcessors(arrayOf(androidx.media3.exoplayer.audio.TeeAudioProcessor(vm.captioner.sink), soundProc))
                     .apply { if (aiOn) @Suppress("DEPRECATION") setAudioCapabilities(androidx.media3.exoplayer.audio.AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES) }
                     .build()
 
@@ -251,21 +259,107 @@ fun PlayerScreen(vm: AppViewModel) {
         val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(ctx).apply {
             if (tunnel) setParameters(buildUponParameters().setTunnelingEnabled(true))
         }
-        ExoPlayer.Builder(ctx, renderers).setTrackSelector(selector).setLoadControl(load).setLivePlaybackSpeedControl(liveSpeed).build().apply {
+        ExoPlayer.Builder(ctx, renderers).setTrackSelector(selector).setLoadControl(load).setLivePlaybackSpeedControl(liveSpeed)
+            .setBandwidthMeter(vm.bandwidth).build().apply {
             playWhenReady = true
             setHandleAudioBecomingNoisy(true)
         }
     }
     val exo = remember(player) { ExoControl(player) }
-    val bandwidth = remember { androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(ctx) }
+
+    // Pausar y retroceder en vivo (Ajustes → Reproducción): con ExoPlayer y canales .ts, una conexión guarda el canal
+    // en el equipo y el reproductor lo lee desde ahí (ver data/Timeshift.kt)
+    val tsOn = live && engine == "exo" && vm.settings.timeshiftMin > 0 && !item.id.startsWith("cu_") &&
+        playUrl.substringBefore('?').endsWith(".ts", true)
+    val tsRoot = remember { File(ctx.cacheDir, "pausa-en-vivo").apply { deleteRecursively() } }      // restos de otra vez
+    val tsSession = remember(item.id, playUrl, tsOn) {
+        if (!tsOn) return@remember null
+        val minutes = vm.settings.timeshiftMin
+        // Tope de espacio: unos 1,6 MB por segundo (canales 1080p pesados) y siempre dejando 400 MB libres
+        val free = tsRoot.apply { mkdirs() }.usableSpace - 400L * 1024 * 1024
+        val maxBytes = minOf(minutes * 60L * 1_600_000L, free)
+        if (maxBytes < 150L * 1024 * 1024) { vm.logEvent("Pausa en vivo: poco espacio libre (${free / 1_048_576} MB)"); return@remember null }
+        cl.iptv.player.data.TimeshiftSession(
+            cl.iptv.player.data.TimeshiftBuffer(File(tsRoot, System.nanoTime().toString()), minutes * 60_000L, maxBytes),
+            item.copy(url = playUrl),
+        ).also { it.start() }
+    }
+    DisposableEffect(tsSession) { onDispose { tsSession?.close() } }
+    // Dónde empezó a leer el reproductor (hora de llegada de esa parte), salto pedido y retraso normal del directo
+    var tsStartAt by remember(tsSession) { mutableStateOf(0L) }
+    var tsJump by remember(tsSession) { mutableStateOf<Long?>(null) }
+    var tsJumpKey by remember(tsSession) { mutableStateOf(0) }
+    var tsLag by remember(tsSession) { mutableStateOf<Long?>(null) }
+    /** Hora (de llegada) de lo que se ve ahora. */
+    fun tsShowing() = tsStartAt + player.currentPosition
+    /** Cuánto va atrás del directo (0 = en directo). */
+    fun tsBehind(): Long {
+        val ts = tsSession ?: return 0
+        if (tsStartAt == 0L) return 0
+        val gap = ts.buffer.latestAt - tsShowing()
+        return (gap - (tsLag ?: gap)).coerceAtLeast(0)
+    }
+    // Varias pulsaciones seguidas de ◄ se suman: se salta medio segundo después de la última
+    LaunchedEffect(tsJump) { if (tsJump != null) { delay(500); tsJumpKey++ } }
+    // Retraso normal del directo: se mide unos segundos después de empezar (o de volver al directo)
+    LaunchedEffect(tsSession, tsStartAt, tsLag) {
+        if (tsSession == null || tsLag != null || tsStartAt == 0L) return@LaunchedEffect
+        while (!player.isPlaying) delay(500)
+        delay(4000)
+        tsLag = tsSession.buffer.latestAt - tsShowing()
+    }
+    val bandwidth = vm.bandwidth
+    // Calidad en canales con varias calidades (Ajustes → Reproducción): automática según el internet, hasta 720p
+    // para ahorrar datos, o siempre la mejor
+    LaunchedEffect(vm.settings.hlsQuality, player) {
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().apply {
+            when (vm.settings.hlsQuality) {
+                "saver" -> { setMaxVideoSize(1280, 720); setForceHighestSupportedBitrate(false) }
+                "max" -> { clearVideoSizeConstraints(); setForceHighestSupportedBitrate(true) }
+                else -> { clearVideoSizeConstraints(); setForceHighestSupportedBitrate(false) }
+            }
+        }.build()
+    }
     var infoTick by remember { mutableStateOf(0) }
     LaunchedEffect(panel) { while (panel == PAction.INFO) { delay(1000); infoTick++ } }
     val ctl: PlaybackControl? = if (useAlt) alt else exo
+    /** Retroceder o adelantar en vivo (con la pausa en vivo). */
+    fun tsSeek(delta: Long) {
+        val ts = tsSession ?: return
+        val lag = tsLag ?: 2_000
+        var target = (tsJump ?: tsShowing()) + delta
+        val earliest = ts.buffer.earliestAt + 1_000
+        if (target < earliest) { target = earliest; vm.message = "Es lo más antiguo guardado" }
+        if (target >= ts.buffer.latestAt - lag - 1_000) { tsJump = Long.MAX_VALUE; return }     // llegó al directo
+        tsJump = target
+    }
 
     // Cargar el elemento actual (o recargar al añadir subtítulos conservando la posición)
-    LaunchedEffect(item.id, subtitle, playUrl, engine, reloadKey, player) {
+    LaunchedEffect(item.id, subtitle, playUrl, engine, reloadKey, player, tsSession, tsJumpKey) {
         error = null
         if (useAlt) { player.stop(); player.clearMediaItems(); bannerUntil = System.currentTimeMillis() + 4500; return@LaunchedEffect }
+        val ts = tsSession
+        if (ts != null) {
+            val b = ts.buffer
+            val jump = tsJump
+            val from = when {
+                // Volver al directo: un par de segundos antes de lo último que llegó
+                jump == Long.MAX_VALUE -> { tsLag = null; b.offsetAt(b.latestAt - 2_500) }
+                jump != null -> b.offsetAt(jump)
+                // Recarga (la imagen se detuvo): seguir desde lo que se estaba viendo, con la descarga reconectada
+                tsStartAt > 0 && player.currentMediaItem?.mediaId == item.id -> { ts.reconnect(); b.offsetAt(tsShowing()) }
+                b.written > 0 -> b.offsetAt(b.latestAt - 2_500)
+                else -> 0L
+            }
+            tsJump = null
+            tsStartAt = if (b.written > 0) b.timeAt(from) else System.currentTimeMillis()
+            val factory = DefaultMediaSourceFactory(androidx.media3.datasource.DataSource.Factory { cl.iptv.player.data.TimeshiftDataSource(b) })
+            val mi = mediaItemFor(item.copy(url = "timeshift://canal?from=$from"), null).buildUpon().setMimeType(MimeTypes.VIDEO_MP2T).build()
+            player.setMediaSource(factory.createMediaSource(mi))
+            player.prepare(); player.play(); userPaused = false
+            if (jump == null) bannerUntil = System.currentTimeMillis() + 4500
+            return@LaunchedEffect
+        }
         val saved = if (item.kind != Kind.LIVE) vm.resumeFor(item) else null
         val pos = if (subtitle != null && player.currentMediaItem?.mediaId == item.id) player.currentPosition
             else if (saved != null && player.currentMediaItem?.mediaId != item.id) { vm.message = "Continuando desde ${fmtDur(saved.pos)}"; saved.pos }
@@ -329,7 +423,6 @@ fun PlayerScreen(vm: AppViewModel) {
 
     // Vigilante de congelamiento: el canal ya andaba pero la imagen se detuvo (sin error).
     // 1.º recarga, 2.º otro motor (en automático) y si no queda otro, avisa con "Reintentar".
-    var userPaused by remember(item.id) { mutableStateOf(false) }
     // Imagen en imagen del sistema al salir de la app: sólo mientras algo se reproduce (no si se dejó en pausa)
     LaunchedEffect(userPaused) { activity.pipEnabled = !userPaused }
     // Gesto de brillo / volumen en curso (para el indicador)
@@ -399,6 +492,12 @@ fun PlayerScreen(vm: AppViewModel) {
                 else -> Unit
             }
         }
+    }
+
+    // Sonido (Ajustes → Sonido o Más → Sonido): ecualizador y volumen parejo en el motor que esté sonando
+    LaunchedEffect(vm.settings.soundEq, vm.settings.soundLevel, alt, engine, soundProc) {
+        soundProc.preset = vm.settings.soundEq; soundProc.level = vm.settings.soundLevel
+        if (useAlt) { delay(300); runCatching { alt?.setSound(vm.settings.soundEq, vm.settings.soundLevel) } }
     }
 
     // Subtítulos IA: necesitan ExoPlayer (es el motor que entrega el audio decodificado); se apagan al salir
@@ -471,6 +570,9 @@ fun PlayerScreen(vm: AppViewModel) {
                 if (badAudio || badVideo) switchEngine("vlc", if (badVideo) "Video no compatible con este equipo: usando VLC" else "Audio no compatible con este equipo: usando VLC")
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) { started = true; error = null; liveRetries = 0 } }
+            override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) {
+                synchronized(cueQueue) { cueQueue.addLast(android.os.SystemClock.uptimeMillis() to cueGroup.cues); while (cueQueue.size > 200) cueQueue.removeFirst() }
+            }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) started = true
                 // Se quedó cargando en pleno directo (no al arrancar): cuenta para el búfer aprendido
@@ -501,10 +603,25 @@ fun PlayerScreen(vm: AppViewModel) {
                     vm.settings.mpeg2Software == "vlc" && vm.aiSubs == null)
                     switchEngine("vlc", "Video de TV de cable sin decodificador en el equipo: usando VLC para una imagen sin rayas")
             }
+            // Calidad automática: avisar cuando baja o sube por la velocidad del internet (como mucho cada 20 s)
+            var lastHeight = 0
+            var lastNoticeAt = 0L
+            var lastItemId = ""
             override fun onVideoInputFormatChanged(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, format: androidx.media3.common.Format,
                                                    reuse: androidx.media3.exoplayer.DecoderReuseEvaluation?) {
                 inputMime = format.sampleMimeType
                 checkMpeg2()
+                val h = format.height
+                if (lastItemId != currentItem.id) { lastItemId = currentItem.id; lastHeight = 0 }
+                if (h > 0 && lastHeight > 0 && h != lastHeight && !exo.qualityLocked && exo.qualities().size > 1) {
+                    val nowMs = System.currentTimeMillis()
+                    vm.logEvent("Calidad automática: ${lastHeight}p → ${h}p (${"%.1f".format(bandwidth.bitrateEstimate / 1e6)} Mb/s)")
+                    if (nowMs - lastNoticeAt > 20_000) {
+                        lastNoticeAt = nowMs
+                        vm.message = if (h < lastHeight) "Calidad: ${h}p (tu internet va más lento)" else "Calidad: ${h}p"
+                    }
+                }
+                if (h > 0) lastHeight = h
             }
             override fun onVideoDecoderInitialized(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, name: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 videoDecoder = name
@@ -513,7 +630,7 @@ fun PlayerScreen(vm: AppViewModel) {
             }
         }
         player.addAnalyticsListener(analytics)
-        onDispose { player.removeListener(listener); player.removeAnalyticsListener(analytics); player.release() }
+        onDispose { vm.saveBitrate(); player.removeListener(listener); player.removeAnalyticsListener(analytics); player.release() }
     }
 
     // Al salir del elemento (otro canal o volver al menú): guardar dónde quedó
@@ -568,9 +685,35 @@ fun PlayerScreen(vm: AppViewModel) {
         onDispose { lifecycle.removeObserver(obs) }
     }
 
+    // Saltar intro (series): el botón aparece al principio del episodio. Si ya se marcó dónde termina la intro de
+    // esta serie (Más → Aquí termina la intro), salta justo ahí; si no, avanza 85 s (lo que dura una intro típica).
+    val isEpisode = !live && item.episode > 0
+    // Estado (no un valor fijo): las teclas del control lo leen al momento, aunque se haya marcado recién
+    var introEnd by remember(item.id) { mutableStateOf(if (isEpisode) vm.introEnd(item) else 0L) }
+    var introDone by remember(item.id) { mutableStateOf(false) }
+    /** ¿Se muestra "Saltar intro"? (al principio del episodio, si todavía no se saltó). */
+    fun showSkipNow(): Boolean {
+        if (!isEpisode || introDone || !started || panel != null) return false
+        val p = ctlOf(useAlt, alt, exo)?.position ?: return false
+        return if (introEnd > 0) p in 1_000 until introEnd - 3_000 else p in 15_000..240_000
+    }
+    fun skipIntro() {
+        val k = ctlOf(useAlt, alt, exo) ?: return
+        introDone = true
+        if (introEnd > 0) { k.seekTo(introEnd); vm.message = "Intro saltada" }
+        else { k.seekBy(85_000); vm.message = "Intro saltada (85 s). Si no calzó, márcala en Más → Aquí termina la intro" }
+    }
+    // Automático (Ajustes → Reproducción): sólo si ya se sabe dónde termina y el episodio está empezando
+    LaunchedEffect(item.id, started, introEnd) {
+        if (!isEpisode || !started || introEnd <= 0 || !vm.settings.autoSkipIntro || introDone) return@LaunchedEffect
+        delay(1500)
+        val p = ctlOf(useAlt, alt, exo)?.position ?: return@LaunchedEffect
+        if (p < introEnd - 5_000 && p < 10 * 60_000) skipIntro()
+    }
+
     // Mando a distancia. Con los controles a la vista, ▲▼◄► y OK se mueven entre los botones;
     // ocultos: ▲▼ cambia de canal (en vivo), ◄► avanza o retrocede, OK muestra los controles.
-    DisposableEffect(item.id, engine, player, vm.mini) {
+    DisposableEffect(item.id, engine, player, vm.mini, tsSession) {
         activity.keyInterceptor = handler@{ ev ->
             val code = ev.keyCode
             val down = ev.action == KeyEvent.ACTION_DOWN
@@ -591,8 +734,12 @@ fun PlayerScreen(vm: AppViewModel) {
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
                     if (down) { val k = ctlOf(useAlt, alt, exo); userPaused = k?.isPlaying == true; k?.togglePause(); poke() }; return@handler true
                 }
-                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { if (down && !live) { ctlOf(useAlt, alt, exo)?.seekBy(30_000); poke() }; return@handler true }
-                KeyEvent.KEYCODE_MEDIA_REWIND -> { if (down && !live) { ctlOf(useAlt, alt, exo)?.seekBy(-10_000); poke() }; return@handler true }
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    if (down) { if (!live) { ctlOf(useAlt, alt, exo)?.seekBy(30_000); poke() } else if (tsSession != null) tsSeek(30_000) }; return@handler true
+                }
+                KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    if (down) { if (!live) { ctlOf(useAlt, alt, exo)?.seekBy(-10_000); poke() } else if (tsSession != null) tsSeek(-10_000) }; return@handler true
+                }
                 KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BOOKMARK -> { if (ev.action == KeyEvent.ACTION_UP) { panel = null; poke() }; return@handler true }
                 KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE -> { if (down) { bannerUntil = System.currentTimeMillis() + 5000; poke() }; return@handler true }
                 KeyEvent.KEYCODE_CAPTIONS -> { if (down) { poke(); panel = PAction.SUBS }; return@handler true }
@@ -608,13 +755,21 @@ fun PlayerScreen(vm: AppViewModel) {
             }
             if (controls || panel != null) { if (down) lastTouch = System.currentTimeMillis(); return@handler false }
             when (code) {
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_SPACE -> { if (down) poke(); true }
+                // Con "Saltar intro" a la vista, OK la salta (como en las apps de streaming)
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_SPACE -> {
+                    if (down) { if (showSkipNow()) skipIntro() else poke() }; true
+                }
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (down) { if (live) vm.zap(if (code == KeyEvent.KEYCODE_DPAD_UP) -1 else 1) else poke() }; true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     if (down) {
-                        if (live) poke()
+                        // En vivo con la pausa en vivo: ◄ retrocede 10 s y ► adelanta (hasta el directo), sin abrir los controles
+                        if (live && tsSession != null && (code == KeyEvent.KEYCODE_DPAD_LEFT || tsBehind() >= 3_000)) {
+                            val left = code == KeyEvent.KEYCODE_DPAD_LEFT
+                            tsSeek(if (left) -10_000 else 10_000); seekFlash = (if (left) -1 else 1) to System.currentTimeMillis()
+                        }
+                        else if (live) poke()
                         else { ctlOf(useAlt, alt, exo)?.seekBy(if (code == KeyEvent.KEYCODE_DPAD_LEFT) -10_000 else 10_000); poke() }
                     }
                     true
@@ -665,6 +820,58 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
 
+    // Subtítulos del canal con retraso (ExoPlayer): se muestran los que llegaron hace [subDelay] ms
+    LaunchedEffect(subDelay, player) {
+        synchronized(cueQueue) { cueQueue.clear() }
+        delayedCues = emptyList()
+        if (subDelay <= 0) return@LaunchedEffect
+        while (true) {
+            delay(50)
+            val limit = android.os.SystemClock.uptimeMillis() - subDelay
+            var show: List<androidx.media3.common.text.Cue>? = null
+            synchronized(cueQueue) { while (cueQueue.isNotEmpty() && cueQueue.first().first <= limit) show = cueQueue.removeFirst().second }
+            show?.let { delayedCues = it }
+        }
+    }
+    fun setSubDelay(v: Long) {
+        val label = if (v == 0L) "sin retraso" else "%+.1f s".format(v / 1000f)
+        if (useAlt) {
+            if (alt?.setSubtitleDelay(v) == true) { subDelay = v; vm.message = "Subtítulos: $label" }
+            else vm.message = "Este motor no permite sincronizar los subtítulos. Prueba con VLC (Más → Motor de reproducción)"
+            return
+        }
+        val f = subtitle
+        if (f != null) {
+            runCatching { cl.iptv.player.data.SubtitleSources.shift(f, v - subDelay, vm.subtitleDir()) }
+                .onSuccess { subtitle = it; subDelay = v; vm.message = "Subtítulos: $label" }
+                .onFailure { vm.message = "No se pudo mover el subtítulo: ${it.message}" }
+            return
+        }
+        if (v < 0) { vm.message = "Con ExoPlayer los subtítulos del canal sólo pueden ir más tarde. Para adelantarlos usa VLC (Más → Motor de reproducción)"; return }
+        subDelay = v; vm.message = "Subtítulos: $label"
+    }
+    // Al cambiar de motor, el nuevo parte sin retraso: se le vuelve a aplicar
+    LaunchedEffect(alt) { if (useAlt && subDelay != 0L) { delay(1500); alt?.setSubtitleDelay(subDelay) } }
+
+    // Enviar a la TV: busca en la red mientras el panel está abierto
+    var castTargets by remember { mutableStateOf<List<cl.iptv.player.data.Cast.Target>>(emptyList()) }
+    DisposableEffect(panel == PAction.SEND) {
+        val f = if (panel == PAction.SEND) cl.iptv.player.data.CastFinder(ctx, vm.deviceName) { castTargets = it }.also { it.start() } else null
+        onDispose { f?.stop() }
+    }
+    fun sendTo(t: cl.iptv.player.data.Cast.Target) {
+        val pos = if (live) 0L else ctl?.position ?: 0L
+        val it0 = item
+        vm.message = "Enviando a ${t.name.removePrefix("Vibe IPTV · ")}…"
+        vm.viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val r = runCatching { cl.iptv.player.data.Cast.send(t, it0, pos) }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                r.onSuccess { ctlOf(useAlt, alt, exo)?.pause(); userPaused = true; vm.message = "Enviado a ${t.name.removePrefix("Vibe IPTV · ")}" }
+                    .onFailure { vm.message = "No se pudo enviar: ${it.message}" }
+            }
+        }
+    }
+
     fun onAction(a: PAction) {
         poke()
         val k = ctl
@@ -672,8 +879,15 @@ fun PlayerScreen(vm: AppViewModel) {
             PAction.BACK -> vm.closePlayer()
             PAction.PREV -> vm.zap(-1)
             PAction.NEXT -> vm.zap(1)
-            PAction.REW -> k?.seekBy(-10_000)
-            PAction.FWD -> k?.seekBy(10_000)
+            PAction.REW -> if (live && tsSession != null) tsSeek(-10_000) else k?.seekBy(-10_000)
+            PAction.FWD -> if (live && tsSession != null) tsSeek(10_000) else k?.seekBy(10_000)
+            PAction.LIVE -> { tsJump = Long.MAX_VALUE; vm.message = "En directo" }
+            PAction.INTRO -> {
+                val p = k?.position ?: 0L
+                if (p < 10_000) vm.message = "Avanza hasta donde termina la intro y vuelve a elegir esta opción"
+                else if (vm.markIntroEnd(item, p)) { introEnd = p; introDone = true; vm.message = "Listo: en los demás episodios, \"Saltar intro\" llegará hasta ${fmtDur(p)}" }
+                else vm.message = "No se pudo saber a qué serie pertenece este episodio"
+            }
             PAction.PLAY -> { userPaused = k?.isPlaying == true; k?.togglePause() }
             PAction.FAV -> {
                 val wasFav = item.id in vm.favorites
@@ -692,6 +906,7 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
 
+    val recentCount = remember(vm.recent, vm.items, item.id) { if (live) vm.recentChannels(item.id).size else 0 }
     // Reloj para el banner
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
@@ -717,6 +932,7 @@ fun PlayerScreen(vm: AppViewModel) {
             key(item.id, "vlc", playUrl, reloadKey, bufLevel) {
                 VlcVideo(
                     url = playUrl, userAgent = item.userAgent, referrer = item.referrer, aspect = vm.settings.aspect, cachingMs = buf.vlcCachingMs,
+                    audioFilter = when { vm.settings.soundEq == cl.iptv.player.data.Sound.NIGHT -> "night"; vm.settings.soundLevel -> "level"; else -> "" },
                     modifier = Modifier.fillMaxSize(),
                     onReady = { alt = it },
                     onPlaying = { started = true; error = null },
@@ -765,7 +981,21 @@ fun PlayerScreen(vm: AppViewModel) {
                     setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                 }
             },
-            update = { v -> v.resizeMode = resize; if (v.player !== player) v.player = player },
+            update = { v ->
+                v.resizeMode = resize; if (v.player !== player) v.player = player
+                // Con retraso, los subtítulos del canal los dibuja la capa de abajo (los de aquí llegarían a tiempo)
+                v.subtitleView?.visibility = if (subDelay > 0 && subtitle == null) android.view.View.GONE else android.view.View.VISIBLE
+            },
+        )
+        if (!useAlt && subDelay > 0 && subtitle == null) AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                androidx.media3.ui.SubtitleView(context).apply {
+                    setUserDefaultStyle(); setUserDefaultTextSize()
+                    setFractionalTextSize(androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale(vm.settings.subSize))
+                }
+            },
+            update = { it.setCues(delayedCues) },
         )
 
         // Tocar la imagen muestra u oculta los controles.
@@ -840,6 +1070,20 @@ fun PlayerScreen(vm: AppViewModel) {
                 modifier = Modifier.align(if (seekFlash.first < 0) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 60.dp)
                     .clip(RoundedCornerShape(30.dp)).background(Color(0x99000000)).padding(horizontal = 18.dp, vertical = 10.dp))
         }
+        // Saltar intro (series): con el control, OK; con el dedo, tocarlo
+        if (!vm.mini && run { now; showSkipNow() }) {
+            Text("Saltar intro ⏭", color = Color(0xFF14181B), fontWeight = FontWeight.ExtraBold, fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 36.dp, bottom = if (controls) 150.dp else 48.dp)
+                    .clip(RoundedCornerShape(12.dp)).background(Color.White).clickable { skipIntro() }
+                    .padding(horizontal = 18.dp, vertical = 10.dp))
+        }
+        // Pausa en vivo: cuánto va atrás del directo (con los controles ocultos)
+        val behindNow = run { now; tsBehind() }
+        if (tsSession != null && !controls && !vm.mini && behindNow >= 3_000) {
+            Text("−${fmtDur(behindNow)} · ► vuelve al directo", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 20.dp, end = 24.dp)
+                    .clip(RoundedCornerShape(10.dp)).background(Color(0xCC5A6066)).padding(horizontal = 12.dp, vertical = 6.dp))
+        }
         // Número de canal que se está escribiendo con el control
         if (digits.isNotEmpty()) {
             Text(digits, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 44.sp,
@@ -902,7 +1146,7 @@ fun PlayerScreen(vm: AppViewModel) {
                     }
                     Text(fmtTime(now), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                     if (vm.sleepAt > 0) Text("⏾ ${((vm.sleepAt - now) / 60_000 + 1).coerceAtLeast(1)} min", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("Motor: ${engineName[engine]}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                    Text("Motor: ${engineName[engine]}" + if (tsSession != null) " · ⏸ en vivo" else "", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
                 }
             }
         }
@@ -940,6 +1184,9 @@ fun PlayerScreen(vm: AppViewModel) {
                 ctl = ctl, live = live, hasList = vm.playList.size > 1, fav = item.id in vm.favorites,
                 showQuality = !useAlt && exo.qualities().isNotEmpty(),
                 recording = vm.recording?.item?.id == item.id,
+                recents = recentCount > 0,
+                timeshift = tsSession != null,
+                behindMs = run { now; tsBehind() },
                 playFocus = playFocus, onAction = ::onAction, onInteract = { lastTouch = System.currentTimeMillis() },
             )
         }
@@ -999,7 +1246,39 @@ fun PlayerScreen(vm: AppViewModel) {
                     PanelRow(if (m == 0) "Desactivado" else "$m min", if (m == 0) vm.sleepAt == 0L else false,
                         if (m == 0 && vm.sleepAt > 0) "Quedan $left min" else "") { vm.setSleep(m); panel = null }
                 }
-                PAction.MORE -> moreActions(live, vm.playList.size > 1, !useAlt && exo.qualities().isNotEmpty()).map { a ->
+                PAction.SOUND -> buildList {
+                    cl.iptv.player.data.Sound.presets.forEach { (id, name) ->
+                        add(PanelRow(name, vm.settings.soundEq == id, when (id) {
+                            cl.iptv.player.data.Sound.VOICES -> "Diálogos más nítidos"
+                            cl.iptv.player.data.Sound.BASS -> "Para películas y música"
+                            cl.iptv.player.data.Sound.NIGHT -> "Graves suaves y volumen parejo, para no despertar a nadie"
+                            else -> "Sin cambios"
+                        }) { vm.updateSettings(vm.settings.copy(soundEq = id)) })
+                    }
+                    add(PanelRow("Volumen parejo", vm.settings.soundLevel,
+                        when {
+                            engine == "system" -> "No disponible con el motor del sistema"
+                            engine == "vlc" -> "Iguala canales y comerciales · en VLC se aplica al volver a abrir el canal"
+                            else -> "Iguala el volumen entre canales y comerciales"
+                        }) { vm.updateSettings(vm.settings.copy(soundLevel = !vm.settings.soundLevel)) })
+                }
+                PAction.SUBDELAY -> (-10..10).map { i ->
+                    val v = i * 500L
+                    PanelRow(if (v == 0L) "Sin retraso" else "%+.1f s".format(v / 1000f) + if (v < 0) " (antes)" else " (después)", subDelay == v,
+                        if (v == 0L) "Los subtítulos aparecen como vienen" else "") { setSubDelay(v) }
+                }
+                PAction.RECENT -> vm.recentChannels(item.id).map { ch ->
+                    val cur = vm.epg.nowNext(ch, now - vm.epgShift).first
+                    val sh = vm.epgShift
+                    PanelRow(ch.name, false, cur?.let { "${it.title}  ${fmtTime(it.start + sh)}–${fmtTime(it.stop + sh)}" }.orEmpty(), logo = ch.logo,
+                        progress = cur?.let { p -> ((now - sh - p.start).toFloat() / (p.stop - p.start)).coerceIn(0f, 1f) } ?: -1f) { vm.playRecent(ch); panel = null }
+                }
+                PAction.SEND -> if (castTargets.isEmpty()) listOf(
+                    PanelRow("Buscando televisores con Vibe IPTV…", detail = "Abre Vibe IPTV en la TV y conéctala a la misma red Wi-Fi que este equipo") {},
+                ) else castTargets.map { t ->
+                    PanelRow(t.name.removePrefix("Vibe IPTV · "), detail = if (live) "Ver este canal en ese equipo" else "Seguir viendo en ese equipo desde ${fmtDur(ctl?.position ?: 0)}") { panel = null; sendTo(t) }
+                }
+                PAction.MORE -> moreActions(live, vm.playList.size > 1, !useAlt && exo.qualities().isNotEmpty(), isEpisode).map { a ->
                     val rec = a == PAction.RECORD && vm.recording?.item?.id == item.id
                     PanelRow(if (rec) "Detener grabación" else a.label, selected = rec, icon = a) { panel = null; onAction(a) }
                 }
@@ -1018,6 +1297,16 @@ fun PlayerScreen(vm: AppViewModel) {
                             else -> "Reserva completa"
                         })
                         add("Cortes en este canal" to stalls.toString())
+                        if (live) add("Pausa en vivo" to when {
+                            tsSession != null -> {
+                                val b = tsSession.buffer
+                                val mins = ((b.latestAt - b.earliestAt) / 60_000).coerceAtLeast(0)
+                                "Guardado: $mins min · ${(b.written - b.oldest) / 1_048_576} MB · reconexiones ${tsSession.reconnects}"
+                            }
+                            vm.settings.timeshiftMin <= 0 -> "Desactivada"
+                            engine != "exo" -> "Sólo con ExoPlayer"
+                            else -> "Sólo en canales .ts"
+                        })
                         if (!useAlt) add("Reconexiones" to reconnects.toString())
                         if (!useAlt && videoDecoder.isNotEmpty()) add("Decodificador de video" to when {
                             videoDecoder.contains("ffmpeg", true) || videoDecoder.startsWith("lib") -> "FFmpeg (software) · $videoDecoder"
@@ -1066,7 +1355,6 @@ private fun SubtitlesDialog(
     var query by remember { mutableStateOf(cleanTitle(item.seriesName.ifBlank { item.name })) }
     var found by remember { mutableStateOf<SubtitleSources.Found?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
-    var offset by remember { mutableStateOf(0L) }
     val scope = rememberCoroutineScope()
     val year = remember(item.name) { Regex("\\b(19[3-9]\\d|20[0-4]\\d)\\b").find(item.name)?.value.orEmpty() }
 
@@ -1081,13 +1369,8 @@ private fun SubtitlesDialog(
 
     Sheet("Subtítulos", onDismiss, wide = true) {
         if (current != null) {
-            Text("Desfase del subtítulo: ${if (offset == 0L) "ninguno" else "%+.1f s".format(offset / 1000f)}", color = c.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ActionButton("Aparecen antes (−0,5 s)", ghost = true) { offset -= 500; onPick(SubtitleSources.shift(current, -500, vm.subtitleDir())) }
-                ActionButton("Aparecen después (+0,5 s)", ghost = true) { offset += 500; onPick(SubtitleSources.shift(current, 500, vm.subtitleDir())) }
-            }
-            Spacer(Modifier.height(14.dp))
+            Text("Si no calzan con la voz: Más opciones → Sincronizar subtítulos", color = c.inkSoft, fontSize = 13.sp)
+            Spacer(Modifier.height(10.dp))
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Field(query, { query = it }, "Título a buscar", modifier = Modifier.weight(1f), onDone = { doSearch() })
@@ -1101,7 +1384,7 @@ private fun SubtitlesDialog(
                     status = "Descargando de ${r.source}…"
                     scope.launch {
                         runCatching { src.download(r, vm.subtitleDir()) }
-                            .onSuccess { offset = 0; onPick(it) }
+                            .onSuccess { onPick(it) }
                             .onFailure { status = "${r.source}: ${it.message}" }
                     }
                 }

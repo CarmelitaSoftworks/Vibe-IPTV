@@ -95,6 +95,13 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Perfiles** (Android): favoritos y «Seguir viendo» por persona; el perfil infantil nunca muestra contenido para adultos.
 - **Grabación** (Android): botón ● en el reproductor para guardar un canal en vivo en *Descargas/VibeIPTV*.
 - **Grabación programada** (Android): en la guía, elige un programa futuro → *● Programar grabación*. Se graba a su hora aunque la app esté cerrada (2 min antes y 3 después) y se guarda en *Descargas/VibeIPTV*; la lista de programadas se ve y cancela en la guía.
+- **Pausar y retroceder la TV en vivo** (Android, ExoPlayer, canales .ts): la app guarda en el equipo los últimos minutos del canal (10, 15 o 30, Ajustes → Reproducción). ◄ retrocede 10 s, ⏯ pausa y ► o *Volver al directo* regresa. Con una sola conexión al proveedor.
+- **Sonido** (Ajustes → Sonido o *Más → Sonido*): ecualizador *Voces claras*, *Más graves* y *Noche*, y **volumen parejo** entre canales y comerciales (Android).
+- **Sincronizar subtítulos**: *Más → Sincronizar subtítulos*, de medio en medio segundo, en todos los motores.
+- **Saltar intro** en series: botón al principio del episodio; marca una vez *Aquí termina la intro* y en los demás episodios salta justo ahí (o solo, si lo activas).
+- **Canales recientes**: botón en el reproductor con los últimos 5 canales vistos.
+- **Enviar a la TV** (Android): con Vibe IPTV abierto en el celular y en la TV, en la misma red Wi-Fi, *Más → Enviar a la TV* lo reproduce allá (las películas siguen desde el mismo minuto).
+- **Calidad automática con aviso**: en canales con varias calidades sube o baja según el internet y avisa cuando cambia; también *Ahorro de datos (hasta 720p)* o *Siempre la mejor*.
 - **Tamaño de los controles del reproductor** ajustable (Ajustes → Reproducción).
 - **Control remoto completo**: teclas numéricas para ir a un canal, **canal anterior**, y temporizador para dormir (15 a 120 min).
 - **Mini reproductor en TV**: el video sigue en una esquina mientras recorres el menú o la guía.

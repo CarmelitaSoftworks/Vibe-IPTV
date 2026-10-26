@@ -94,11 +94,13 @@ class MainActivity : ComponentActivity() {
         // Salir de la app con normalidad (Inicio, Atrás) también cuenta como inicio correcto: así abrir y salir
         // rápido dos veces no deja la app en modo seguro sin motivo
         cl.iptv.player.data.Arranque.listo(this)
+        vm.stopCastReceiver()
     }
 
     override fun onStart() {
         super.onStart()
         vm.onForeground()   // al abrir o volver a la app: guía al día
+        vm.startCastReceiver()   // recibir videos enviados desde el celular (mientras la app está abierta)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

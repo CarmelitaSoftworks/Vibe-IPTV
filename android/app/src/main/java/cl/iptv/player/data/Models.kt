@@ -89,6 +89,17 @@ data class Settings(
     val aiSubsLang: String = "",
     /** MPEG-2 sin decodificador en el chip: "vlc" (desentrelaza, mejor imagen) | "exo" (FFmpeg en ExoPlayer, sin cambiar de motor). */
     val mpeg2Software: String = "vlc",
+    /** Sonido: ecualizador (normal | voces | graves | noche) y volumen parejo entre canales y comerciales. */
+    val soundEq: String = "normal",
+    val soundLevel: Boolean = false,
+    /** Series: saltar la intro sola cuando ya se sabe dónde termina (se aprende con "Aquí termina la intro"). */
+    val autoSkipIntro: Boolean = false,
+    /** Pausar y retroceder la TV en vivo: guarda en el equipo los últimos minutos del canal (0 = apagado). */
+    val timeshiftMin: Int = 15,
+    /** Calidad en canales con varias calidades (HLS): auto (según el internet) | saver (hasta 720p) | max. */
+    val hlsQuality: String = "auto",
+    /** Recibir videos enviados desde el celular por Wi-Fi (Enviar a la TV). */
+    val castReceive: Boolean = true,
     /** Buscar y cargar subtítulos solos en películas y series (fuentes sin clave: OpenSubtitles y Podnapisi). */
     val autoSubs: Boolean = true,
     /** Modo liviano para TV boxes modestos (Xiaomi Mi Box / Mi TV Stick): auto | on | off. */

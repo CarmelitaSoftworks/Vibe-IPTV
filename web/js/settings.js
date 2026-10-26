@@ -61,6 +61,8 @@ function sections() {
       { type: 'toggle', key: 'liveCushion', label: 'Colchón en vivo', desc: 'Si un canal en vivo queda con poco video guardado, se reproduce un poco más lento (no se nota) hasta rehacer la reserva. Así aguanta mejor los cortes, a cambio de ir unos segundos más atrás del directo' },
       { type: 'choice', key: 'liveFormat', label: 'Formato de canales en vivo (Xtream)', options: [['m3u8', 'HLS (.m3u8) — recomendado'], ['ts', 'MPEG-TS (.ts)']] },
       { type: 'toggle', key: 'autoNext', label: 'Siguiente episodio automático' },
+      { type: 'toggle', key: 'autoSkipIntro', label: 'Saltar la intro sola', desc: 'En series, cuando ya marcaste dónde termina la intro (botón de la bandera en el reproductor). Si no, aparece el botón "Saltar intro"' },
+      { type: 'choice', key: 'hlsQuality', label: 'Calidad en canales con varias calidades', desc: 'Automática: sube o baja según la velocidad de tu internet y avisa cuando cambia', options: [['auto', 'Automática (según el internet)'], ['saver', 'Ahorro de datos (hasta 720p)'], ['max', 'Siempre la mejor']] },
     ] },
     { id: 'subs', name: 'Subtítulos', rows: [
       { type: 'choice', key: 'subSize', label: 'Tamaño del texto', options: [['small', 'Pequeño'], ['normal', 'Normal'], ['large', 'Grande'], ['xlarge', 'Muy grande']] },

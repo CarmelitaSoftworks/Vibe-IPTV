@@ -45,6 +45,12 @@ class MpvHandle(private val mpv: MPVLib) : AltEngine {
         get() = (mpv.getPropertyDouble("speed") ?: 1.0).toFloat()
         set(v) { mpv.setPropertyDouble("speed", v.toDouble()) }
 
+    override fun setSound(preset: String, level: Boolean) {
+        runCatching { mpv.setPropertyString("af", cl.iptv.player.data.Sound.mpvFilters(preset, level)) }
+    }
+
+    override fun setSubtitleDelay(ms: Long): Boolean = runCatching { mpv.setPropertyDouble("sub-delay", ms / 1000.0) }.isSuccess
+
     override fun addExternalSubtitle(file: java.io.File) { mpv.command(arrayOf("sub-add", file.absolutePath, "select")) }
 
     override val bufferedAheadMs: Long? get() = mpv.getPropertyDouble("demuxer-cache-duration")?.let { (it * 1000).toLong() }

@@ -40,6 +40,10 @@ interface PlaybackControl {
     fun info(): List<Pair<String, String>> = emptyList()
     /** Video ya cargado por delante de lo que se ve (ms), o null si el motor no lo informa. */
     val bufferedAheadMs: Long? get() = null
+    /** Ecualizador y volumen parejo (ver data/Sound.kt). */
+    fun setSound(preset: String, level: Boolean) {}
+    /** Retraso de los subtítulos en ms (+ = aparecen después). false si este motor no lo permite. */
+    fun setSubtitleDelay(ms: Long): Boolean = false
 }
 
 private fun lang(code: String?): String? = code?.takeIf { it.isNotBlank() && it != "und" }?.let {
