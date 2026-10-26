@@ -55,6 +55,41 @@ object Cast {
         }
     }
 
+    // ---------- Pasar las listas a la TV (con código) ----------
+    fun sourceToJson(s: Source) = JSONObject().put("id", s.id).put("name", s.name).put("type", s.type.name).put("url", s.url)
+        .put("server", s.server).put("username", s.username).put("password", s.password).put("epgUrl", s.epgUrl)
+
+    fun sourceFrom(o: JSONObject): Source? {
+        val type = runCatching { SourceType.valueOf(o.optString("type")) }.getOrNull() ?: return null
+        val s = Source(o.optString("id").ifBlank { java.util.UUID.randomUUID().toString() }, o.optString("name").take(80).ifBlank { "Lista" }, type,
+            url = o.optString("url"), server = o.optString("server"), username = o.optString("username"),
+            password = o.optString("password"), epgUrl = o.optString("epgUrl"))
+        val ok = if (type == SourceType.XTREAM) s.server.isNotBlank() && s.username.isNotBlank() else s.url.startsWith("http")
+        return s.takeIf { ok }
+    }
+
+    private fun client() = Http.client.newBuilder().connectTimeout(4, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS).build()
+    private fun base(t: Target) = "http://${t.host.hostAddress?.let { if (':' in it) "[$it]" else it } ?: error("Sin dirección")}:${t.port}"
+
+    /** Pide a la TV que muestre un código en pantalla. */
+    fun pair(t: Target) {
+        val body = JSONObject().put("from", Build.MODEL ?: "Celular").toString().toRequestBody("application/json".toMediaType())
+        client().newCall(Request.Builder().url("${base(t)}/pair").post(body).build()).execute().use { r ->
+            if (r.code == 429) error("La TV no acepta más códigos por ahora: espera un par de minutos")
+            if (!r.isSuccessful) error(if (r.code == 403) "La TV tiene apagado \"Recibir videos desde el celular\"" else "La TV respondió ${r.code}")
+        }
+    }
+
+    /** Envía las listas con el código que muestra la TV. Devuelve cuántas recibió. */
+    fun sendSources(t: Target, code: String, sources: List<Source>): Int {
+        val o = JSONObject().put("code", code).put("sources", org.json.JSONArray(sources.map { sourceToJson(it) }))
+        client().newCall(Request.Builder().url("${base(t)}/sources").post(o.toString().toRequestBody("application/json".toMediaType())).build()).execute().use { r ->
+            if (r.code == 401) error("Código incorrecto o vencido: pide uno nuevo")
+            if (!r.isSuccessful) error("La TV respondió ${r.code}")
+            return r.body?.string()?.trim()?.toIntOrNull() ?: sources.size
+        }
+    }
+
     /** Sólo la red de la casa: direcciones privadas, locales o el mismo equipo. */
     fun isLocal(a: InetAddress) = a.isSiteLocalAddress || a.isLinkLocalAddress || a.isLoopbackAddress ||
         (a.address.size == 16 && (a.address[0].toInt() and 0xfe) == 0xfc)          // IPv6 privada (fc00::/7)
@@ -64,10 +99,28 @@ object Cast {
  * Recibe en la TV: un servidor mínimo en la red local que se anuncia para que el celular lo encuentre.
  * Funciona mientras Vibe IPTV está abierto (Android no deja abrir videos desde segundo plano).
  */
-class CastReceiver(private val ctx: Context, private val name: String, private val onPlay: (Item, Long, String) -> Unit) {
+class CastReceiver(
+    private val ctx: Context, private val name: String, private val onPlay: (Item, Long, String) -> Unit,
+    /** Pasar listas: mostrar el código en la TV (null = ocultarlo) y recibir las listas ya validadas. */
+    private val onPairCode: (String?, String) -> Unit = { _, _ -> },
+    private val onSources: (List<Source>, String) -> Unit = { _, _ -> },
+) {
+    // Código para pasar listas: 4 cifras, vale 3 minutos y 3 intentos (nadie más en la red puede cargar listas)
+    private var code: String? = null
+    private var codeUntil = 0L
+    private var codeFrom = ""
+    private var tries = 0
+    /** Quién pidió el código: sólo ese equipo puede usarlo. */
+    private var codeAddr: java.net.InetAddress? = null
+    /** Pedidos de código recientes (para que nadie pueda probar códigos sin parar) y bloqueo tras fallar. */
+    private val pairTimes = ArrayDeque<Long>()
+    private var lockedUntil = 0L
     private var server: ServerSocket? = null
     private var reg: NsdManager.RegistrationListener? = null
     private val main = Handler(Looper.getMainLooper())
+
+    /** Puerto en que escucha (para las pruebas). */
+    val port: Int get() = server?.localPort ?: -1
 
     fun start() {
         if (server != null) return
@@ -116,10 +169,45 @@ class CastReceiver(private val ctx: Context, private val name: String, private v
         val parts = first.split(' ')
         when {
             parts.size >= 2 && parts[0] == "GET" && parts[1] == "/hola" -> reply(200, name)
+            parts.size >= 2 && parts[0] == "POST" && parts[1] == "/pair" && length in 0..4_096 -> {
+                val o = readJson(input, length)
+                val now = System.currentTimeMillis()
+                // Límites: un código a la vez (otro equipo no puede reemplazarlo), como mucho 5 códigos cada 10 minutos
+                // y 2 minutos de bloqueo después de 3 intentos fallidos. Así adivinar el código tomaría días.
+                val c = synchronized(this) {
+                    while (pairTimes.isNotEmpty() && now - pairTimes.first() > 600_000) pairTimes.removeFirst()
+                    val busyOther = code != null && now < codeUntil && codeAddr != sock.inetAddress
+                    if (now < lockedUntil || pairTimes.size >= 5 || busyOther) null
+                    else {
+                        pairTimes.addLast(now)
+                        code = (1000 + java.security.SecureRandom().nextInt(9000)).toString()
+                        codeUntil = now + 180_000; tries = 0; codeAddr = sock.inetAddress
+                        codeFrom = o?.optString("from")?.take(60).orEmpty().ifBlank { "otro equipo" }
+                        code!!
+                    }
+                }
+                if (c == null) { reply(429, "Espera un momento antes de pedir otro código"); return@use }
+                main.post { onPairCode(c, codeFrom) }
+                main.postDelayed({ synchronized(this) { if (code == c) { code = null; onPairCode(null, "") } } }, 180_000)
+                reply(200, "ok")
+            }
+            parts.size >= 2 && parts[0] == "POST" && parts[1] == "/sources" && length in 1..262_144 -> {
+                val o = readJson(input, length)
+                val ok = synchronized(this) {
+                    val valid = code != null && System.currentTimeMillis() < codeUntil && sock.inetAddress == codeAddr && o?.optString("code") == code
+                    if (!valid && code != null && ++tries >= 3) { code = null; lockedUntil = System.currentTimeMillis() + 120_000 }
+                    if (valid) code = null
+                    valid
+                }
+                if (!ok) { reply(401, "Código incorrecto"); if (code == null) main.post { onPairCode(null, "") }; return@use }
+                val arr = o!!.optJSONArray("sources") ?: org.json.JSONArray()
+                val list = (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.let { j -> Cast.sourceFrom(j) } }
+                val from = codeFrom
+                main.post { onPairCode(null, ""); onSources(list, from) }
+                reply(200, list.size.toString())
+            }
             parts.size >= 2 && parts[0] == "POST" && parts[1] == "/play" && length in 1..65_536 -> {
-                val buf = ByteArray(length); var got = 0
-                while (got < length) { val n = input.read(buf, got, length - got); if (n < 0) break; got += n }
-                val o = runCatching { JSONObject(String(buf, 0, got, Charsets.UTF_8)) }.getOrNull()
+                val o = readJson(input, length)
                 val item = o?.let { Cast.itemFrom(it) }
                 if (item == null) { reply(400, "Pedido no válido"); return@use }
                 val pos = o.optLong("pos").coerceAtLeast(0)
@@ -129,6 +217,16 @@ class CastReceiver(private val ctx: Context, private val name: String, private v
             }
             else -> reply(404, "No encontrado")
         }
+    }
+
+    /** Cancelado en la TV: el código deja de valer. */
+    fun cancelPair() { synchronized(this) { code = null } }
+
+    private fun readJson(input: java.io.InputStream, length: Int): JSONObject? {
+        if (length <= 0) return null
+        val buf = ByteArray(length); var got = 0
+        while (got < length) { val n = input.read(buf, got, length - got); if (n < 0) break; got += n }
+        return runCatching { JSONObject(String(buf, 0, got, Charsets.UTF_8)) }.getOrNull()
     }
 
     fun stop() {

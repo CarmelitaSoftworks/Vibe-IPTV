@@ -76,6 +76,45 @@ object Http {
         dest
     }
 
+    /**
+     * Descarga sólo si cambió desde la última vez (el servidor responde "sin cambios" gracias a la fecha / etiqueta
+     * que mandó antes) y reintenta si falla. Devuelve true si el archivo es nuevo, false si sigue igual.
+     * Para la guía: un XMLTV pesa decenas de megas y casi nunca cambia de una hora a otra.
+     */
+    suspend fun downloadIfChanged(url: String, dest: java.io.File, ua: String = DEFAULT_UA, attempts: Int = 3): Boolean = withContext(Dispatchers.IO) {
+        val meta = java.io.File(dest.parentFile, dest.name + ".meta")
+        // Las marcas sólo valen para la misma dirección (si cambió la URL de la guía, se baja completa)
+        val (etag, modified) = if (dest.exists() && meta.exists()) runCatching {
+            meta.readLines().let { if (it.getOrElse(2) { "" } == url) it.getOrElse(0) { "" } to it.getOrElse(1) { "" } else "" to "" }
+        }.getOrDefault("" to "") else "" to ""
+        var last: Exception? = null
+        for (i in 1..attempts) {
+            try {
+                val req = Request.Builder().url(url).header("User-Agent", ua.ifBlank { DEFAULT_UA })
+                    .apply { if (etag.isNotBlank()) header("If-None-Match", etag); if (modified.isNotBlank()) header("If-Modified-Since", modified) }
+                    .build()
+                client.newCall(req).execute().use { r ->
+                    if (r.code == 304 && dest.exists()) { dest.setLastModified(System.currentTimeMillis()); return@withContext false }
+                    if (!r.isSuccessful) throw IOException("HTTP ${r.code}")
+                    val body = r.body ?: throw IOException("Respuesta vacía")
+                    val tmp = java.io.File(dest.parentFile, dest.name + ".part")
+                    tmp.outputStream().use { out -> body.byteStream().use { it.copyTo(out) } }
+                    if (tmp.length() == 0L) { tmp.delete(); throw IOException("Respuesta vacía") }
+                    if (!tmp.renameTo(dest)) { tmp.copyTo(dest, overwrite = true); tmp.delete() }
+                    runCatching { meta.writeText("${r.header("ETag").orEmpty()}\n${r.header("Last-Modified").orEmpty()}\n$url") }
+                }
+                return@withContext true
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
+                last = e
+                // Errores que no se arreglan reintentando (cuenta sin acceso, no existe): no insistir
+                if (e.message?.let { it.startsWith("HTTP 4") && it != "HTTP 408" && it != "HTTP 429" } == true) break
+                if (i < attempts) kotlinx.coroutines.delay(2_000L * i)
+            }
+        }
+        throw last ?: IOException("No se pudo descargar")
+    }
+
     /** Abre la respuesta como stream y la procesa dentro de [block] (en hilo IO). */
     suspend fun <T> stream(url: String, ua: String = DEFAULT_UA, block: (InputStream) -> T): T = withContext(Dispatchers.IO) {
         client.newCall(request(url, ua)).execute().use { r ->

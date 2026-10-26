@@ -47,17 +47,18 @@ enum class PAction(val label: String) {
     SPEED("Velocidad"), ENGINE("Motor de reproducción"), INFO("Información técnica"), FAV("Favorito"), PIP("Mini reproductor (ver el menú)"),
     EXTERNAL("Abrir en la app VLC"), RECORD("Grabar"), LASTCH("Canal anterior"), SLEEP("Temporizador para dormir"),
     MULTI("Multivista"), SOUND("Sonido"), SUBDELAY("Sincronizar subtítulos"), INTRO("Aquí termina la intro"),
-    RECENT("Canales recientes"), SEND("Enviar a la TV"), LIVE("Volver al directo"), MORE("Más opciones"),
+    RECENT("Canales recientes"), AUDIODELAY("Sincronizar audio"), FIND("Buscar en la guía"), SEND("Enviar a la TV"), LIVE("Volver al directo"), MORE("Más opciones"),
 }
 
 /** Opciones que van dentro de "Más opciones" (las de uso frecuente quedan a la vista en la barra). */
 fun moreActions(live: Boolean, hasList: Boolean, showQuality: Boolean, episode: Boolean = false): List<PAction> = buildList {
     add(PAction.SEND)
     if (showQuality) add(PAction.QUALITY)
-    add(PAction.SOUND); add(PAction.SUBDELAY)
+    add(PAction.SOUND); add(PAction.AUDIODELAY); add(PAction.SUBDELAY)
     if (episode) add(PAction.INTRO)
     add(PAction.ASPECT)
     if (!live) add(PAction.SPEED)
+    if (live) add(PAction.FIND)
     if (live && hasList) add(PAction.LASTCH)
     if (live) add(PAction.RECORD)
     if (live && hasList) add(PAction.MULTI)
@@ -105,6 +106,10 @@ fun PlayerIcon(a: PAction, tint: Color, modifier: Modifier = Modifier, on: Boole
             PAction.SOUND -> { line(6f, 4f, 6f, 20f); line(12f, 4f, 12f, 20f); line(18f, 4f, 18f, 20f); line(4f, 14f, 8f, 14f); line(10f, 8f, 14f, 8f); line(16f, 16f, 20f, 16f) }
             // Subtítulo con flechas: moverlo antes o después
             PAction.SUBDELAY -> { rect(3f, 9f, 18f, 10f); line(7f, 15f, 17f, 15f); line(4f, 5f, 9f, 5f); line(6f, 3f, 4f, 5f, 6f, 7f); line(15f, 5f, 20f, 5f); line(18f, 3f, 20f, 5f, 18f, 7f) }
+            // Parlante con reloj: sincronizar audio
+            PAction.AUDIODELAY -> { poly(false, 3f, 9.5f, 6.5f, 9.5f, 10.5f, 6f, 10.5f, 18f, 6.5f, 14.5f, 3f, 14.5f); drawCircle(tint, 5f * s, p(17f, 12f), style = Stroke(w)); line(17f, 9.5f, 17f, 12f, 18.8f, 13.2f) }
+            // Lupa: buscar en la guía
+            PAction.FIND -> { drawCircle(tint, 6f * s, p(10f, 10f), style = Stroke(w)); line(14.5f, 14.5f, 20f, 20f) }
             // Bandera: aquí termina la intro
             PAction.INTRO -> { line(6f, 3f, 6f, 21f); poly(false, 6f, 4f, 18f, 4f, 15f, 8f, 18f, 12f, 6f, 12f) }
             // Reloj con lista: canales recientes

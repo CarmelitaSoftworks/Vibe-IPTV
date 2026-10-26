@@ -215,6 +215,9 @@ fun PlayerScreen(vm: AppViewModel) {
     val tunnel = vm.settings.tunneling && !aiOn
     // Ecualizador y volumen parejo de ExoPlayer: uno por reproductor (dos reproductores no pueden compartirlo)
     val soundProc = remember(live, aiOn, tunnel) { cl.iptv.player.data.SoundProcessor() }
+    // Sincronizar audio en ExoPlayer: el video se dibuja con la hora corrida (el audio manda el reloj), así el sonido
+    // queda antes o después de la imagen. Lo lee el hilo del reproductor.
+    val videoShift = remember { java.util.concurrent.atomic.AtomicLong(0L) }
     val player = remember(live, aiOn, tunnel) {
         // Búfer medido en segundos (no en megas: con canales 1080p pesados el límite en megas lo dejaba en pocos
         // segundos) y velocidad fija en directo: evita cortes y saltos hacia adelante
@@ -243,6 +246,13 @@ fun PlayerScreen(vm: AppViewModel) {
                                              fallback: Boolean, handler: android.os.Handler, listener: androidx.media3.exoplayer.video.VideoRendererEventListener,
                                              joiningMs: Long, out: java.util.ArrayList<androidx.media3.exoplayer.Renderer>) {
                 super.buildVideoRenderers(context, mode, selector, fallback, handler, listener, joiningMs, out)
+                // El de video del equipo, con la hora corrida según "Sincronizar audio"
+                val i = out.indexOfFirst { it.javaClass == androidx.media3.exoplayer.video.MediaCodecVideoRenderer::class.java }
+                if (i >= 0) out[i] = object : androidx.media3.exoplayer.video.MediaCodecVideoRenderer(
+                    context, codecAdapterFactory, selector, joiningMs, fallback, handler, listener, 50,
+                ) {
+                    override fun render(positionUs: Long, elapsedRealtimeUs: Long) = super.render(positionUs + videoShift.get(), elapsedRealtimeUs)
+                }
                 runCatching {
                     if (io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegLibrary.isAvailable())
                         out.add(io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegVideoRenderer(joiningMs, handler, listener, 50))
@@ -448,6 +458,8 @@ fun PlayerScreen(vm: AppViewModel) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { hosts.forEach { h -> runCatching { cl.iptv.player.data.Http.dns.lookup(h) } } }
     }
     LaunchedEffect(item.id) { vm.logEvent("Reproducir: ${item.name} [${item.kind}] ${item.url}") }
+    // Guía del canal: si no sale en el XMLTV, se pide al proveedor (Xtream)
+    LaunchedEffect(item.id) { if (live) vm.ensureGuide(item) }
     // Colchón en vivo (Ajustes → Reproducción): si queda poco video guardado, se reproduce un 2–4 % más lento hasta
     // rehacerlo (ExoPlayer y MPV, que informan cuánto tienen guardado)
     LaunchedEffect(item.id, engine, player, alt, vm.settings.liveCushion) {
@@ -498,6 +510,12 @@ fun PlayerScreen(vm: AppViewModel) {
     LaunchedEffect(vm.settings.soundEq, vm.settings.soundLevel, alt, engine, soundProc) {
         soundProc.preset = vm.settings.soundEq; soundProc.level = vm.settings.soundLevel
         if (useAlt) { delay(300); runCatching { alt?.setSound(vm.settings.soundEq, vm.settings.soundLevel) } }
+    }
+
+    // Sincronizar audio (Más → Sincronizar audio): igual para todos los canales (depende del parlante, no del canal)
+    LaunchedEffect(vm.settings.audioDelayMs, alt, engine) {
+        videoShift.set(vm.settings.audioDelayMs * 1000L)
+        if (useAlt) { delay(300); runCatching { alt?.setAudioDelay(vm.settings.audioDelayMs.toLong()) } }
     }
 
     // Subtítulos IA: necesitan ExoPlayer (es el motor que entrega el audio decodificado); se apagan al salir
@@ -882,6 +900,7 @@ fun PlayerScreen(vm: AppViewModel) {
             PAction.REW -> if (live && tsSession != null) tsSeek(-10_000) else k?.seekBy(-10_000)
             PAction.FWD -> if (live && tsSession != null) tsSeek(10_000) else k?.seekBy(10_000)
             PAction.LIVE -> { tsJump = Long.MAX_VALUE; vm.message = "En directo" }
+            PAction.FIND -> vm.openGuideSearch()
             PAction.INTRO -> {
                 val p = k?.position ?: 0L
                 if (p < 10_000) vm.message = "Avanza hasta donde termina la intro y vuelve a elegir esta opción"
@@ -1161,6 +1180,13 @@ fun PlayerScreen(vm: AppViewModel) {
                 if (!activity.isTv) Text("✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x99000000))
                         .clickable { vm.closePlayer() }.padding(horizontal = 7.dp))
+                // En teléfonos y tabletas: cambiar el tamaño (pequeño → mediano → grande); se mueve arrastrándolo
+                if (!activity.isTv) Text("⤡", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x99000000))
+                        .clickable {
+                            val next = when (vm.settings.miniSize) { "small" -> "medium"; "medium" -> "large"; else -> "small" }
+                            vm.updateSettings(vm.settings.copy(miniSize = next))
+                        }.padding(horizontal = 7.dp))
             }
         }
         if (!vm.mini) error?.let { msg ->
@@ -1261,6 +1287,16 @@ fun PlayerScreen(vm: AppViewModel) {
                             engine == "vlc" -> "Iguala canales y comerciales · en VLC se aplica al volver a abrir el canal"
                             else -> "Iguala el volumen entre canales y comerciales"
                         }) { vm.updateSettings(vm.settings.copy(soundLevel = !vm.settings.soundLevel)) })
+                }
+                PAction.AUDIODELAY -> (-10..10).map { i ->
+                    val v = i * 100
+                    PanelRow(if (v == 0) "Sin retraso" else "%+d ms".format(v) + if (v > 0) " (sonido después)" else " (sonido antes)", vm.settings.audioDelayMs == v,
+                        when {
+                            v != 0 -> ""
+                            engine == "system" -> "No disponible con el motor del sistema"
+                            tunnel && !useAlt -> "Con el modo túnel lo maneja el equipo: apágalo en Ajustes para usar esto"
+                            else -> "Si el sonido va adelantado a la imagen (parlantes Bluetooth), elige \"sonido después\""
+                        }) { vm.updateSettings(vm.settings.copy(audioDelayMs = v)) }
                 }
                 PAction.SUBDELAY -> (-10..10).map { i ->
                     val v = i * 500L

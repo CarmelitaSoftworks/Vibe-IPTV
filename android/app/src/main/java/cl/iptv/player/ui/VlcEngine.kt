@@ -52,6 +52,7 @@ class VlcHandle(val player: MediaPlayer) : AltEngine {
     }
 
     override fun setSubtitleDelay(ms: Long) = player.setSpuDelay(ms * 1000)          // VLC lo mide en microsegundos
+    override fun setAudioDelay(ms: Long) = player.setAudioDelay(ms * 1000)
 
     override fun addExternalSubtitle(file: File) {
         player.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, Uri.fromFile(file), true)

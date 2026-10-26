@@ -17,12 +17,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import kotlinx.coroutines.delay
 
 @Composable
 fun App(vm: AppViewModel) {
     var splash by rememberSaveable { mutableStateOf(true) }
-    Box(Modifier.fillMaxSize()) {
+    // Tamaño de la pantalla de la app (para dejar el mini reproductor en la esquina más cercana)
+    var rootSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    Box(Modifier.fillMaxSize().onSizeChanged { rootSize = it }) {
         // Mini reproductor: Atrás en la raíz del menú vuelve a pantalla completa
         // (va antes que los BackHandler del menú: ésos tienen prioridad cuando están activos)
         BackHandler(enabled = vm.mini && vm.multiview == null) { vm.expandMini() }
@@ -52,14 +59,44 @@ fun App(vm: AppViewModel) {
         if (vm.multiview != null) MultiviewScreen(vm)
         else if (vm.screen == Screen.PLAYER) {
             val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+            // Mini reproductor ajustable (Ajustes → Reproducción): tamaño y esquina; con el dedo se arrastra y queda
+            // en la esquina más cercana. Base: teléfono 55 % del ancho en vertical, 40 % en horizontal, TV 30 %.
+            val base = if (cfg.screenWidthDp < 600) 0.55f else if (cfg.smallestScreenWidthDp < 600) 0.40f else 0.30f
+            val scale = when (vm.settings.miniSize) { "small" -> 0.72f; "large" -> 1.4f; else -> 1f }
+            val miniW = (cfg.screenWidthDp * (base * scale).coerceAtMost(0.9f)).dp
+            val corner = when (vm.settings.miniCorner) {
+                "bl" -> Alignment.BottomStart; "tr" -> Alignment.TopEnd; "tl" -> Alignment.TopStart; else -> Alignment.BottomEnd
+            }
+            var drag by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+            // Centro de la ventanita en la pantalla (ya con el arrastre): se mide, así sirve igual al girar el teléfono
+            var miniCenter by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
             Box(
-                // Teléfono: ventanita más grande (55 % del ancho en vertical) y sobre la barra de navegación
-                if (vm.mini) Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 16.dp, bottom = 16.dp)
-                    .width((cfg.screenWidthDp * (if (cfg.screenWidthDp < 600) 0.55f else if (cfg.smallestScreenWidthDp < 600) 0.40f else 0.30f)).dp).aspectRatio(16f / 9f)
+                if (vm.mini) Modifier.align(corner).systemBarsPadding().padding(16.dp)
+                    .offset { androidx.compose.ui.unit.IntOffset(drag.x.toInt(), drag.y.toInt()) }
+                    .width(miniW).aspectRatio(16f / 9f)
+                    .onGloballyPositioned { lc ->
+                        val p = lc.positionInRoot()
+                        miniCenter = androidx.compose.ui.geometry.Offset(p.x + lc.size.width / 2f, p.y + lc.size.height / 2f)
+                    }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragEnd = {
+                                // Soltar: a la esquina más cercana según dónde quedó el centro de la ventanita
+                                val c = (if (miniCenter.y < rootSize.height / 2f) "t" else "b") + (if (miniCenter.x < rootSize.width / 2f) "l" else "r")
+                                drag = androidx.compose.ui.geometry.Offset.Zero
+                                if (c != vm.settings.miniCorner) vm.updateSettings(vm.settings.copy(miniCorner = c))
+                            },
+                            onDragCancel = { drag = androidx.compose.ui.geometry.Offset.Zero },
+                        ) { change, d -> change.consume(); drag += d }
+                    }
                     .clip(RoundedCornerShape(12.dp)).border(2.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                 else Modifier.fillMaxSize()
             ) { PlayerScreen(vm) }
         }
+
+        // Pasar listas desde el celular: en el celular, la ventana para enviar; en la TV, el código a escribir
+        if (vm.showSendSources) SendSourcesSheet(vm) { vm.showSendSources = false }
+        vm.pairCode?.let { (code, from) -> PairCodeOverlay(code, from) { vm.cancelPair() } }
 
         // Mensajes breves (equivalente a un toast)
         val msg = vm.message

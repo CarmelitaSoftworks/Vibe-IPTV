@@ -68,7 +68,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Listas M3U / M3U8** desde URL o archivo, y **cuentas Xtream Codes** (con detección automática de puertos y formatos).
 - **Desde una captura de pantalla**: sube la foto o captura del mensaje de tu proveedor y el servidor, usuario, contraseña, enlace M3U y guía se rellenan solos. La lectura se hace en tu equipo (ML Kit en Android, Tesseract.js en la web): la imagen no se envía a ningún servidor.
 - **Varias listas guardadas** y cambio rápido entre ellas.
-- **Guía de programación XMLTV** (también comprimida en .gz) que se **actualiza sola** al agregar una lista y al abrir la app. Admite varias guías combinadas y ajuste de horario.
+- **Guía de programación XMLTV** (también comprimida en .gz) que se **actualiza sola** al agregar una lista y al abrir la app. Admite varias guías combinadas y ajuste de horario. Sólo se descarga si cambió, abre al instante desde una copia compacta, reconoce canales aunque traigan país o *HD* en el nombre y, en Xtream, completa los canales sin guía pidiéndola al proveedor.
 - **Guía en grilla** (Android y web): canales y programas en una línea de tiempo, navegable con el control.
 - **TV en diferido** (catch-up de Xtream): los programas ya emitidos se ven desde el inicio, si tu cuenta lo permite.
 - Compatible con guías generadas con el proyecto libre [iptv-org/epg](https://github.com/iptv-org/epg).
@@ -102,9 +102,13 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Canales recientes**: botón en el reproductor con los últimos 5 canales vistos.
 - **Enviar a la TV** (Android): con Vibe IPTV abierto en el celular y en la TV, en la misma red Wi-Fi, *Más → Enviar a la TV* lo reproduce allá (las películas siguen desde el mismo minuto).
 - **Calidad automática con aviso**: en canales con varias calidades sube o baja según el internet y avisa cuando cambia; también *Ahorro de datos (hasta 720p)* o *Siempre la mejor*.
+- **Pasar mis listas a la TV** (Android): en el celular, Ajustes → Listas y guía → *Pasar mis listas a la TV*; la TV muestra un código de 4 cifras y ya no hay que escribir usuario y contraseña con el control.
+- **Revisar canales caídos** (Android): prueba los canales en vivo de a uno, mientras no ves nada, y puede ocultar los que no responden.
+- **Sincronizar audio**: *Más → Sincronizar audio* si el sonido va adelantado o atrasado (parlantes Bluetooth, barras de sonido).
+- **Buscar en la guía** sin tildes y por palabras (también en la descripción), y desde el reproductor: *Más → Buscar en la guía*.
 - **Tamaño de los controles del reproductor** ajustable (Ajustes → Reproducción).
 - **Control remoto completo**: teclas numéricas para ir a un canal, **canal anterior**, y temporizador para dormir (15 a 120 min).
-- **Mini reproductor en TV**: el video sigue en una esquina mientras recorres el menú o la guía.
+- **Mini reproductor en TV**: el video sigue en una esquina mientras recorres el menú o la guía. Tamaño (pequeño, mediano, grande) y esquina en Ajustes → Reproducción; en el teléfono se arrastra con el dedo.
 - **Multivista**: hasta 4 canales a la vez; suena el que elijas.
 - **Vistos recientemente**, **buscar un programa en la guía** por su nombre y **organizar categorías** (ocultar y ordenar).
 - **Fila en el inicio de Android TV / Google TV** con tus favoritos y canales recientes.

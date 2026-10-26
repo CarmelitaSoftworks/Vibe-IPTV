@@ -104,6 +104,22 @@ class XtreamClient(server: String, private val user: String, private val pass: S
     fun catchupUrl(id: Any) = "$base/timeshift/$u/$p/{dur}/{start}/$id.ts"
     fun movieUrl(id: Any, ext: String) = "$base/movie/$u/$p/$id.${ext.ifBlank { "mp4" }}"
     fun episodeUrl(id: Any, ext: String) = "$base/series/$u/$p/$id.${ext.ifBlank { "mp4" }}"
+    /**
+     * Programación de un canal pedida directo al servidor (get_short_epg): para canales que no salen en el XMLTV.
+     * Los títulos vienen en Base64; las horas, en segundos UTC.
+     */
+    suspend fun shortEpg(streamId: String, limit: Int = 12): List<Programme> {
+        val o = runCatching { JSONObject(api("get_short_epg", mapOf("stream_id" to streamId, "limit" to limit.toString()))) }.getOrNull() ?: return emptyList()
+        val a = o.optJSONArray("epg_listings") ?: return emptyList()
+        fun b64(s: String) = runCatching { String(android.util.Base64.decode(s, android.util.Base64.DEFAULT), Charsets.UTF_8) }.getOrDefault(s).trim()
+        return (0 until a.length()).mapNotNull { a.optJSONObject(it) }.mapNotNull { e ->
+            val start = e.optString("start_timestamp").toLongOrNull()?.times(1000) ?: return@mapNotNull null
+            val stop = e.optString("stop_timestamp").toLongOrNull()?.times(1000) ?: return@mapNotNull null
+            if (stop <= start) return@mapNotNull null
+            Programme(start, stop, b64(e.optString("title")), b64(e.optString("description")).take(Epg.MAX_DESC))
+        }.sortedBy { it.start }
+    }
+
     fun epgUrl() = "$base/xmltv.php?username=$u&password=$p"
 
     private fun cats(a: JSONArray): Map<String, String> =

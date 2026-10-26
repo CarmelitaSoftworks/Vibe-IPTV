@@ -95,3 +95,33 @@ test('Grupos: categoría y subcategoría', async () => {
   assert.deepEqual(splitGroup('Series » Drama » Turcas'), { cat: 'Drama', sub: 'Turcas' });
   assert.deepEqual(splitGroup(''), { cat: 'Sin categoría', sub: '' });
 });
+
+test('guía: calza canales con país, calidad, tildes o mayúsculas distintas', () => {
+  const now = Date.UTC(2026, 9, 20, 12);
+  const xml = `<tv><channel id="Senal.cl"><display-name>Señal Uno</display-name></channel>
+    <programme start="20261020110000 +0000" stop="20261020130000 +0000" channel="Senal.cl"><title>Noticias</title></programme></tv>`;
+  const epg = parseXmltv(xml, now);
+  for (const name of ['CL: Señal Uno HD', '|CL| Señal Uno FHD', 'Senal Uno 4K'])
+    assert.equal(epg.nowNext({ name }, now).now?.title, 'Noticias', name);
+  assert.equal(epg.nowNext({ name: 'x', tvgId: 'senal.CL' }, now).now?.title, 'Noticias');
+  assert.equal(epg.nowNext({ name: 'Señal Dos HD' }, now).now, null);
+});
+
+test('buscar en la guía: palabras sin tildes, título antes que descripción y lo de ahora primero', async () => {
+  const { searchGuide } = await import('../js/epg.js');
+  const now = Date.UTC(2026, 9, 20, 12);
+  const xml = `<tv><channel id="a"><display-name>Deportes</display-name></channel><channel id="b"><display-name>Noticias</display-name></channel>
+    <programme start="20261020150000 +0000" stop="20261020170000 +0000" channel="a"><title>Colo-Colo vs. Universidad</title></programme>
+    <programme start="20261020110000 +0000" stop="20261020130000 +0000" channel="b"><title>Central</title><desc>Resumen de Colo Colo</desc></programme>
+    <programme start="20261020180000 +0000" stop="20261020190000 +0000" channel="b"><title>Película</title></programme></tv>`;
+  const epg = parseXmltv(xml, now);
+  const r = searchGuide(epg, [{ name: 'Deportes', url: 'a' }, { name: 'Noticias', url: 'b' }], 'colo colo', now - 3600e3, now);
+  assert.deepEqual(r.map(([, p]) => p.title), ['Central', 'Colo-Colo vs. Universidad']);
+  assert.equal(searchGuide(epg, [{ name: 'Noticias', url: 'b' }], 'pelicula', 0, now)[0][1].title, 'Película');
+});
+
+test('guía: marcas con "|" o "-" no se confunden con un país', async () => {
+  const { loose } = await import('../js/epg.js');
+  assert.equal(loose('HBO | Family'), 'hbofamily');
+  assert.equal(loose('CL: Canal 13 HD'), 'canal13');
+});

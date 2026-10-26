@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cl.iptv.player.data.*
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -88,8 +89,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val parentalOn: Boolean get() = settings.parentalPin.isNotBlank()
     private fun applyParental() {
         // Perfil infantil: el contenido para adultos nunca se muestra
-        items = if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems
-        hiddenAdult = allItems.size - items.size
+        val noAdult = if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems
+        hiddenAdult = allItems.size - noAdult.size                  // sólo lo de adultos (no los canales caídos ocultos)
+        items = if (settings.hideDead && deadIds.isNotEmpty()) noAdult.filterNot { it.id in deadIds } else noAdult
         if (category !in setOf(CAT_ALL, CAT_FAV, CAT_RESUME, CAT_RECENT) && items.none { it.cat == category }) { category = CAT_ALL; subcategory = "" }
         recompute(false)
     }
@@ -311,11 +313,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun open(src: Source) {
         loadJob?.cancel()
         source = src; allItems = emptyList(); items = emptyList(); epg = Epg.EMPTY; series = null; episodes = emptyList(); home = true
-        epgJob?.cancel(); epgAt = 0; epgUrls = ""; epgStatus = ""
+        epgJob?.cancel(); epgAt = 0; epgUrls = ""; epgStatus = ""; guideTried.clear()
         showWelcome = false
         favorites = store.favorites(src.id)
         resume = store.resume(src.id)
         recent = store.recent(src.id)
+        scanJob?.cancel(); scanStatus = ""
+        ChannelCheck.load(getApplication(), src.id).let { (ids, at) -> deadIds = ids; deadAt = at }
         loadCatPrefs()
         store.lastSourceId = src.id
         recompute(true)
@@ -442,8 +446,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- guía EPG: caché en disco + actualización ----------
     private fun epgDir() = File(getApplication<Application>().filesDir, "epg").apply { mkdirs() }
-    private fun epgFiles(srcId: String) = epgDir().listFiles { f -> f.name.startsWith("${srcId}_") && !f.name.endsWith(".part") }
+    private fun epgFiles(srcId: String) = epgDir().listFiles { f -> f.name.startsWith("${srcId}_") && f.name.endsWith(".xml") }
         ?.sortedBy { it.name }.orEmpty()
+    /** La guía ya leída, en formato compacto (ver Epg.save): se carga mucho más rápido que el XML. */
+    private fun epgBin(srcId: String) = File(epgDir(), "$srcId.bin")
+    /** Pasado este tiempo se vuelve a leer el XML aunque no haya cambiado (para correr la ventana de horas). */
+    private val EPG_BIN_MAX_AGE = 12 * 3600_000L
+
+    /** Lee los XML y guarda la versión compacta. */
+    private fun parseAndSave(srcId: String, files: List<File>): Epg? {
+        val e = parseFiles(files) ?: return null
+        runCatching { e.save(epgBin(srcId)) }.onFailure { epgBin(srcId).delete() }
+        return e
+    }
+    /** Al reemplazar la guía se conservan los canales pedidos uno a uno al proveedor. */
+    private fun replaceEpg(e: Epg) { epg = if (epg.extra.isEmpty()) e else Epg(e.byId, e.nameToId, epg.extra) }
 
     private fun parseFiles(files: List<File>): Epg? {
         val parsed = files.mapNotNull { f -> runCatching { f.inputStream().use { EpgParser.parse(it) } }.getOrNull() }
@@ -453,11 +470,96 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun loadCachedEpg(src: Source) {
         val files = epgFiles(src.id)
         if (files.isEmpty()) return
-        val e = withContext(Dispatchers.IO) { parseFiles(files) } ?: return
+        val bin = epgBin(src.id)
+        val e = withContext(Dispatchers.IO) {
+            (if (bin.exists() && System.currentTimeMillis() - bin.lastModified() < EPG_BIN_MAX_AGE) Epg.load(bin) else null)
+                ?: parseAndSave(src.id, files)
+        } ?: return
         if (source?.id != src.id || epgAt > 0) return     // ya llegó una más nueva
-        epg = e
+        replaceEpg(e)
         epgAt = files.maxOf { it.lastModified() }
         epgStatus = "Guía guardada del ${java.text.SimpleDateFormat("dd/MM HH:mm", I18n.locale).format(java.util.Date(epgAt))} · actualizando…"
+    }
+
+    // ---------- Revisar canales caídos ----------
+    /** Canales en vivo que no respondieron en la última revisión (y cuándo fue). */
+    var deadIds by mutableStateOf<Set<String>>(emptySet()); private set
+    var deadAt by mutableStateOf(0L); private set
+    var scanStatus by mutableStateOf(""); private set
+    private var scanJob: Job? = null
+    val scanning get() = scanJob?.isActive == true
+
+    /**
+     * Revisa todos los canales en vivo de la lista, de a uno y sólo mientras no se está viendo nada (para no quitarle
+     * la conexión al reproductor). Se puede salir de Ajustes: sigue en segundo plano mientras la app esté abierta.
+     */
+    fun scanChannels() {
+        if (scanning) { scanJob?.cancel(); scanStatus = "Revisión detenida"; return }
+        val src = source ?: return
+        val live = allItems.filter { it.kind == Kind.LIVE }.distinctBy { it.url }
+        if (live.isEmpty()) { scanStatus = "Esta lista no tiene canales en vivo"; return }
+        val app = getApplication<Application>()
+        scanJob = viewModelScope.launch {
+            val failed = LinkedHashSet<Item>()
+            fun watching() = screen == Screen.PLAYER || multiview != null
+            suspend fun waitIdle() { while (watching()) { scanStatus = "En pausa mientras ves un canal…"; kotlinx.coroutines.delay(3_000) } }
+            // Si empiezas a ver algo en plena prueba, se corta esa conexión al tiro (muchas cuentas admiten una sola)
+            // y el canal se vuelve a probar después
+            suspend fun probe(ch: Item): Boolean {
+                while (true) {
+                    waitIdle()
+                    val r = kotlinx.coroutines.coroutineScope {
+                        val d = async { ChannelCheck.alive(ch) }
+                        while (d.isActive) { if (watching()) { d.cancel(); return@coroutineScope null }; kotlinx.coroutines.delay(150) }
+                        d.await()
+                    }
+                    if (r != null) return r
+                }
+            }
+            live.forEachIndexed { i, ch ->
+                scanStatus = "Revisando ${i + 1} de ${live.size} · ${failed.size} sin señal"
+                if (!probe(ch)) failed += ch
+                kotlinx.coroutines.delay(250)
+            }
+            // Segunda oportunidad para los que fallaron (un corte momentáneo no lo marca como caído)
+            val dead = HashSet<String>()
+            failed.forEachIndexed { i, ch ->
+                scanStatus = "Confirmando ${i + 1} de ${failed.size}…"
+                if (!probe(ch)) dead += ch.id
+                kotlinx.coroutines.delay(500)
+            }
+            // Mismo enlace en varias categorías: todos los elementos con esa dirección
+            val deadUrls = live.filter { it.id in dead }.map { it.url }.toSet()
+            val ids = allItems.filter { it.kind == Kind.LIVE && it.url in deadUrls }.map { it.id }.toSet()
+            if (source?.id != src.id) return@launch
+            deadIds = ids; deadAt = System.currentTimeMillis()
+            ChannelCheck.save(app, src.id, ids, deadAt)
+            scanStatus = "Listo: ${ids.size} de ${live.size} canales sin señal"
+            logEvent("Revisión de canales: ${ids.size} de ${live.size} sin señal")
+            message = scanStatus
+            applyParental()
+        }
+    }
+    fun clearDead() {
+        val src = source ?: return
+        ChannelCheck.clear(getApplication(), src.id); deadIds = emptySet(); deadAt = 0; scanStatus = ""
+        applyParental(); message = "Marcas de canales caídos borradas"
+    }
+
+    // ---------- Guía canal por canal (Xtream) ----------
+    // Canales que no salen en el XMLTV (o listas sin XMLTV): se pide su programación directo al proveedor, de a pocos
+    private val guideTried = HashSet<String>()
+    private val guideLimit = kotlinx.coroutines.sync.Semaphore(3)
+    fun ensureGuide(item: Item) {
+        val x = xtream ?: return
+        if (item.kind != Kind.LIVE || item.id in guideTried || epg.has(item)) return
+        val sid = Regex("/live/[^/]+/[^/]+/(\\d+)").find(item.url)?.groupValues?.get(1) ?: return
+        guideTried += item.id
+        val srcId = source?.id
+        viewModelScope.launch {
+            val list = guideLimit.withPermit { runCatching { x.shortEpg(sid) }.getOrDefault(emptyList()) }
+            if (list.isNotEmpty() && source?.id == srcId) epg = epg.withExtra(item.id, list)
+        }
     }
 
     /** Descarga una o varias guías (separadas por coma o espacio), las guarda y las combina. */
@@ -469,23 +571,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         epgJob = viewModelScope.launch {
             epgStatus = "Actualizando guía…"
             val list = urls.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
-            val files = list.mapIndexed { i, url ->
+            // Cada guía se baja sólo si cambió (y con reintentos); las que no cambiaron no se vuelven a leer
+            val results = list.mapIndexed { i, url ->
                 async {
-                    runCatching { Http.download(url, File(epgDir(), "${src.id}_$i.xml")) }
-                        .onFailure { android.util.Log.w("IPTV", "EPG: ${it.message}") }.getOrNull()
+                    runCatching { File(epgDir(), "${src.id}_$i.xml").let { f -> f to Http.downloadIfChanged(url, f) } }
+                        .onFailure { logEvent("Guía: no se pudo bajar ${url.substringBefore('?')}: ${it.message}") }.getOrNull()
                 }
             }.awaitAll()
             if (source?.id != src.id) return@launch
-            val ok = files.filterNotNull()
+            val ok = results.filterNotNull()
             if (ok.isEmpty()) {
                 epgStatus = "No se pudo actualizar la guía (sin respuesta del servidor)." + if (epgAt > 0) " Se mantiene la última guardada." else ""
                 return@launch
             }
+            val files = ok.map { it.first }
             // Descartar guías viejas de URLs que ya no están en la lista
-            epgFiles(src.id).filter { f -> f !in ok }.forEach { it.delete() }
-            val e = withContext(Dispatchers.IO) { parseFiles(ok) }
+            epgFiles(src.id).filter { f -> f !in files }.forEach { it.delete(); File(it.parentFile, it.name + ".meta").delete() }
+            val bin = epgBin(src.id)
+            val fresh = bin.exists() && System.currentTimeMillis() - bin.lastModified() < EPG_BIN_MAX_AGE
+            if (ok.none { it.second } && epg.byId.isNotEmpty() && fresh && files.size == list.size) {
+                epgAt = System.currentTimeMillis()
+                epgStatus = "Guía al día (sin cambios) · revisada a las ${fmtTime(epgAt)} · ${epg.channelCount} canales con programación"
+                return@launch
+            }
+            val e = withContext(Dispatchers.IO) { parseAndSave(src.id, files) }
             if (e == null) { epgStatus = "La guía descargada no es un XMLTV válido."; return@launch }
-            epg = e
+            replaceEpg(e)
             epgAt = System.currentTimeMillis()
             epgStatus = "Guía actualizada a las ${fmtTime(epgAt)} · ${e.channelCount} canales con programación"
         }
@@ -518,7 +629,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteSource(src: Source) {
         store.remove(src.id)
-        epgFiles(src.id).forEach { it.delete() }
+        epgFiles(src.id).forEach { it.delete(); File(it.parentFile, it.name + ".meta").delete() }
+        epgBin(src.id).delete()
         sources = store.sources()
         if (source?.id == src.id) {
             source = null; allItems = emptyList(); items = emptyList(); recompute(true)
@@ -527,6 +639,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(s: Settings) {
+        val old = settings
         val formatChanged = s.liveFormat != settings.liveFormat
         val pinChanged = s.parentalPin != settings.parentalPin
         settings = s
@@ -535,6 +648,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (pinChanged) { adultUnlocked = false; applyParental() }
         if (formatChanged) source?.takeIf { it.type == SourceType.XTREAM }?.let { open(it) }
         if (s.castReceive) startCastReceiver() else stopCastReceiver()
+        if (s.hideDead != old.hideDead) applyParental()
     }
 
     // ---------- navegación / filtros ----------
@@ -793,9 +907,39 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var remoteStart: Pair<String, Long>? = null
     fun startCastReceiver() {
         if (!settings.castReceive || castReceiver != null) return
-        castReceiver = cl.iptv.player.data.CastReceiver(getApplication(), deviceName) { item, pos, from -> playRemote(item, pos, from) }.also { it.start() }
+        castReceiver = cl.iptv.player.data.CastReceiver(getApplication(), deviceName,
+            onPlay = { item, pos, from -> playRemote(item, pos, from) },
+            onPairCode = { c, from -> pairCode = c?.let { it to from } },
+            onSources = { list, from -> receiveSources(list, from) },
+        ).also { it.start() }
     }
-    fun stopCastReceiver() { castReceiver?.stop(); castReceiver = null }
+    fun stopCastReceiver() { castReceiver?.stop(); castReceiver = null; pairCode = null }
+
+    // ---------- Pasar listas desde el celular ----------
+    /** En la TV: código a mostrar y quién lo pidió (null = nada). */
+    var pairCode by mutableStateOf<Pair<String, String>?>(null)
+    /** En el celular: ventana "Pasar mis listas a la TV". */
+    var showSendSources by mutableStateOf(false)
+    fun cancelPair() { castReceiver?.cancelPair(); pairCode = null }
+    private fun receiveSources(list: List<Source>, from: String) {
+        if (list.isEmpty()) { message = "No llegó ninguna lista válida"; return }
+        val existing = store.sources()
+        var first: Source? = null
+        list.forEach { s ->
+            // La misma lista ya guardada (mismo servidor y usuario, o mismo enlace): se actualiza en vez de duplicarla
+            val same = existing.firstOrNull { e ->
+                e.type == s.type && if (s.type == SourceType.XTREAM) XtreamClient.normalize(e.server) == XtreamClient.normalize(s.server) && e.username == s.username else e.url == s.url
+            }
+            val idTaken = same == null && existing.any { it.id == s.id }
+            val saved = when { same != null -> s.copy(id = same.id); idTaken -> s.copy(id = java.util.UUID.randomUUID().toString()); else -> s }
+            store.upsert(saved)
+            if (first == null) first = saved
+        }
+        sources = store.sources()
+        logEvent("Listas recibidas desde $from: ${list.size}")
+        message = "Listas recibidas desde $from: ${list.size}"
+        if (source == null) first?.let { open(it) }
+    }
     private fun playRemote(item: Item, pos: Long, from: String) {
         // Si este equipo tiene la misma lista, se usa el canal de aquí: así se puede seguir cambiando con ▲▼
         val local = items.firstOrNull { it.id == item.id && it.url == item.url } ?: items.firstOrNull { it.url == item.url }
@@ -1021,9 +1165,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Mini reproductor (imagen en imagen dentro de la app, para TV y TV boxes) ----------
     /** El video sigue en una ventana chica en la esquina mientras se recorre el menú o la guía. */
     var mini by mutableStateOf(false); private set
+    /** Abrir la Guía directo en "Buscar programa" (desde el reproductor). */
+    var guideSearch = false
+    fun openGuideSearch() { guideSearch = true; enterMini(quiet = true); showGuide = true }
     fun enterMini(quiet: Boolean = false) {
         mini = true; showSettings = false; returnFocusId = playing?.id
-        if (!quiet) message = "Mini reproductor: tócalo (o Atrás en el Inicio) para volver a pantalla completa"
+        if (!quiet) message = "Mini reproductor: tócalo (o Atrás en el Inicio) para volver a pantalla completa. Tamaño y posición en Ajustes → Reproducción"
     }
     fun expandMini() { mini = false; showSettings = false; showGuide = false }
     val menuVisible: Boolean get() = screen == Screen.MENU || mini

@@ -73,6 +73,7 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
         )),
         Section("sources", "Listas y guía", SecIcon.SOURCES, listOf(
             Row.Action("Mis listas", value = { "${vm.sources.size} ${if (vm.sources.size == 1) "guardada" else "guardadas"}" }, arrow = true) { vm.showSettings = false; vm.showWelcome = true },
+            Row.Action("Pasar mis listas a la TV", "Desde el celular: envía tus listas (con usuario y contraseña) a la TV por Wi-Fi, sin escribirlas con el control. En la TV aparece un código para confirmar", arrow = true) { vm.showSendSources = true },
             Row.Action("Actualizar lista ahora", "La lista se guarda en el equipo y se actualiza sola al abrir; esto la descarga de nuevo", value = { vm.loading ?: "" }) { vm.showSettings = false; vm.refreshList() },
             Row.Info("Cuenta", vm.accountSummary()),
             Row.Action("Actualizar guía ahora", value = { vm.epgStatus.ifBlank { if (vm.source == null) "Abre una lista primero" else "Sin guía cargada" } }) { vm.refreshEpg() },
@@ -80,6 +81,15 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
                 listOf("4" to "Cada 4 horas", "12" to "Cada 12 horas", "24" to "Una vez al día", "0" to "Sólo al abrir la app"),
                 { it.epgEvery.toString() }, { s, v -> s.copy(epgEvery = v.toInt()) }),
             Row.Choice("Desfase de la guía", "Corrige guías que muestran la hora corrida", offsets, { it.epgOffset.toString() }, { s, v -> s.copy(epgOffset = v.toInt()) }),
+            Row.Action("Revisar canales caídos", "Prueba cada canal en vivo, de a uno y sólo mientras no estás viendo nada. Puede tardar varios minutos; puedes salir de Ajustes. Vuelve a pulsar para detenerla",
+                value = {
+                    vm.scanStatus.ifBlank {
+                        if (vm.deadAt > 0) "${vm.deadIds.size} sin señal · ${java.text.SimpleDateFormat("dd/MM HH:mm", I18n.locale).format(java.util.Date(vm.deadAt))}" else "Revisar"
+                    }
+                }) { vm.scanChannels() },
+            Row.Toggle("Ocultar canales caídos", "No muestra los canales que no respondieron en la última revisión",
+                get = { it.hideDead }, set = { s, v -> s.copy(hideDead = v) }),
+            Row.Danger("Olvidar canales caídos", "Vuelve a mostrar todos los canales") { vm.clearDead() },
         )),
         Section("look", "Apariencia", SecIcon.LOOK, listOf(
             Row.Choice("Idioma", "Idioma de la app", listOf("auto" to "Automático (idioma del sistema)", "es" to "Español", "en" to "English"), get = { it.lang }, set = { s, v -> s.copy(lang = v) }),
@@ -134,6 +144,11 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Choice("Calidad en canales con varias calidades", "Automática: sube o baja según la velocidad de tu internet y avisa cuando cambia",
                 listOf("auto" to "Automática (según el internet)", "saver" to "Ahorro de datos (hasta 720p)", "max" to "Siempre la mejor"),
                 get = { it.hlsQuality }, set = { s, v -> s.copy(hlsQuality = v) }),
+            Row.Choice("Mini reproductor: tamaño", "La ventanita con el video que queda mientras recorres el menú o la guía (botón Mini reproductor del reproductor). En el teléfono también se agranda con su botón ⤡",
+                listOf("small" to "Pequeño", "medium" to "Mediano", "large" to "Grande"), get = { it.miniSize }, set = { s, v -> s.copy(miniSize = v) }),
+            Row.Choice("Mini reproductor: posición", "En el teléfono o la tableta también se mueve arrastrándolo con el dedo",
+                listOf("br" to "Abajo a la derecha", "bl" to "Abajo a la izquierda", "tr" to "Arriba a la derecha", "tl" to "Arriba a la izquierda"),
+                get = { it.miniCorner }, set = { s, v -> s.copy(miniCorner = v) }),
             Row.Toggle("Recibir videos desde el celular", "Con Vibe IPTV abierto en los dos y en la misma red Wi-Fi: en el celular, Más → Enviar a la TV",
                 get = { it.castReceive }, set = { s, v -> s.copy(castReceive = v) }),
         )),
