@@ -491,6 +491,12 @@ fun PlayerScreen(vm: AppViewModel) {
             override fun onVideoDecoderInitialized(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, name: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 videoDecoder = name
                 vm.logEvent("Decodificador de video: $name")
+                // MPEG-2 de la TV de cable decodificado por FFmpeg (el chip no puede): viene entrelazado y FFmpeg no lo
+                // desentrelaza (se ven rayas en los bordes al moverse). VLC sí, así que en automático se pasa a VLC,
+                // salvo con subtítulos IA (necesitan ExoPlayer) o si en Ajustes se eligió quedarse en ExoPlayer
+                val mpeg2 = player.videoFormat?.sampleMimeType == androidx.media3.common.MimeTypes.VIDEO_MPEG2
+                if (name.contains("ffmpeg", true) && mpeg2 && vm.settings.engine == "auto" && vm.settings.mpeg2Software == "vlc" && vm.aiSubs == null)
+                    switchEngine("vlc", "Video de TV de cable sin decodificador en el equipo: usando VLC para una imagen sin rayas")
             }
         }
         player.addAnalyticsListener(analytics)

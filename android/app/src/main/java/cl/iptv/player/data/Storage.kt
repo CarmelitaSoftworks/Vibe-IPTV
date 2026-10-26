@@ -131,7 +131,7 @@ class Storage(private val ctx: Context) {
             subSize = str("subSize", d.subSize), startup = str("startup", d.startup),
             engine = str("engine", d.engine), aspect = str("aspect", d.aspect), subdlKey = str("subdlKey", ""),
             parentalPin = str("parentalPin", ""),
-            showDetails = prefs.getBoolean("showDetails", d.showDetails), hudScale = prefs.getFloat("hudScale", d.hudScale), buffer = str("buffer", d.buffer), liveCushion = prefs.getBoolean("liveCushion", d.liveCushion), tunneling = prefs.getBoolean("tunneling", d.tunneling), aiSubsLang = str("aiSubsLang", d.aiSubsLang), autoSubs = prefs.getBoolean("autoSubs", d.autoSubs), lite = str("lite", d.lite), tmdbKey = str("tmdbKey", ""),
+            showDetails = prefs.getBoolean("showDetails", d.showDetails), hudScale = prefs.getFloat("hudScale", d.hudScale), buffer = str("buffer", d.buffer), liveCushion = prefs.getBoolean("liveCushion", d.liveCushion), tunneling = prefs.getBoolean("tunneling", d.tunneling), aiSubsLang = str("aiSubsLang", d.aiSubsLang), mpeg2Software = str("mpeg2Software", d.mpeg2Software), autoSubs = prefs.getBoolean("autoSubs", d.autoSubs), lite = str("lite", d.lite), tmdbKey = str("tmdbKey", ""),
         )
     }
 
@@ -144,7 +144,7 @@ class Storage(private val ctx: Context) {
         .putInt("epgEvery", s.epgEvery).putInt("epgOffset", s.epgOffset)
         .putString("subSize", s.subSize).putString("startup", s.startup)
         .putString("engine", s.engine).putString("aspect", s.aspect).putString("subdlKey", s.subdlKey).putString("parentalPin", s.parentalPin)
-        .putBoolean("showDetails", s.showDetails).putFloat("hudScale", s.hudScale).putString("buffer", s.buffer).putBoolean("liveCushion", s.liveCushion).putBoolean("tunneling", s.tunneling).putString("aiSubsLang", s.aiSubsLang).putBoolean("autoSubs", s.autoSubs).putString("lite", s.lite).putString("tmdbKey", s.tmdbKey)
+        .putBoolean("showDetails", s.showDetails).putFloat("hudScale", s.hudScale).putString("buffer", s.buffer).putBoolean("liveCushion", s.liveCushion).putBoolean("tunneling", s.tunneling).putString("aiSubsLang", s.aiSubsLang).putString("mpeg2Software", s.mpeg2Software).putBoolean("autoSubs", s.autoSubs).putString("lite", s.lite).putString("tmdbKey", s.tmdbKey)
         .apply()
 
     var lastItemId: String?
