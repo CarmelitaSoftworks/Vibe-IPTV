@@ -60,8 +60,18 @@ fun GuideScreen(vm: AppViewModel) {
     var focused by remember { mutableStateOf<Pair<Item, Programme?>?>(null) }
     var detail by remember { mutableStateOf<Pair<Item, Programme>?>(null) }
     var searching by remember { mutableStateOf(false) }
+    // Grabaciones programadas (se vuelve a leer al programar o cancelar una)
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var recTick by remember { mutableStateOf(0) }
+    val scheduled = remember(recTick) { cl.iptv.player.data.Schedules.pending(ctx) }
+    // Las que terminan de grabar desaparecen solas: se vuelve a leer la lista cada 30 s
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); recTick++ } }
+    // Android 13+: sin este permiso no se ve el aviso de "Grabando" ni el de "Grabación guardada"
+    val askNotif = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+    var showScheduled by remember { mutableStateOf(false) }
 
-    BackHandler { if (detail != null) detail = null else if (searching) searching = false else vm.showGuide = false }
+    BackHandler { if (detail != null) detail = null else if (searching) searching = false else if (showScheduled) showScheduled = false else vm.showGuide = false }
 
     // Empezar con "ahora" a la vista y el foco en el programa actual del primer canal
     LaunchedEffect(Unit) {
@@ -88,6 +98,7 @@ fun GuideScreen(vm: AppViewModel) {
                 Text("${channels.size} canales" + if (vm.category != CAT_ALL && vm.section == cl.iptv.player.data.Kind.LIVE) " · ${vm.title()}" else "",
                     color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
+            if (scheduled.isNotEmpty()) { Pill("● Programadas · ${scheduled.size}") { showScheduled = true }; Spacer(Modifier.width(10.dp)) }
             Pill("🔍 Buscar programa") { searching = true }
             Spacer(Modifier.width(14.dp))
             Text(fmtTime(now), color = c.ink, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
@@ -194,6 +205,51 @@ fun GuideScreen(vm: AppViewModel) {
             if (!catchup && shifted.stop <= now) {
                 Spacer(Modifier.height(8.dp))
                 Text("Este canal no tiene TV en diferido.", color = c.inkSoft, fontSize = 13.sp)
+            }
+            // Programa futuro: grabarlo a su hora (la app puede estar cerrada)
+            if (shifted.start > now) {
+                val recId = cl.iptv.player.data.ScheduledRec.idFor(ch.id, shifted.start)
+                val already = scheduled.any { it.id == recId }
+                Spacer(Modifier.height(10.dp))
+                ActionButton(if (already) "Cancelar la grabación programada" else "● Programar grabación", ghost = already) {
+                    if (already) { cl.iptv.player.data.Schedules.remove(ctx, recId, stopRunning = true); vm.message = "Grabación cancelada" }
+                    else {
+                        // La URL se convierte a .ts al grabar (Recorder.record): aquí va tal cual
+                        val r = cl.iptv.player.data.ScheduledRec(recId, p.title, ch.name, ch.url, ch.userAgent, ch.referrer, shifted.start, shifted.stop)
+                        val clash = cl.iptv.player.data.Schedules.overlaps(ctx, r)
+                        cl.iptv.player.data.Schedules.add(ctx, r)
+                        if (android.os.Build.VERSION.SDK_INT >= 33 && ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                            runCatching { askNotif.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
+                        val exact = cl.iptv.player.data.Schedules.exactAllowed(ctx)
+                        vm.message = "Grabación programada: ${p.title} · ${fmtTime(shifted.start)}–${fmtTime(shifted.stop)}. Se guarda en ${cl.iptv.player.data.Recorder.folderLabel}" +
+                            (if (clash) ". Ojo: choca con otra grabación y muchas cuentas admiten una sola conexión" else "") +
+                            (if (!exact) ". Este equipo no deja empezar a la hora exacta: activa \"Alarmas y recordatorios\" para Vibe IPTV" else "")
+                        // Sin alarmas exactas Android puede atrasar el inicio o no dejar arrancar la grabación: abrir el permiso
+                        if (!exact && android.os.Build.VERSION.SDK_INT >= 31) runCatching {
+                            ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                android.net.Uri.parse("package:" + ctx.packageName)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                        vm.logEvent("Grabación programada: ${p.title} (${ch.name})")
+                    }
+                    recTick++; detail = null
+                }
+                if (!already) Text("Empieza 2 min antes y termina 3 min después. La TV debe quedar encendida o en reposo, no desenchufada.",
+                    color = c.inkSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+    }
+
+    // Lista de grabaciones programadas, para cancelarlas
+    if (showScheduled) Sheet("Grabaciones programadas", onDismiss = { showScheduled = false }, wide = true) {
+        if (scheduled.isEmpty()) Text("No hay grabaciones programadas.", color = c.inkSoft)
+        scheduled.forEach { r ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(r.title, color = c.ink, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("${r.channel} · ${java.text.SimpleDateFormat("EEE d", java.util.Locale.getDefault()).format(java.util.Date(r.start))} · ${fmtTime(r.start)}–${fmtTime(r.end)}",
+                        color = c.inkSoft, fontSize = 13.sp)
+                }
+                ActionButton("Cancelar", ghost = true) { cl.iptv.player.data.Schedules.remove(ctx, r.id, stopRunning = true); recTick++ }
             }
         }
     }

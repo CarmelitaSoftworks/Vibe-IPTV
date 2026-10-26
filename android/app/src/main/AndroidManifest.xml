@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Fila de canales en la pantalla de inicio de Android TV -->
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
+    <!-- Grabaciones programadas: grabar a la hora del programa aunque la app esté cerrada -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!-- Android TV: la app funciona sin pantalla táctil y aparece en el lanzador de TV -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -53,5 +60,14 @@
                 <data android:scheme="vibeiptv" />
             </intent-filter>
         </activity>
+
+        <!-- Grabaciones programadas desde la guía -->
+        <receiver android:name=".data.RecAlarmReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <service android:name=".RecordingService" android:exported="false" android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

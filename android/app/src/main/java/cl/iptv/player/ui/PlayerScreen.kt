@@ -488,9 +488,28 @@ fun PlayerScreen(vm: AppViewModel) {
         val analytics = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onLoadError(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, l: androidx.media3.exoplayer.source.LoadEventInfo,
                                      m: androidx.media3.exoplayer.source.MediaLoadData, e: java.io.IOException, cancelled: Boolean) { reconnects++ }
+            // MPEG-2 de la TV de cable decodificado por FFmpeg (el chip no puede): viene entrelazado y FFmpeg no lo
+            // desentrelaza (se ven rayas en los bordes al moverse). VLC sí, así que en automático se pasa a VLC,
+            // salvo con subtítulos IA (necesitan ExoPlayer), si en Ajustes se eligió quedarse en ExoPlayer o si la
+            // persona eligió ExoPlayer a mano para este canal. Se revisa al conocer el formato y al abrir el
+            // decodificador, porque según el equipo uno llega antes que el otro.
+            var inputMime: String? = null
+            fun checkMpeg2() {
+                val mpeg2 = (inputMime ?: player.videoFormat?.sampleMimeType) == androidx.media3.common.MimeTypes.VIDEO_MPEG2
+                val manualExo = engineFor?.first == currentItem.id && engineFor?.second == "exo"
+                if (videoDecoder.contains("ffmpeg", true) && mpeg2 && !manualExo && vm.settings.engine == "auto" &&
+                    vm.settings.mpeg2Software == "vlc" && vm.aiSubs == null)
+                    switchEngine("vlc", "Video de TV de cable sin decodificador en el equipo: usando VLC para una imagen sin rayas")
+            }
+            override fun onVideoInputFormatChanged(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, format: androidx.media3.common.Format,
+                                                   reuse: androidx.media3.exoplayer.DecoderReuseEvaluation?) {
+                inputMime = format.sampleMimeType
+                checkMpeg2()
+            }
             override fun onVideoDecoderInitialized(t: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, name: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 videoDecoder = name
                 vm.logEvent("Decodificador de video: $name")
+                checkMpeg2()
             }
         }
         player.addAnalyticsListener(analytics)

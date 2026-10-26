@@ -87,6 +87,8 @@ data class Settings(
     val tunneling: Boolean = false,
     /** Subtítulos IA: idioma que quedó activado ("" = apagados). Se vuelven a encender solos al abrir el reproductor. */
     val aiSubsLang: String = "",
+    /** MPEG-2 sin decodificador en el chip: "vlc" (desentrelaza, mejor imagen) | "exo" (FFmpeg en ExoPlayer, sin cambiar de motor). */
+    val mpeg2Software: String = "vlc",
     /** Buscar y cargar subtítulos solos en películas y series (fuentes sin clave: OpenSubtitles y Podnapisi). */
     val autoSubs: Boolean = true,
     /** Modo liviano para TV boxes modestos (Xiaomi Mi Box / Mi TV Stick): auto | on | off. */
