@@ -779,6 +779,14 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 :root[data-app-theme="desk"] .round-btn.right { border-radius: 4px; background: linear-gradient(180deg, #0c59b9, #139ee9 15%, #1290e8 80%, #0d61c7); }
 :root[data-app-theme="desk"] .round-btn:focus-visible, :root[data-app-theme="desk"] .round-btn:hover { box-shadow: 0 0 0 3px #ffd25a; transform: none; }
 
+/* Modo liviano con los temas de consola: sin agrandar ni sombras grandes al enfocar (en equipos modestos se traba);
+   sólo un borde. Va con :root delante para ganarle a las reglas de cada tema. */
+:root[data-app-theme="pulse"] body.no-anim .tile:focus, :root[data-app-theme="pulse"] body.no-anim .tile:focus-visible, :root[data-app-theme="pulse"] body.no-anim .tile:not(.empty-slot):hover,
+:root[data-app-theme="horizon"] body.no-anim .tile:focus, :root[data-app-theme="horizon"] body.no-anim .tile:focus-visible, :root[data-app-theme="horizon"] body.no-anim .tile:not(.empty-slot):hover {
+  transform: none; box-shadow: 0 0 0 3px #fff;
+}
+:root[data-app-theme="desk"] body.no-anim .stage { box-shadow: none; }
+
 /* ===== iPhone y iPad ===== */
 /* Los controles respetan la muesca y la barra de inicio (también en horizontal, donde la muesca queda a un lado),
    los botones tienen tamaño de dedo y se ocultan los que iOS no permite: el volumen lo manejan los botones del

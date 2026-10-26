@@ -45,4 +45,14 @@ class ScheduleTest {
         Schedules.add(ctx, rec("vieja", ahora - 3 * hora, ahora - 2 * hora))
         assertTrue(Schedules.pending(ctx).none { it.id == "vieja" })
     }
+
+    @Test fun cadaAlarmaConSuNumeroYSeConserva() {
+        val ahora = System.currentTimeMillis()
+        Schedules.add(ctx, rec("c1", ahora + hora, ahora + 2 * hora))
+        Schedules.add(ctx, rec("c2", ahora + 3 * hora, ahora + 4 * hora))
+        val c1 = Schedules.find(ctx, "c1")!!.code
+        assertTrue(c1 != Schedules.find(ctx, "c2")!!.code)
+        Schedules.add(ctx, rec("c1", ahora + hora, ahora + 2 * hora))          // reprogramar no cambia el número
+        assertEquals(c1, Schedules.find(ctx, "c1")!!.code)
+    }
 }

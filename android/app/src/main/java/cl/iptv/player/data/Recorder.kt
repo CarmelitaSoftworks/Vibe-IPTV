@@ -40,6 +40,16 @@ object Recorder {
         return f.outputStream() to { bytes -> if (bytes <= 0) f.delete() }
     }
 
+    /** Carpeta donde queda el archivo, para decírsela a la persona (antes de Android 10 no hay acceso a Descargas). */
+    val folderLabel: String get() =
+        if (Build.VERSION.SDK_INT >= 29) "Descargas/VibeIPTV" else "Android/data/cl.iptv.player/files/Movies/VibeIPTV"
+
+    /** Nombre del archivo: título sin caracteres raros + fecha y hora. */
+    fun fileName(title: String, at: Long): String {
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.US).format(java.util.Date(at))
+        return "${title.replace(Regex("[^\\p{L}\\p{N} ._-]"), "_").take(40).trim()}_$stamp.ts"
+    }
+
     /** En Xtream el canal .m3u8 también existe como .ts (más simple de grabar). */
     fun bestUrl(url: String): String {
         val m = Regex("^(.*/live/[^/]+/[^/]+/\\d+)\\.m3u8(\\?.*)?$", RegexOption.IGNORE_CASE).find(url) ?: return url
@@ -85,9 +95,21 @@ object Recorder {
         var playlist = start
         val seen = LinkedHashSet<String>()
         var total = 0L
+        var fails = 0
         while (true) {
             currentCoroutineContext().ensureActive()
-            val text = Http.client.newCall(request(playlist, item)).execute().use { it.body?.string().orEmpty() }
+            // Un corte (lista o trozo que no llega) no termina la grabación: se reintenta, y sólo se rinde tras
+            // muchos fallos seguidos (o enseguida si nunca llegó a grabar nada).
+            val text = try {
+                Http.client.newCall(request(playlist, item)).execute().use { r ->
+                    if (!r.isSuccessful) throw java.io.IOException("HTTP ${r.code}")
+                    r.body?.string().orEmpty()
+                }
+            } catch (e: java.io.IOException) {
+                fails++
+                if (fails >= (if (total == 0L) 3 else 20)) throw e
+                delay(1500); continue
+            }
             val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
             if (lines.any { it.startsWith("#EXT-X-STREAM-INF") }) {          // lista maestra: elegir la primera calidad
                 val v = lines.firstOrNull { !it.startsWith("#") } ?: error("Lista vacía")
@@ -97,8 +119,14 @@ object Recorder {
             for (seg in lines.filter { !it.startsWith("#") }) {
                 val segUrl = URI(playlist).resolve(seg).toString()
                 if (!seen.add(segUrl)) continue
-                Http.client.newCall(request(segUrl, item)).execute().use { r ->
-                    r.body?.byteStream()?.copyTo(out)?.let { total += it; onBytes(total) }
+                try {
+                    Http.client.newCall(request(segUrl, item)).execute().use { r ->
+                        if (!r.isSuccessful) throw java.io.IOException("HTTP ${r.code}")
+                        r.body?.byteStream()?.copyTo(out)?.let { total += it; onBytes(total); fails = 0 }
+                    }
+                } catch (e: java.io.IOException) {
+                    fails++                                   // se pierde ese trozo, pero se sigue con los demás
+                    if (fails >= 20) throw e
                 }
                 while (seen.size > 300) seen.remove(seen.first())
             }
