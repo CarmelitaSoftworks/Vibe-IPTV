@@ -89,7 +89,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val parentalOn: Boolean get() = settings.parentalPin.isNotBlank()
     private fun applyParental() {
         // Perfil infantil: el contenido para adultos nunca se muestra
-        items = if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems
+        items = (if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems)
+            .let { l -> if (settings.hideDead && deadIds.isNotEmpty()) l.filterNot { it.id in deadIds } else l }
         hiddenAdult = allItems.size - items.size
         if (category !in setOf(CAT_ALL, CAT_FAV, CAT_RESUME, CAT_RECENT) && items.none { it.cat == category }) { category = CAT_ALL; subcategory = "" }
         recompute(false)
@@ -317,6 +318,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         favorites = store.favorites(src.id)
         resume = store.resume(src.id)
         recent = store.recent(src.id)
+        scanJob?.cancel(); scanStatus = ""
+        ChannelCheck.load(getApplication(), src.id).let { (ids, at) -> deadIds = ids; deadAt = at }
         loadCatPrefs()
         store.lastSourceId = src.id
         recompute(true)
@@ -478,6 +481,59 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         epgStatus = "Guía guardada del ${java.text.SimpleDateFormat("dd/MM HH:mm", I18n.locale).format(java.util.Date(epgAt))} · actualizando…"
     }
 
+    // ---------- Revisar canales caídos ----------
+    /** Canales en vivo que no respondieron en la última revisión (y cuándo fue). */
+    var deadIds by mutableStateOf<Set<String>>(emptySet()); private set
+    var deadAt by mutableStateOf(0L); private set
+    var scanStatus by mutableStateOf(""); private set
+    private var scanJob: Job? = null
+    val scanning get() = scanJob?.isActive == true
+
+    /**
+     * Revisa todos los canales en vivo de la lista, de a uno y sólo mientras no se está viendo nada (para no quitarle
+     * la conexión al reproductor). Se puede salir de Ajustes: sigue en segundo plano mientras la app esté abierta.
+     */
+    fun scanChannels() {
+        if (scanning) { scanJob?.cancel(); scanStatus = "Revisión detenida"; return }
+        val src = source ?: return
+        val live = allItems.filter { it.kind == Kind.LIVE }.distinctBy { it.url }
+        if (live.isEmpty()) { scanStatus = "Esta lista no tiene canales en vivo"; return }
+        val app = getApplication<Application>()
+        scanJob = viewModelScope.launch {
+            val failed = LinkedHashSet<Item>()
+            suspend fun waitIdle() { while (screen == Screen.PLAYER || multiview != null) { scanStatus = "En pausa mientras ves un canal…"; kotlinx.coroutines.delay(3_000) } }
+            live.forEachIndexed { i, ch ->
+                waitIdle()
+                scanStatus = "Revisando ${i + 1} de ${live.size} · ${failed.size} sin señal"
+                if (!ChannelCheck.alive(ch)) failed += ch
+                kotlinx.coroutines.delay(250)
+            }
+            // Segunda oportunidad para los que fallaron (un corte momentáneo no lo marca como caído)
+            val dead = HashSet<String>()
+            failed.forEachIndexed { i, ch ->
+                waitIdle()
+                scanStatus = "Confirmando ${i + 1} de ${failed.size}…"
+                if (!ChannelCheck.alive(ch)) dead += ch.id
+                kotlinx.coroutines.delay(500)
+            }
+            // Mismo enlace en varias categorías: todos los elementos con esa dirección
+            val deadUrls = live.filter { it.id in dead }.map { it.url }.toSet()
+            val ids = allItems.filter { it.kind == Kind.LIVE && it.url in deadUrls }.map { it.id }.toSet()
+            if (source?.id != src.id) return@launch
+            deadIds = ids; deadAt = System.currentTimeMillis()
+            ChannelCheck.save(app, src.id, ids, deadAt)
+            scanStatus = "Listo: ${ids.size} de ${live.size} canales sin señal"
+            logEvent("Revisión de canales: ${ids.size} de ${live.size} sin señal")
+            message = scanStatus
+            applyParental()
+        }
+    }
+    fun clearDead() {
+        val src = source ?: return
+        ChannelCheck.clear(getApplication(), src.id); deadIds = emptySet(); deadAt = 0; scanStatus = ""
+        applyParental(); message = "Marcas de canales caídos borradas"
+    }
+
     // ---------- Guía canal por canal (Xtream) ----------
     // Canales que no salen en el XMLTV (o listas sin XMLTV): se pide su programación directo al proveedor, de a pocos
     private val guideTried = HashSet<String>()
@@ -571,6 +627,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(s: Settings) {
+        val old = settings
         val formatChanged = s.liveFormat != settings.liveFormat
         val pinChanged = s.parentalPin != settings.parentalPin
         settings = s
@@ -579,6 +636,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (pinChanged) { adultUnlocked = false; applyParental() }
         if (formatChanged) source?.takeIf { it.type == SourceType.XTREAM }?.let { open(it) }
         if (s.castReceive) startCastReceiver() else stopCastReceiver()
+        if (s.hideDead != old.hideDead) applyParental()
     }
 
     // ---------- navegación / filtros ----------
@@ -837,9 +895,39 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var remoteStart: Pair<String, Long>? = null
     fun startCastReceiver() {
         if (!settings.castReceive || castReceiver != null) return
-        castReceiver = cl.iptv.player.data.CastReceiver(getApplication(), deviceName) { item, pos, from -> playRemote(item, pos, from) }.also { it.start() }
+        castReceiver = cl.iptv.player.data.CastReceiver(getApplication(), deviceName,
+            onPlay = { item, pos, from -> playRemote(item, pos, from) },
+            onPairCode = { c, from -> pairCode = c?.let { it to from } },
+            onSources = { list, from -> receiveSources(list, from) },
+        ).also { it.start() }
     }
-    fun stopCastReceiver() { castReceiver?.stop(); castReceiver = null }
+    fun stopCastReceiver() { castReceiver?.stop(); castReceiver = null; pairCode = null }
+
+    // ---------- Pasar listas desde el celular ----------
+    /** En la TV: código a mostrar y quién lo pidió (null = nada). */
+    var pairCode by mutableStateOf<Pair<String, String>?>(null)
+    /** En el celular: ventana "Pasar mis listas a la TV". */
+    var showSendSources by mutableStateOf(false)
+    fun cancelPair() { castReceiver?.cancelPair(); pairCode = null }
+    private fun receiveSources(list: List<Source>, from: String) {
+        if (list.isEmpty()) { message = "No llegó ninguna lista válida"; return }
+        val existing = store.sources()
+        var first: Source? = null
+        list.forEach { s ->
+            // La misma lista ya guardada (mismo servidor y usuario, o mismo enlace): se actualiza en vez de duplicarla
+            val same = existing.firstOrNull { e ->
+                e.type == s.type && if (s.type == SourceType.XTREAM) XtreamClient.normalize(e.server) == XtreamClient.normalize(s.server) && e.username == s.username else e.url == s.url
+            }
+            val idTaken = same == null && existing.any { it.id == s.id }
+            val saved = when { same != null -> s.copy(id = same.id); idTaken -> s.copy(id = java.util.UUID.randomUUID().toString()); else -> s }
+            store.upsert(saved)
+            if (first == null) first = saved
+        }
+        sources = store.sources()
+        logEvent("Listas recibidas desde $from: ${list.size}")
+        message = "Listas recibidas desde $from: ${list.size}"
+        if (source == null) first?.let { open(it) }
+    }
     private fun playRemote(item: Item, pos: Long, from: String) {
         // Si este equipo tiene la misma lista, se usa el canal de aquí: así se puede seguir cambiando con ▲▼
         val local = items.firstOrNull { it.id == item.id && it.url == item.url } ?: items.firstOrNull { it.url == item.url }
@@ -1065,6 +1153,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Mini reproductor (imagen en imagen dentro de la app, para TV y TV boxes) ----------
     /** El video sigue en una ventana chica en la esquina mientras se recorre el menú o la guía. */
     var mini by mutableStateOf(false); private set
+    /** Abrir la Guía directo en "Buscar programa" (desde el reproductor). */
+    var guideSearch = false
+    fun openGuideSearch() { guideSearch = true; enterMini(quiet = true); showGuide = true }
     fun enterMini(quiet: Boolean = false) {
         mini = true; showSettings = false; returnFocusId = playing?.id
         if (!quiet) message = "Mini reproductor: tócalo (o Atrás en el Inicio) para volver a pantalla completa. Tamaño y posición en Ajustes → Reproducción"

@@ -50,6 +50,7 @@ class MpvHandle(private val mpv: MPVLib) : AltEngine {
     }
 
     override fun setSubtitleDelay(ms: Long): Boolean = runCatching { mpv.setPropertyDouble("sub-delay", ms / 1000.0) }.isSuccess
+    override fun setAudioDelay(ms: Long): Boolean = runCatching { mpv.setPropertyDouble("audio-delay", ms / 1000.0) }.isSuccess
 
     override fun addExternalSubtitle(file: java.io.File) { mpv.command(arrayOf("sub-add", file.absolutePath, "select")) }
 

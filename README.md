@@ -102,6 +102,10 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Canales recientes**: botón en el reproductor con los últimos 5 canales vistos.
 - **Enviar a la TV** (Android): con Vibe IPTV abierto en el celular y en la TV, en la misma red Wi-Fi, *Más → Enviar a la TV* lo reproduce allá (las películas siguen desde el mismo minuto).
 - **Calidad automática con aviso**: en canales con varias calidades sube o baja según el internet y avisa cuando cambia; también *Ahorro de datos (hasta 720p)* o *Siempre la mejor*.
+- **Pasar mis listas a la TV** (Android): en el celular, Ajustes → Listas y guía → *Pasar mis listas a la TV*; la TV muestra un código de 4 cifras y ya no hay que escribir usuario y contraseña con el control.
+- **Revisar canales caídos** (Android): prueba los canales en vivo de a uno, mientras no ves nada, y puede ocultar los que no responden.
+- **Sincronizar audio**: *Más → Sincronizar audio* si el sonido va adelantado o atrasado (parlantes Bluetooth, barras de sonido).
+- **Buscar en la guía** sin tildes y por palabras (también en la descripción), y desde el reproductor: *Más → Buscar en la guía*.
 - **Tamaño de los controles del reproductor** ajustable (Ajustes → Reproducción).
 - **Control remoto completo**: teclas numéricas para ir a un canal, **canal anterior**, y temporizador para dormir (15 a 120 min).
 - **Mini reproductor en TV**: el video sigue en una esquina mientras recorres el menú o la guía. Tamaño (pequeño, mediano, grande) y esquina en Ajustes → Reproducción; en el teléfono se arrastra con el dedo.

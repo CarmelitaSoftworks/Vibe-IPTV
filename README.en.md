@@ -102,6 +102,10 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Recent channels**: a player button with the last 5 channels watched.
 - **Send to TV** (Android): with Vibe IPTV open on the phone and the TV, on the same Wi-Fi, *More → Send to TV* plays it there (movies continue from the same minute).
 - **Automatic quality with notice**: on channels with several qualities it goes up or down with your internet and tells you when it changes; also *Data saver (up to 720p)* or *Always the best*.
+- **Send my lists to the TV** (Android): on the phone, Settings → Lists & guide → *Send my lists to the TV*; the TV shows a 4-digit code and you no longer type username and password with the remote.
+- **Check for dead channels** (Android): tests live channels one at a time while you're not watching, and can hide those that don't respond.
+- **Sync audio**: *More → Sync audio* if the sound is ahead of or behind the picture (Bluetooth speakers, soundbars).
+- **Search the guide** without accents and by words (also in the description), and from the player: *More → Search the guide*.
 - **Adjustable player controls size** (Settings → Playback).
 - **Full remote support**: number keys to jump to a channel, **previous channel**, and a sleep timer (15 to 120 min).
 - **Mini player on TV**: the video keeps playing in a corner while you browse the menu or the guide. Size (small, medium, large) and corner in Settings → Playback; on the phone you can drag it with your finger.

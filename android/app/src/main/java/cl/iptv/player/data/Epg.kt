@@ -47,6 +47,35 @@ class Epg(
         return emptyList()
     }
 
+    /**
+     * Buscar un programa en toda la guía: sin tildes ni mayúsculas, con todas las palabras ("colo colo" encuentra
+     * "Colo-Colo vs. Universidad"), primero por título y después por descripción. Lo que se está dando ahora va
+     * primero; después, por hora.
+     */
+    fun search(channels: List<Item>, query: String, from: Long, now: Long, limit: Int = 80): List<Pair<Item, Programme>> {
+        val words = fold(query).split(' ').filter { it.length >= 2 }
+        if (words.isEmpty()) return emptyList()
+        val seen = HashSet<String>()
+        val hits = ArrayList<Triple<Item, Programme, Int>>()
+        for (ch in channels) {
+            if (ch.kind != Kind.LIVE) continue
+            for (p in listFor(ch)) {
+                if (p.stop <= from) continue
+                val score = when {
+                    fold(p.title).let { t -> words.all { it in t } } -> 2
+                    p.desc.isNotEmpty() && fold(p.desc).let { d -> words.all { it in d } } -> 1
+                    else -> continue
+                }
+                if (!seen.add(ch.url + "|" + p.start)) continue                 // mismo canal repetido en la lista
+                hits += Triple(ch, p, score)
+                if (hits.size >= 2_000) break
+            }
+        }
+        return hits.sortedWith(compareByDescending<Triple<Item, Programme, Int>> { it.second.start <= now && it.second.stop > now }
+            .thenByDescending { it.third }.thenBy { it.second.start })
+            .take(limit).map { it.first to it.second }
+    }
+
     /** true si este canal ya tiene programación (para no pedirla de nuevo al proveedor). */
     fun has(item: Item) = listFor(item).isNotEmpty()
 
@@ -94,6 +123,9 @@ class Epg(
             return Epg(byId, names)
         }
         fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+        /** Para buscar: sin tildes, en minúsculas y con espacios en vez de signos. */
+        fun fold(s: String): String = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "").lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
 
         private val QUALITY = Regex("(uhd|fhd|hd|sd|4k|8k|hevc|h265|h264|1080p?|720p?|2160p?|backup|bkp)+$")
         /** Nombre normalizado sin calidad al final. Recibe un nombre ya pasado por [norm] o uno original. */

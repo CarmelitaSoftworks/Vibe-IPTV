@@ -44,6 +44,8 @@ interface PlaybackControl {
     fun setSound(preset: String, level: Boolean) {}
     /** Retraso de los subtítulos en ms (+ = aparecen después). false si este motor no lo permite. */
     fun setSubtitleDelay(ms: Long): Boolean = false
+    /** Retraso del audio en ms (+ = el sonido llega después; para parlantes Bluetooth o barras de sonido). */
+    fun setAudioDelay(ms: Long): Boolean = false
 }
 
 private fun lang(code: String?): String? = code?.takeIf { it.isNotBlank() && it != "und" }?.let {

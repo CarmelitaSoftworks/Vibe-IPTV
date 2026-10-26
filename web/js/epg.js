@@ -63,6 +63,34 @@ export function parseXmltv(xml, now = Date.now(), pastMs = 24 * 3600e3, futureMs
   return new Epg(byId, nameToId);
 }
 
+/** Para buscar: sin tildes, en minúsculas y con espacios en vez de signos. */
+export const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/**
+ * Buscar un programa en toda la guía: todas las palabras, sin tildes ni mayúsculas; primero por título y después por
+ * descripción. Lo que se está dando ahora va primero; después, por hora.
+ */
+export function searchGuide(epg, channels, query, from, now, limit = 80) {
+  const words = fold(query).split(' ').filter((w) => w.length >= 2);
+  if (!words.length) return [];
+  const seen = new Set(), hits = [];
+  for (const ch of channels) {
+    for (const p of epg.listFor(ch)) {
+      if (p.stop <= from) continue;
+      const t = fold(p.title);
+      const score = words.every((w) => t.includes(w)) ? 2 : p.desc && words.every((w) => fold(p.desc).includes(w)) ? 1 : 0;
+      if (!score) continue;
+      const k = `${ch.url}|${p.start}`;
+      if (seen.has(k)) continue;
+      seen.add(k); hits.push([ch, p, score]);
+    }
+    if (hits.length >= 2000) break;
+  }
+  const live = (p) => p.start <= now && p.stop > now;
+  hits.sort((a, b) => (live(b[1]) - live(a[1])) || (b[2] - a[2]) || (a[1].start - b[1].start));
+  return hits.slice(0, limit).map(([ch, p]) => [ch, p]);
+}
+
 export class Epg {
   constructor(byId = new Map(), nameToId = new Map()) { this.byId = byId; this.nameToId = nameToId; }
   /** Índices extra (se arman la primera vez): id sin mayúsculas y nombres sin país ni calidad. */

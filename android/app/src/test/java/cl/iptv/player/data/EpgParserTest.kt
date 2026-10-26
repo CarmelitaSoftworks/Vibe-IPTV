@@ -77,4 +77,12 @@ class EpgParserTest {
         assertEquals("En vivo", epg.nowNext(item, now).first?.title)
         assertEquals(true, epg.has(item))
     }
+
+    @Test fun buscarSinTildesYPorPalabras() {
+        val epg = EpgParser.parse(xml.byteInputStream(), now)
+        val ch = listOf(Item("x", Kind.LIVE, "Canal Uno", url = "u"))
+        assertEquals(listOf("Película"), epg.search(ch, "pelicula", from = now - 3_600_000, now = now).map { it.second.title })
+        assertEquals("Noticiero", epg.search(ch, "NOTICIERO", from = 0, now = now).first().second.title)
+        assertEquals(0, epg.search(ch, "x", from = 0, now = now).size)
+    }
 }

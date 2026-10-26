@@ -89,6 +89,10 @@ fun App(vm: AppViewModel) {
             ) { PlayerScreen(vm) }
         }
 
+        // Pasar listas desde el celular: en el celular, la ventana para enviar; en la TV, el código a escribir
+        if (vm.showSendSources) SendSourcesSheet(vm) { vm.showSendSources = false }
+        vm.pairCode?.let { (code, from) -> PairCodeOverlay(code, from) { vm.cancelPair() } }
+
         // Mensajes breves (equivalente a un toast)
         val msg = vm.message
         LaunchedEffect(msg) { if (msg != null) { delay(3500); vm.message = null } }

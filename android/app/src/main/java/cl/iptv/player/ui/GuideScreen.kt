@@ -59,7 +59,8 @@ fun GuideScreen(vm: AppViewModel) {
     val firstFocus = remember { FocusRequester() }
     var focused by remember { mutableStateOf<Pair<Item, Programme?>?>(null) }
     var detail by remember { mutableStateOf<Pair<Item, Programme>?>(null) }
-    var searching by remember { mutableStateOf(false) }
+    // Desde el reproductor (Más → Buscar en la guía) se abre directo en la búsqueda
+    var searching by remember { mutableStateOf(vm.guideSearch.also { vm.guideSearch = false }) }
     // Grabaciones programadas (se vuelve a leer al programar o cancelar una)
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var recTick by remember { mutableStateOf(0) }
@@ -168,18 +169,14 @@ fun GuideScreen(vm: AppViewModel) {
         LaunchedEffect(Unit) { delay(80); runCatching { fr.requestFocus() } }
         LaunchedEffect(q) {
             delay(300)
-            val n = cl.iptv.player.data.Epg.norm(q)
-            hits = if (n.length < 2) emptyList() else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                val from = System.currentTimeMillis() - sh - 3 * 86_400_000L
-                vm.items.asSequence().filter { it.kind == cl.iptv.player.data.Kind.LIVE }
-                    .flatMap { ch -> vm.epg.listFor(ch).asSequence().filter { it.stop > from && cl.iptv.player.data.Epg.norm(it.title).contains(n) }.map { ch to it } }
-                    .distinctBy { (ch, p) -> ch.id + p.start }
-                    .take(400).toList().sortedBy { it.second.start }.take(80)
+            hits = if (q.trim().length < 2) emptyList() else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val t = System.currentTimeMillis() - sh
+                vm.epg.search(vm.items, q, from = t - 86_400_000L, now = t)
             }
         }
         val day = remember { java.text.SimpleDateFormat("EEE d", java.util.Locale.getDefault()) }
         Sheet("Buscar en la guía", onDismiss = { searching = false }, wide = true) {
-            Field(q, { q = it }, "Nombre del programa", modifier = Modifier.focusRequester(fr))
+            Field(q, { q = it }, "Programa, equipo o tema (ej. colo colo, noticias)", modifier = Modifier.focusRequester(fr))
             Spacer(Modifier.height(8.dp))
             if (q.length >= 2 && hits.isEmpty()) Text("Sin resultados en la guía cargada.", color = c.inkSoft, fontSize = 13.sp)
             hits.forEach { (ch, p) ->
