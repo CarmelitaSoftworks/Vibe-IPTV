@@ -98,6 +98,9 @@ data class Settings(
     val timeshiftMin: Int = 15,
     /** Calidad en canales con varias calidades (HLS): auto (según el internet) | saver (hasta 720p) | max. */
     val hlsQuality: String = "auto",
+    /** Mini reproductor dentro de la app: tamaño (small | medium | large) y esquina (br | bl | tr | tl). */
+    val miniSize: String = "medium",
+    val miniCorner: String = "br",
     /** Recibir videos enviados desde el celular por Wi-Fi (Enviar a la TV). */
     val castReceive: Boolean = true,
     /** Buscar y cargar subtítulos solos en películas y series (fuentes sin clave: OpenSubtitles y Podnapisi). */

@@ -104,7 +104,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Automatic quality with notice**: on channels with several qualities it goes up or down with your internet and tells you when it changes; also *Data saver (up to 720p)* or *Always the best*.
 - **Adjustable player controls size** (Settings → Playback).
 - **Full remote support**: number keys to jump to a channel, **previous channel**, and a sleep timer (15 to 120 min).
-- **Mini player on TV**: the video keeps playing in a corner while you browse the menu or the guide.
+- **Mini player on TV**: the video keeps playing in a corner while you browse the menu or the guide. Size (small, medium, large) and corner in Settings → Playback; on the phone you can drag it with your finger.
 - **Multiview**: up to 4 channels at once; the one you pick plays sound.
 - **Recently watched**, **search the guide by programme name** and **organize categories** (hide and reorder).
 - **Android TV / Google TV home screen row** with your favorites and recent channels.

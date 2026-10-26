@@ -1161,6 +1161,13 @@ fun PlayerScreen(vm: AppViewModel) {
                 if (!activity.isTv) Text("✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x99000000))
                         .clickable { vm.closePlayer() }.padding(horizontal = 7.dp))
+                // En teléfonos y tabletas: cambiar el tamaño (pequeño → mediano → grande); se mueve arrastrándolo
+                if (!activity.isTv) Text("⤡", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x99000000))
+                        .clickable {
+                            val next = when (vm.settings.miniSize) { "small" -> "medium"; "medium" -> "large"; else -> "small" }
+                            vm.updateSettings(vm.settings.copy(miniSize = next))
+                        }.padding(horizontal = 7.dp))
             }
         }
         if (!vm.mini) error?.let { msg ->

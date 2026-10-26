@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import kotlinx.coroutines.delay
 
 @Composable
@@ -52,10 +54,36 @@ fun App(vm: AppViewModel) {
         if (vm.multiview != null) MultiviewScreen(vm)
         else if (vm.screen == Screen.PLAYER) {
             val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+            // Mini reproductor ajustable (Ajustes → Reproducción): tamaño y esquina; con el dedo se arrastra y queda
+            // en la esquina más cercana. Base: teléfono 55 % del ancho en vertical, 40 % en horizontal, TV 30 %.
+            val base = if (cfg.screenWidthDp < 600) 0.55f else if (cfg.smallestScreenWidthDp < 600) 0.40f else 0.30f
+            val scale = when (vm.settings.miniSize) { "small" -> 0.72f; "large" -> 1.4f; else -> 1f }
+            val miniW = (cfg.screenWidthDp * (base * scale).coerceAtMost(0.9f)).dp
+            val corner = when (vm.settings.miniCorner) {
+                "bl" -> Alignment.BottomStart; "tr" -> Alignment.TopEnd; "tl" -> Alignment.TopStart; else -> Alignment.BottomEnd
+            }
+            var drag by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+            val density = androidx.compose.ui.platform.LocalDensity.current
             Box(
-                // Teléfono: ventanita más grande (55 % del ancho en vertical) y sobre la barra de navegación
-                if (vm.mini) Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 16.dp, bottom = 16.dp)
-                    .width((cfg.screenWidthDp * (if (cfg.screenWidthDp < 600) 0.55f else if (cfg.smallestScreenWidthDp < 600) 0.40f else 0.30f)).dp).aspectRatio(16f / 9f)
+                if (vm.mini) Modifier.align(corner).systemBarsPadding().padding(16.dp)
+                    .offset { androidx.compose.ui.unit.IntOffset(drag.x.toInt(), drag.y.toInt()) }
+                    .width(miniW).aspectRatio(16f / 9f)
+                    .pointerInput(vm.settings.miniCorner, vm.settings.miniSize) {
+                        detectDragGestures(
+                            onDragEnd = {
+                                // Soltar: a la esquina más cercana según dónde quedó el centro de la ventanita
+                                val w = cfg.screenWidthDp * density.density; val h = cfg.screenHeightDp * density.density
+                                val left = corner == Alignment.BottomStart || corner == Alignment.TopStart
+                                val top = corner == Alignment.TopEnd || corner == Alignment.TopStart
+                                val cx = (if (left) size.width / 2f else w - size.width / 2f) + drag.x
+                                val cy = (if (top) size.height / 2f else h - size.height / 2f) + drag.y
+                                val c = (if (cy < h / 2) "t" else "b") + (if (cx < w / 2) "l" else "r")
+                                drag = androidx.compose.ui.geometry.Offset.Zero
+                                if (c != vm.settings.miniCorner) vm.updateSettings(vm.settings.copy(miniCorner = c))
+                            },
+                            onDragCancel = { drag = androidx.compose.ui.geometry.Offset.Zero },
+                        ) { change, d -> change.consume(); drag += d }
+                    }
                     .clip(RoundedCornerShape(12.dp)).border(2.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                 else Modifier.fillMaxSize()
             ) { PlayerScreen(vm) }

@@ -1023,7 +1023,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var mini by mutableStateOf(false); private set
     fun enterMini(quiet: Boolean = false) {
         mini = true; showSettings = false; returnFocusId = playing?.id
-        if (!quiet) message = "Mini reproductor: tócalo (o Atrás en el Inicio) para volver a pantalla completa"
+        if (!quiet) message = "Mini reproductor: tócalo (o Atrás en el Inicio) para volver a pantalla completa. Tamaño y posición en Ajustes → Reproducción"
     }
     fun expandMini() { mini = false; showSettings = false; showGuide = false }
     val menuVisible: Boolean get() = screen == Screen.MENU || mini
