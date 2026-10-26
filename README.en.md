@@ -13,7 +13,7 @@ M3U/M3U8 playlists · Xtream Codes · XMLTV guide · Built for the remote contro
 ![Platforms](https://img.shields.io/badge/platforms-Web%20%7C%20iPhone%20%7C%20Android%20%7C%20Android%20TV-3ddc84)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7f52ff?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-4285f4?logo=jetpackcompose&logoColor=white)
-![Engines](https://img.shields.io/badge/engines-ExoPlayer%20%7C%20VLC%20%7C%20MPV-ff7a00)
+![Engines](https://img.shields.io/badge/engines-ExoPlayer%20%7C%20VLC%20%7C%20MPV%20%7C%20system-ff7a00)
 ![PWA](https://img.shields.io/badge/web-PWA-5a0fc8)
 ![License](https://img.shields.io/badge/license-GPLv3-blue)
 ![Open source](https://img.shields.io/badge/open-source-brightgreen)
@@ -26,7 +26,7 @@ M3U/M3U8 playlists · Xtream Codes · XMLTV guide · Built for the remote contro
 **Vibe IPTV** is a **free and open-source** project (**GPLv3** license) by **Carmelita Softworks**, made of two
 native apps built around the same idea: an **installable web app (PWA)** that runs in any browser, and a
 **native app for Android and Android TV** written in Kotlin with Jetpack Compose. It has a tile-based
-channel menu, settings organized by sections and **three playback engines** (ExoPlayer, VLC and MPV), so
+channel menu, settings organized by sections and **four playback engines** (ExoPlayer, VLC, MPV and the system one), so
 even the tricky cable-TV channels play.
 
 All the code is out in the open: you can review it, build it yourself, modify it and share it.
@@ -44,7 +44,9 @@ All the code is out in the open: you can review it, build it yourself, modify it
 ## ✨ Features
 
 ### ▶️ Playback
-- **Three engines on Android** that take over from each other automatically: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv). If one can't handle a channel, the next one tries; you can also pin one in Settings.
+- **Four engines on Android** that take over from each other automatically: ExoPlayer (Media3) → **VLC** (LibVLC) → **MPV** (libmpv) → **the system one** (Android's built-in player). If one can't handle a channel, the next one tries; you can also pin one in Settings.
+- **FFmpeg video inside ExoPlayer**: if the device can't decode a video (cable-TV MPEG-2 and others), ExoPlayer does it in software without switching to VLC, keeping the live cushion and diagnostics. The device chip's decoder is always preferred; software stays as a fallback.
+- Optional **tunnel mode** for Android TV (Settings → Playback): video and audio go straight to the TV chip.
 - **Cable-TV formats**: interlaced MPEG-2 video and AC-3 / E-AC-3 / MP2 audio, with automatic deinterlacing.
 - **In the browser**: hls.js and mpegts.js, plus on-the-fly **ffmpeg** conversion through the local server when the browser can't play a format.
 - **Configures itself for your device**: at startup it detects memory, CPU and decoders. On modest TV boxes (Xiaomi Mi Box / Mi TV Stick, 1–2 GB devices) it turns on **lite mode**: menus without shadows or animations, lighter artwork and lighter video processing.
@@ -73,7 +75,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ### 💬 Subtitles
 - Searches **several sources at once**: OpenSubtitles (the same database as VLC's **VLSub** extension), SubDL and Podnapisi.
-- **Offline AI subtitles** (Android): transcribes Spanish, English or Portuguese audio live with [Vosk](https://alphacephei.com/vosk) (open source). The **AI** build (`vibe-iptv-ia-*.apk`) includes the Spanish model; the regular one downloads it the first time (~40 MB).
+- **Offline AI subtitles** (Android): transcribes Spanish, English or Portuguese audio live with [Vosk](https://alphacephei.com/vosk) (open source). The **AI** build (`vibe-iptv-ia-*.apk`) includes the Spanish model; the regular one downloads it the first time (~40 MB). Voice filter and automatic volume to better understand TV audio, and they stay on for every channel until you turn them off.
 - **Automatic subtitles** (on by default): in movies and series, if the audio isn't in your language, it uses the built-in track or finds and loads one from OpenSubtitles and Podnapisi, **no key or account needed**.
 - **SubDL built in through its official API**: searches by IMDb ID, downloads just the episode from season packs, flags SDH subtitles and lets you **test your key** in Settings.
 - Opens `.zip` files, fixes the encoding of Spanish `.srt` files (Windows-1252), converts `.ass` and lets you **shift the subtitle earlier or later**.
@@ -222,7 +224,7 @@ npm test
 | Part | Technology |
 |---|---|
 | Android | Kotlin 2.1, Jetpack Compose, Gradle 8.13 / AGP 8.11, SDK 36 |
-| Android playback | Media3 ExoPlayer, LibVLC, libmpv |
+| Android playback | Media3 ExoPlayer (+ FFmpeg from NextLib and Jellyfin), LibVLC, libmpv, Android MediaPlayer |
 | Networking & images | OkHttp, Coil |
 | Screenshot reading | ML Kit Text Recognition (Android), Tesseract.js (web) |
 | Web | Framework-free JavaScript (ES modules), PWA |
@@ -263,8 +265,8 @@ It's a *vibe coded* project ([how it was made](CREDITS.md#made-with-vibe-coding)
 
 It exists thanks to these open-source projects and services:
 
-- **🎬 Playback:** ▶️ [ExoPlayer (Media3)](https://github.com/androidx/media) · 🔶 [LibVLC](https://code.videolan.org/videolan/vlc) · 🎞️ [mpv / libmpv](https://github.com/jarnedemeulemeester/libmpv-android) · 🧩 [FFmpeg](https://ffmpeg.org) · 🔊 [Jellyfin FFmpeg decoder](https://github.com/jellyfin/jellyfin-androidx-media) · 🌐 [hls.js](https://github.com/video-dev/hls.js) · 📡 [mpegts.js](https://github.com/xqq/mpegts.js)
-- **💬 Subtitles and AI:** 🎙️ [Vosk](https://alphacephei.com/vosk) · 🔗 [JNA](https://github.com/java-native-access/jna) · 🧠 [whisper.cpp](https://github.com/ggml-org/whisper.cpp) · ⚙️ [ggml](https://github.com/ggml-org/ggml) · 🗣️ [Whisper model (OpenAI)](https://github.com/openai/whisper) · 📷 [ML Kit](https://developers.google.com/ml-kit) · 🔍 [Tesseract.js](https://github.com/naptha/tesseract.js) · 📝 [OpenSubtitles](https://www.opensubtitles.org) · 📝 [SubDL](https://subdl.com) · 📝 [Podnapisi](https://www.podnapisi.net)
+- **🎬 Playback:** ▶️ [ExoPlayer (Media3)](https://github.com/androidx/media) · 🔶 [LibVLC](https://code.videolan.org/videolan/vlc) · 🎞️ [mpv / libmpv](https://github.com/jarnedemeulemeester/libmpv-android) · 🧩 [FFmpeg](https://ffmpeg.org) · 🔊 [Jellyfin FFmpeg decoder](https://github.com/jellyfin/jellyfin-androidx-media) · 📼 [NextLib](https://github.com/anilbeesetti/nextlib) · 🌐 [hls.js](https://github.com/video-dev/hls.js) · 📡 [mpegts.js](https://github.com/xqq/mpegts.js)
+- **💬 Subtitles and AI:** 🎙️ [Vosk](https://alphacephei.com/vosk) · 🔗 [JNA](https://github.com/java-native-access/jna) · 📷 [ML Kit](https://developers.google.com/ml-kit) · 🔍 [Tesseract.js](https://github.com/naptha/tesseract.js) · 📝 [OpenSubtitles](https://www.opensubtitles.org) · 📝 [SubDL](https://subdl.com) · 📝 [Podnapisi](https://www.podnapisi.net)
 - **📺 Guide and playlists:** 🗓️ [iptv-org/epg](https://github.com/iptv-org/epg) · 📥 [OkHttp](https://github.com/square/okhttp)
 - **🎨 Interface:** 🟣 [Kotlin](https://kotlinlang.org) · 🧱 [Jetpack Compose](https://developer.android.com/compose) · 🔄 [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) · 🖼️ [Coil](https://github.com/coil-kt/coil) · 💡 [OwnTV (design inspiration)](https://github.com/ahXN00/OwnTV)
 - **🧪 Testing:** 🤖 [Robolectric](https://github.com/robolectric/robolectric) · 📸 [Roborazzi](https://github.com/takahirom/roborazzi)

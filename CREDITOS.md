@@ -27,6 +27,7 @@ También existe gracias a estos proyectos y servicios:
 | [mpv / libmpv para Android](https://github.com/jarnedemeulemeester/libmpv-android) | Segundo motor alternativo | ![ver repositorio](https://img.shields.io/badge/licencia-ver%20repositorio-6e7781) |
 | [FFmpeg](https://ffmpeg.org) | Decodificación de audio y video | ![LGPL 2.1+](https://img.shields.io/badge/licencia-LGPL%202.1%2B-8250df) |
 | [Decodificador FFmpeg de Jellyfin](https://github.com/jellyfin/jellyfin-androidx-media) | Audio AC-3, E-AC-3 y DTS en ExoPlayer | ![ver repositorio](https://img.shields.io/badge/licencia-ver%20repositorio-6e7781) |
+| [NextLib (FFmpeg para Media3)](https://github.com/anilbeesetti/nextlib) | Video MPEG-2 y otros en ExoPlayer sin cambiar de motor | ![GPL 3.0](https://img.shields.io/badge/licencia-GPL%203.0-blue) |
 | [hls.js](https://github.com/video-dev/hls.js) | Reproducción HLS en la versión web | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 | [mpegts.js](https://github.com/xqq/mpegts.js) | Reproducción MPEG-TS en la versión web | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 
@@ -36,9 +37,6 @@ También existe gracias a estos proyectos y servicios:
 |---|---|---|
 | [Vosk (Alpha Cephei)](https://alphacephei.com/vosk) | Subtítulos con IA sin internet | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 | [JNA](https://github.com/java-native-access/jna) | Puente nativo que usa Vosk | ![LGPL 2.1 / Apache 2.0](https://img.shields.io/badge/licencia-LGPL%202.1%20%2F%20Apache%202.0-8250df) |
-| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Subtítulos Whisper (versión de prueba) | ![MIT](https://img.shields.io/badge/licencia-MIT-2ea44f) |
-| [ggml](https://github.com/ggml-org/ggml) | Cálculo del modelo en el procesador | ![MIT](https://img.shields.io/badge/licencia-MIT-2ea44f) |
-| [Modelo Whisper (OpenAI)](https://github.com/openai/whisper) | Modelo de voz "base", versión convertida de [whisper.cpp en Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) | ![MIT](https://img.shields.io/badge/licencia-MIT-2ea44f) |
 | [ML Kit (Google)](https://developers.google.com/ml-kit) | Leer datos desde una captura (Android) | ![términos de Google](https://img.shields.io/badge/licencia-t%C3%A9rminos%20de%20Google-6e7781) |
 | [Tesseract.js](https://github.com/naptha/tesseract.js) | Leer datos desde una captura (web) | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 | [OpenSubtitles · SubDL · Podnapisi](https://www.opensubtitles.org) | Búsqueda de subtítulos en línea | ![servicios en línea](https://img.shields.io/badge/licencia-servicios%20en%20l%C3%ADnea-6e7781) |

@@ -3,6 +3,8 @@ node_modules/
 # Android / Gradle
 .gradle/
 build/
+# Archivos temporales de la compilación nativa (CMake)
+.cxx/
 local.properties
 *.iml
 .idea/

@@ -81,4 +81,13 @@ class CaptionerTest {
         assertEquals("hola a todos", LiveCaptioner.clean("hola  [unk] a todos"))
         assertEquals("sol", LiveCaptioner.clean("sol"))
     }
+
+    @Test fun filtroDeVozQuitaGravesYDejaLaVoz() {
+        fun tono(hz: Double) = ShortArray(16_000) { (8_000 * kotlin.math.sin(2 * Math.PI * hz * it / 16_000)).toInt().toShort() }
+        fun nivel(hz: Double): Double { val a = tono(hz); VoiceFilter().process(a); return LiveCaptioner.rms(a.copyOfRange(4_000, 16_000)) }
+        val voz = nivel(1_000.0)
+        assertTrue("la voz pasa casi entera", voz > 5_000)
+        assertTrue("los graves se atenúan", nivel(40.0) < voz / 4)
+        assertTrue("lo muy agudo se atenúa", nivel(7_000.0) < voz / 3)
+    }
 }

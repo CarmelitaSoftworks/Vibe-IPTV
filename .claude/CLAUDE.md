@@ -46,7 +46,7 @@ Reproductor neutral: no trae listas ni contenido; el usuario carga su lista M3U 
 No hay Android SDK en las sesiones: **la APK la compila GitHub**. No intentes compilar Android en local.
 
 - `.github/workflows/compilar-apk.yml` corre en cada push a `main`:
-  NDK (Whisper) → modelo de voz Vosk para la versión IA → `assembleRelease` (sabores `estandar` e `ia`) →
+  modelo de voz Vosk para la versión IA → `assembleRelease` (sabores `estandar` e `ia`) →
   `testEstandarReleaseUnitTest` → publicación.
 - **Sólo publica** si el último commit del push lleva **`[publicar]`** en el mensaje, o con
   `gh workflow run compilar-apk.yml --ref main -f publicar=true`.
@@ -84,7 +84,7 @@ android/app/src/main/java/cl/iptv/player/
   ui/MenuScreen.kt         menú clásico; temas con menú propio: MetroScreen, WaveScreen, ConsoleThemes, DeskScreen
   ui/SettingsScreen.kt     ajustes (filas Toggle/Choice/TextField/Action/Danger/Info/Slider)
   ui/I18n.kt               `Text` que traduce solo; `tr()` para textos fuera de Text
-  data/                    Xtream, M3U, EPG, almacenamiento, subtítulos, búfer, equipo, Whisper/Vosk…
+  data/                    Xtream, M3U, EPG, almacenamiento, subtítulos, búfer, equipo, Vosk…
 android/app/src/test/      pruebas JUnit/Robolectric (deben pasar)
 web/                       app web (módulos ES sin framework) + server/ (Node: proxy, ffmpeg, subtítulos)
 web/test/                  `cd web && npm test` (debe pasar)
