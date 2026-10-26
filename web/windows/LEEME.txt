@@ -1,0 +1,31 @@
+VIBE IPTV PARA WINDOWS (PORTABLE)
+=================================
+
+No hay que instalar nada:
+
+1. Descomprime este .zip donde quieras (Escritorio, un pendrive...).
+2. Abre la carpeta VibeIPTV y haz doble clic en "Abrir Vibe IPTV.bat".
+3. Se abre el navegador con la app. Deja abierta la ventana negra mientras la usas:
+   al cerrarla se cierra la app.
+
+Para verla también desde la TV, el celular o la tablet de tu casa, usa
+"Abrir Vibe IPTV (TV y celulares).bat": muestra la dirección que hay que abrir en ellos.
+Si Windows pregunta por el Firewall, elige "Redes privadas" y Permitir.
+
+Si Windows muestra "Windows protegió su PC", pulsa "Más información" y "Ejecutar de todas formas"
+(pasa con los programas que no se compran en una tienda).
+
+Tus listas y ajustes quedan guardados en el navegador de este PC.
+Trae ffmpeg: los canales con formatos que el navegador no reproduce (TV de cable) se convierten solos.
+
+Vibe IPTV es un reproductor: no trae listas ni canales. Código abierto (GPLv3):
+https://github.com/CarmelitaSoftworks/Vibe-IPTV
+
+-----------------------------------------------------------------------------------------------
+
+VIBE IPTV FOR WINDOWS (PORTABLE)
+
+Nothing to install: unzip, open the VibeIPTV folder and double-click "Abrir Vibe IPTV.bat".
+The app opens in the browser; keep the black window open while you use it.
+"Abrir Vibe IPTV (TV y celulares).bat" also lets the TV, phone or tablet at home open it (it shows the address).
+If Windows says "Windows protected your PC", click "More info" and "Run anyway".

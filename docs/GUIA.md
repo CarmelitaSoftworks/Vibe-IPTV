@@ -23,7 +23,9 @@ Dos apps nativas que comparten el mismo diseño de menú (cuadrícula de mosaico
 
 **Descargar:** en GitHub, botón verde **Code → Download ZIP** y descomprímelo (o `git clone`). Los archivos `.bat` están dentro de la carpeta `web`. Necesitas **Node.js** (versión LTS, de [nodejs.org](https://nodejs.org)).
 
-**En Windows lo más fácil:** doble clic en `web/iniciar.bat` (abre el navegador solo) o en `web/iniciar-red-local.bat` para usarla también desde el TV o el celular de tu red (muestra la dirección a usar). Deja la ventana negra abierta mientras usas la app.
+**En Windows, sin instalar nada:** descarga la versión portable [vibe-iptv-windows.zip](https://github.com/CarmelitaSoftworks/Vibe-IPTV/releases/download/prueba/vibe-iptv-windows.zip), descomprímela, abre la carpeta *VibeIPTV* y haz doble clic en *Abrir Vibe IPTV.bat* (o *Abrir Vibe IPTV (TV y celulares).bat* para usarla también desde la TV o el celular). Trae Node.js, ffmpeg y el lector de capturas; tus listas y ajustes quedan en el navegador del PC.
+
+**Con el repositorio descargado:** doble clic en `web/iniciar.bat` (abre el navegador solo) o en `web/iniciar-red-local.bat` para usarla también desde el TV o el celular de tu red (muestra la dirección a usar). Deja la ventana negra abierta mientras usas la app.
 
 ```bash
 cd web

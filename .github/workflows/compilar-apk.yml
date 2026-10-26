@@ -103,12 +103,15 @@ jobs:
             cp $d/app-$f-x86_64-release.apk dist/$p-x86_64.apk
             cp $d/app-$f-universal-release.apk dist/$p-universal.apk
           done
+          # Versión portable para Windows (descomprimir y abrir; trae Node.js y ffmpeg)
+          bash "$GITHUB_WORKSPACE/web/windows/empaquetar.sh" dist
           firma=$([ "$SIGNED" = "fija" ] && echo "Firma fija: se actualiza encima sin perder listas ni ajustes." || echo "⚠️ Firma de prueba: desinstala la versión anterior antes de instalar.")
           {
             echo "**Vibe IPTV 0.1.$N** · $firma"
             echo
             echo "📺 TV / Fire TV / TV Box: \`vibe-iptv-armv7.apk\` · Downloader: **9370754**"
             echo "📱 Celular / Phone: \`vibe-iptv-arm64.apk\` · Si no sabes / Not sure: \`vibe-iptv-universal.apk\`"
+            echo "💻 Windows (portable, sin instalar nada): \`vibe-iptv-windows.zip\` → descomprimir y abrir *Abrir Vibe IPTV.bat*"
             echo "✨ Con subtítulos IA sin internet (modelo de voz en español incluido, +40 MB) / With offline AI subtitles: \`vibe-iptv-ia-armv7.apk\` (TV) · \`vibe-iptv-ia-arm64.apk\` (celular)"
             echo
             echo "### Cambios / Changes"
@@ -116,10 +119,10 @@ jobs:
             git log --no-merges --pretty='- %s' ${prev:+$prev..}HEAD | grep -v -i 'registro\|build-logs' | head -25
           } > notes.md
           # Versión numerada (historial) …
-          gh release create "v0.1.$N" dist/*.apk --prerelease --target "$GITHUB_SHA" --title "Vibe IPTV 0.1.$N" --notes-file notes.md
+          gh release create "v0.1.$N" dist/*.apk dist/*.zip --prerelease --target "$GITHUB_SHA" --title "Vibe IPTV 0.1.$N" --notes-file notes.md
           # … y "prueba", siempre la última: a ella apuntan Downloader y los enlaces cortos
           gh release delete prueba --yes --cleanup-tag || true
-          gh release create prueba dist/*.apk --prerelease --target "$GITHUB_SHA" \
+          gh release create prueba dist/*.apk dist/*.zip --prerelease --target "$GITHUB_SHA" \
             --title "Vibe IPTV — última versión / latest (0.1.$N)" --notes-file notes.md
 
       - name: Mostrar errores / Show errors

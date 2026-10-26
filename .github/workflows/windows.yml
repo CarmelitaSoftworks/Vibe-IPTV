@@ -1,0 +1,29 @@
+# Versión portable para Windows (vibe-iptv-windows.zip) y la sube a la versión "prueba" y a la última numerada.
+# Las versiones nuevas ya la traen sola (compilar-apk.yml); esto sirve para agregarla o rehacerla sin compilar la APK.
+#   gh workflow run windows.yml --ref main
+name: Versión para Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Armar el zip portable
+        run: bash web/windows/empaquetar.sh dist
+      - name: Subir a las versiones
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload prueba dist/vibe-iptv-windows.zip --clobber
+          ultima=$(gh release list --exclude-drafts -L 30 --json tagName -q '[.[] | select(.tagName | startswith("v0.1."))][0].tagName')
+          if [ -n "$ultima" ]; then gh release upload "$ultima" dist/vibe-iptv-windows.zip --clobber; fi
+          echo "Subida a prueba y $ultima"
