@@ -9,24 +9,32 @@ import java.util.TimeZone
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
-class Epg(
+/** Índices para encontrar la guía de un canal; se arman una vez y se comparten entre copias de la misma guía. */
+internal class EpgIndex(byId: Map<String, List<Programme>>, nameToId: Map<String, String>) {
+    /** El id del XMLTV sin distinguir mayúsculas (muchas listas escriben "Canal13.cl" y la guía "canal13.cl"). */
+    val idLower: Map<String, String> by lazy { byId.keys.associateBy { it.lowercase() } }
+    /** Nombres "sueltos": sin país al principio ni HD / FHD / 4K al final ("CL: Canal 13 HD" = "Canal 13"). */
+    val looseToId: Map<String, String> by lazy {
+        val m = HashMap<String, String>()
+        nameToId.forEach { (k, v) -> m.putIfAbsent(Epg.loose(k), v) }
+        byId.keys.forEach { id -> m.putIfAbsent(Epg.loose(id.substringBeforeLast('.')), id) }
+        m
+    }
+}
+
+class Epg internal constructor(
     internal val byId: Map<String, List<Programme>>,
     internal val nameToId: Map<String, String>,
     /** Guía pedida canal por canal al proveedor (Xtream) para los que no salen en el XMLTV: id del elemento → programas. */
-    internal val extra: Map<String, List<Programme>> = emptyMap(),
+    internal val extra: Map<String, List<Programme>>,
+    private val index: EpgIndex,
 ) {
+    constructor(byId: Map<String, List<Programme>>, nameToId: Map<String, String>, extra: Map<String, List<Programme>> = emptyMap()) :
+        this(byId, nameToId, extra, EpgIndex(byId, nameToId))
 
     val channelCount: Int get() = byId.size + extra.size
-
-    /** El id del XMLTV sin distinguir mayúsculas (muchas listas escriben "Canal13.cl" y la guía "canal13.cl"). */
-    private val idLower: Map<String, String> by lazy { byId.keys.associateBy { it.lowercase() } }
-    /** Nombres "sueltos": sin país al principio ni HD / FHD / 4K al final ("CL: Canal 13 HD" = "Canal 13"). */
-    private val looseToId: Map<String, String> by lazy {
-        val m = HashMap<String, String>()
-        nameToId.forEach { (k, v) -> m.putIfAbsent(loose(k), v) }
-        byId.keys.forEach { id -> m.putIfAbsent(loose(id.substringBeforeLast('.')), id) }
-        m
-    }
+    private val idLower get() = index.idLower
+    private val looseToId get() = index.looseToId
 
     fun listFor(item: Item): List<Programme> {
         extra[item.id]?.let { if (it.isNotEmpty()) return it }
@@ -79,7 +87,8 @@ class Epg(
     /** true si este canal ya tiene programación (para no pedirla de nuevo al proveedor). */
     fun has(item: Item) = listFor(item).isNotEmpty()
 
-    fun withExtra(itemId: String, list: List<Programme>) = Epg(byId, nameToId, extra + (itemId to list))
+    /** Agrega la guía de un canal sin volver a armar los índices (llegan de a una al recorrer la Guía). */
+    fun withExtra(itemId: String, list: List<Programme>) = Epg(byId, nameToId, extra + (itemId to list), index)
 
     fun nowNext(item: Item, now: Long = System.currentTimeMillis()): Pair<Programme?, Programme?> {
         val list = listFor(item)
@@ -125,14 +134,22 @@ class Epg(
         fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
         /** Para buscar: sin tildes, en minúsculas y con espacios en vez de signos. */
         fun fold(s: String): String = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
-            .replace(Regex("\\p{Mn}+"), "").lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
+            .replace(DIACRITICS, "").lowercase().replace(NOT_WORD, " ").trim()
 
         private val QUALITY = Regex("(uhd|fhd|hd|sd|4k|8k|hevc|h265|h264|1080p?|720p?|2160p?|backup|bkp)+$")
+        /** Prefijo de país: "CL:", "|AR|", "[MX]", "ES -". Sólo códigos de país reales (no "HBO |" ni "TNT -"). */
+        private val COUNTRY = Regex("^\\W*([A-Za-z]{2,3})\\W*?\\s*[:|\\]\\-]+\\s*")
+        private val COUNTRIES: Set<String> by lazy {
+            java.util.Locale.getISOCountries().toHashSet().apply { remove("TV"); addAll(listOf("UK", "USA", "LAT", "LATAM", "LA", "EU")) }
+        }
+        private val DIACRITICS = Regex("\\p{Mn}+")
+        private val NOT_WORD = Regex("[^\\p{L}\\p{N}]+")
         /** Nombre normalizado sin calidad al final. Recibe un nombre ya pasado por [norm] o uno original. */
         fun loose(s: String): String {
             // País al principio: "CL: Canal 13", "|AR| TN", "MX - Azteca" (se mira el original, antes de quitar signos)
             val raw = s.trim()
-            val noCountry = Regex("^\\W*[A-Za-z]{2,3}\\s*[:|\\]\\-]+\\s*").replace(raw, "").ifBlank { raw }
+            val m = COUNTRY.find(raw)
+            val noCountry = if (m != null && m.groupValues[1].uppercase() in COUNTRIES) raw.substring(m.range.last + 1).ifBlank { raw } else raw
             var n = norm(noCountry)
             repeat(2) { n = QUALITY.replace(n, "") }
             return n.ifBlank { norm(raw) }

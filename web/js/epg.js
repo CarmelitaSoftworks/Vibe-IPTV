@@ -25,11 +25,15 @@ export function parseXmltvTime(t) {
 const attr = (s, name) => (new RegExp(`${name}\\s*=\\s*"([^"]*)"`).exec(s) || [])[1] || '';
 // Sin tildes ni signos: "Señal Uno" = "senal uno" (antes se borraban las letras con tilde y no calzaban)
 const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const COUNTRIES = new Set(('AR BO BR CA CL CO CR CU DE DO EC ES FR GB GT HN IT MX NI PA PE PR PT PY SV US UY VE ' +
+  'UK USA LAT LATAM EU').split(' '));
 const QUALITY = /(uhd|fhd|hd|sd|4k|8k|hevc|h265|h264|1080p?|720p?|2160p?|backup|bkp)+$/;
 /** Nombre "suelto": sin país al principio ("CL: ", "|AR| ") ni calidad al final ("HD", "4K"). */
 export function loose(s) {
   const raw = String(s || '').trim();
-  const noCountry = raw.replace(/^\W*[A-Za-z]{2,3}\s*[:|\]\-]+\s*/, '') || raw;
+  // Sólo códigos de país reales: "CL: Canal 13" sí, "HBO | Family" o "TNT - Series" no
+  const m = /^\W*([A-Za-z]{2,3})\W*?\s*[:|\]\-]+\s*/.exec(raw);
+  const noCountry = (m && COUNTRIES.has(m[1].toUpperCase()) ? raw.slice(m[0].length) : raw) || raw;
   let n = norm(noCountry);
   for (let i = 0; i < 2; i++) n = n.replace(QUALITY, '');
   return n || norm(raw);

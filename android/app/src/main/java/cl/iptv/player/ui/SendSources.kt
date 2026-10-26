@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -91,7 +92,10 @@ fun SendSourcesSheet(vm: AppViewModel, onDismiss: () -> Unit) {
 /** En la TV: el código que hay que escribir en el celular. */
 @Composable
 fun PairCodeOverlay(code: String, from: String, onCancel: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color(0xB3000000)), contentAlignment = Alignment.Center) {
+    // Ventana propia: el control remoto queda en ella (▲▼ y OK no tocan lo de atrás) y Atrás la cancela
+    val cancel = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(120); runCatching { cancel.requestFocus() } }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onCancel) {
         Column(
             Modifier.clip(RoundedCornerShape(22.dp)).background(Color(0xFF1B2126)).padding(horizontal = 40.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -102,7 +106,7 @@ fun PairCodeOverlay(code: String, from: String, onCancel: () -> Unit) {
             Spacer(Modifier.height(14.dp))
             Text(code.toCharArray().joinToString(" "), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 56.sp)
             Spacer(Modifier.height(16.dp))
-            ActionButton("Cancelar", ghost = true, onClick = onCancel)
+            ActionButton("Cancelar", Modifier.focusRequester(cancel), ghost = true, onClick = onCancel)
         }
     }
 }

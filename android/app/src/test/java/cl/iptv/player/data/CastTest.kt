@@ -52,6 +52,9 @@ class CastTest {
             assertNull(shown)                                                // el código desaparece de la TV
             // El mismo código no sirve dos veces
             assertTrue(runCatching { Cast.sendSources(tv, code, listOf(xt)) }.isFailure)
+            // Nadie puede pedir códigos sin parar: como mucho 5 cada 10 minutos
+            repeat(4) { Cast.pair(tv) }
+            assertTrue(runCatching { Cast.pair(tv) }.isFailure)
         } finally { rx.stop() }
     }
 }

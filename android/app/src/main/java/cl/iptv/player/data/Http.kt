@@ -83,7 +83,10 @@ object Http {
      */
     suspend fun downloadIfChanged(url: String, dest: java.io.File, ua: String = DEFAULT_UA, attempts: Int = 3): Boolean = withContext(Dispatchers.IO) {
         val meta = java.io.File(dest.parentFile, dest.name + ".meta")
-        val (etag, modified) = if (dest.exists() && meta.exists()) runCatching { meta.readLines().let { it.getOrElse(0) { "" } to it.getOrElse(1) { "" } } }.getOrDefault("" to "") else "" to ""
+        // Las marcas sólo valen para la misma dirección (si cambió la URL de la guía, se baja completa)
+        val (etag, modified) = if (dest.exists() && meta.exists()) runCatching {
+            meta.readLines().let { if (it.getOrElse(2) { "" } == url) it.getOrElse(0) { "" } to it.getOrElse(1) { "" } else "" to "" }
+        }.getOrDefault("" to "") else "" to ""
         var last: Exception? = null
         for (i in 1..attempts) {
             try {
@@ -98,7 +101,7 @@ object Http {
                     tmp.outputStream().use { out -> body.byteStream().use { it.copyTo(out) } }
                     if (tmp.length() == 0L) { tmp.delete(); throw IOException("Respuesta vacía") }
                     if (!tmp.renameTo(dest)) { tmp.copyTo(dest, overwrite = true); tmp.delete() }
-                    runCatching { meta.writeText("${r.header("ETag").orEmpty()}\n${r.header("Last-Modified").orEmpty()}") }
+                    runCatching { meta.writeText("${r.header("ETag").orEmpty()}\n${r.header("Last-Modified").orEmpty()}\n$url") }
                 }
                 return@withContext true
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }

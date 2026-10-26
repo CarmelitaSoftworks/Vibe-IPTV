@@ -19,12 +19,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import kotlinx.coroutines.delay
 
 @Composable
 fun App(vm: AppViewModel) {
     var splash by rememberSaveable { mutableStateOf(true) }
-    Box(Modifier.fillMaxSize()) {
+    // Tamaño de la pantalla de la app (para dejar el mini reproductor en la esquina más cercana)
+    var rootSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    Box(Modifier.fillMaxSize().onSizeChanged { rootSize = it }) {
         // Mini reproductor: Atrás en la raíz del menú vuelve a pantalla completa
         // (va antes que los BackHandler del menú: ésos tienen prioridad cuando están activos)
         BackHandler(enabled = vm.mini && vm.multiview == null) { vm.expandMini() }
@@ -63,21 +68,21 @@ fun App(vm: AppViewModel) {
                 "bl" -> Alignment.BottomStart; "tr" -> Alignment.TopEnd; "tl" -> Alignment.TopStart; else -> Alignment.BottomEnd
             }
             var drag by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-            val density = androidx.compose.ui.platform.LocalDensity.current
+            // Centro de la ventanita en la pantalla (ya con el arrastre): se mide, así sirve igual al girar el teléfono
+            var miniCenter by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
             Box(
                 if (vm.mini) Modifier.align(corner).systemBarsPadding().padding(16.dp)
                     .offset { androidx.compose.ui.unit.IntOffset(drag.x.toInt(), drag.y.toInt()) }
                     .width(miniW).aspectRatio(16f / 9f)
-                    .pointerInput(vm.settings.miniCorner, vm.settings.miniSize) {
+                    .onGloballyPositioned { lc ->
+                        val p = lc.positionInRoot()
+                        miniCenter = androidx.compose.ui.geometry.Offset(p.x + lc.size.width / 2f, p.y + lc.size.height / 2f)
+                    }
+                    .pointerInput(Unit) {
                         detectDragGestures(
                             onDragEnd = {
                                 // Soltar: a la esquina más cercana según dónde quedó el centro de la ventanita
-                                val w = cfg.screenWidthDp * density.density; val h = cfg.screenHeightDp * density.density
-                                val left = corner == Alignment.BottomStart || corner == Alignment.TopStart
-                                val top = corner == Alignment.TopEnd || corner == Alignment.TopStart
-                                val cx = (if (left) size.width / 2f else w - size.width / 2f) + drag.x
-                                val cy = (if (top) size.height / 2f else h - size.height / 2f) + drag.y
-                                val c = (if (cy < h / 2) "t" else "b") + (if (cx < w / 2) "l" else "r")
+                                val c = (if (miniCenter.y < rootSize.height / 2f) "t" else "b") + (if (miniCenter.x < rootSize.width / 2f) "l" else "r")
                                 drag = androidx.compose.ui.geometry.Offset.Zero
                                 if (c != vm.settings.miniCorner) vm.updateSettings(vm.settings.copy(miniCorner = c))
                             },

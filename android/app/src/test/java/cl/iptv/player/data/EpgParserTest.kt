@@ -85,4 +85,11 @@ class EpgParserTest {
         assertEquals("Noticiero", epg.search(ch, "NOTICIERO", from = 0, now = now).first().second.title)
         assertEquals(0, epg.search(ch, "x", from = 0, now = now).size)
     }
+
+    @Test fun marcasNoSeConfundenConPais() {
+        assertEquals("hbofamily", Epg.loose("HBO | Family"))
+        assertEquals("tntseries", Epg.loose("TNT - Series"))
+        assertEquals("canal13", Epg.loose("CL: Canal 13 HD"))
+        assertEquals("tn", Epg.loose("|AR| TN"))
+    }
 }

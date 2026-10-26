@@ -75,6 +75,7 @@ object Cast {
     fun pair(t: Target) {
         val body = JSONObject().put("from", Build.MODEL ?: "Celular").toString().toRequestBody("application/json".toMediaType())
         client().newCall(Request.Builder().url("${base(t)}/pair").post(body).build()).execute().use { r ->
+            if (r.code == 429) error("La TV no acepta más códigos por ahora: espera un par de minutos")
             if (!r.isSuccessful) error(if (r.code == 403) "La TV tiene apagado \"Recibir videos desde el celular\"" else "La TV respondió ${r.code}")
         }
     }
@@ -109,6 +110,11 @@ class CastReceiver(
     private var codeUntil = 0L
     private var codeFrom = ""
     private var tries = 0
+    /** Quién pidió el código: sólo ese equipo puede usarlo. */
+    private var codeAddr: java.net.InetAddress? = null
+    /** Pedidos de código recientes (para que nadie pueda probar códigos sin parar) y bloqueo tras fallar. */
+    private val pairTimes = ArrayDeque<Long>()
+    private var lockedUntil = 0L
     private var server: ServerSocket? = null
     private var reg: NsdManager.RegistrationListener? = null
     private val main = Handler(Looper.getMainLooper())
@@ -165,12 +171,22 @@ class CastReceiver(
             parts.size >= 2 && parts[0] == "GET" && parts[1] == "/hola" -> reply(200, name)
             parts.size >= 2 && parts[0] == "POST" && parts[1] == "/pair" && length in 0..4_096 -> {
                 val o = readJson(input, length)
+                val now = System.currentTimeMillis()
+                // Límites: un código a la vez (otro equipo no puede reemplazarlo), como mucho 5 códigos cada 10 minutos
+                // y 2 minutos de bloqueo después de 3 intentos fallidos. Así adivinar el código tomaría días.
                 val c = synchronized(this) {
-                    code = (1000 + java.security.SecureRandom().nextInt(9000)).toString()
-                    codeUntil = System.currentTimeMillis() + 180_000; tries = 0
-                    codeFrom = o?.optString("from")?.take(60).orEmpty().ifBlank { "otro equipo" }
-                    code!!
+                    while (pairTimes.isNotEmpty() && now - pairTimes.first() > 600_000) pairTimes.removeFirst()
+                    val busyOther = code != null && now < codeUntil && codeAddr != sock.inetAddress
+                    if (now < lockedUntil || pairTimes.size >= 5 || busyOther) null
+                    else {
+                        pairTimes.addLast(now)
+                        code = (1000 + java.security.SecureRandom().nextInt(9000)).toString()
+                        codeUntil = now + 180_000; tries = 0; codeAddr = sock.inetAddress
+                        codeFrom = o?.optString("from")?.take(60).orEmpty().ifBlank { "otro equipo" }
+                        code!!
+                    }
                 }
+                if (c == null) { reply(429, "Espera un momento antes de pedir otro código"); return@use }
                 main.post { onPairCode(c, codeFrom) }
                 main.postDelayed({ synchronized(this) { if (code == c) { code = null; onPairCode(null, "") } } }, 180_000)
                 reply(200, "ok")
@@ -178,8 +194,8 @@ class CastReceiver(
             parts.size >= 2 && parts[0] == "POST" && parts[1] == "/sources" && length in 1..262_144 -> {
                 val o = readJson(input, length)
                 val ok = synchronized(this) {
-                    val valid = code != null && System.currentTimeMillis() < codeUntil && o?.optString("code") == code
-                    if (!valid && code != null && ++tries >= 3) code = null
+                    val valid = code != null && System.currentTimeMillis() < codeUntil && sock.inetAddress == codeAddr && o?.optString("code") == code
+                    if (!valid && code != null && ++tries >= 3) { code = null; lockedUntil = System.currentTimeMillis() + 120_000 }
                     if (valid) code = null
                     valid
                 }

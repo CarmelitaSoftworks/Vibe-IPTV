@@ -89,9 +89,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val parentalOn: Boolean get() = settings.parentalPin.isNotBlank()
     private fun applyParental() {
         // Perfil infantil: el contenido para adultos nunca se muestra
-        items = (if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems)
-            .let { l -> if (settings.hideDead && deadIds.isNotEmpty()) l.filterNot { it.id in deadIds } else l }
-        hiddenAdult = allItems.size - items.size
+        val noAdult = if ((parentalOn && !adultUnlocked) || profile.kid) allItems.filterNot { it.isAdult() } else allItems
+        hiddenAdult = allItems.size - noAdult.size                  // sólo lo de adultos (no los canales caídos ocultos)
+        items = if (settings.hideDead && deadIds.isNotEmpty()) noAdult.filterNot { it.id in deadIds } else noAdult
         if (category !in setOf(CAT_ALL, CAT_FAV, CAT_RESUME, CAT_RECENT) && items.none { it.cat == category }) { category = CAT_ALL; subcategory = "" }
         recompute(false)
     }
@@ -501,19 +501,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         scanJob = viewModelScope.launch {
             val failed = LinkedHashSet<Item>()
-            suspend fun waitIdle() { while (screen == Screen.PLAYER || multiview != null) { scanStatus = "En pausa mientras ves un canal…"; kotlinx.coroutines.delay(3_000) } }
+            fun watching() = screen == Screen.PLAYER || multiview != null
+            suspend fun waitIdle() { while (watching()) { scanStatus = "En pausa mientras ves un canal…"; kotlinx.coroutines.delay(3_000) } }
+            // Si empiezas a ver algo en plena prueba, se corta esa conexión al tiro (muchas cuentas admiten una sola)
+            // y el canal se vuelve a probar después
+            suspend fun probe(ch: Item): Boolean {
+                while (true) {
+                    waitIdle()
+                    val r = kotlinx.coroutines.coroutineScope {
+                        val d = async { ChannelCheck.alive(ch) }
+                        while (d.isActive) { if (watching()) { d.cancel(); return@coroutineScope null }; kotlinx.coroutines.delay(150) }
+                        d.await()
+                    }
+                    if (r != null) return r
+                }
+            }
             live.forEachIndexed { i, ch ->
-                waitIdle()
                 scanStatus = "Revisando ${i + 1} de ${live.size} · ${failed.size} sin señal"
-                if (!ChannelCheck.alive(ch)) failed += ch
+                if (!probe(ch)) failed += ch
                 kotlinx.coroutines.delay(250)
             }
             // Segunda oportunidad para los que fallaron (un corte momentáneo no lo marca como caído)
             val dead = HashSet<String>()
             failed.forEachIndexed { i, ch ->
-                waitIdle()
                 scanStatus = "Confirmando ${i + 1} de ${failed.size}…"
-                if (!ChannelCheck.alive(ch)) dead += ch.id
+                if (!probe(ch)) dead += ch.id
                 kotlinx.coroutines.delay(500)
             }
             // Mismo enlace en varias categorías: todos los elementos con esa dirección

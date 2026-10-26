@@ -119,3 +119,9 @@ test('buscar en la guía: palabras sin tildes, título antes que descripción y 
   assert.deepEqual(r.map(([, p]) => p.title), ['Central', 'Colo-Colo vs. Universidad']);
   assert.equal(searchGuide(epg, [{ name: 'Noticias', url: 'b' }], 'pelicula', 0, now)[0][1].title, 'Película');
 });
+
+test('guía: marcas con "|" o "-" no se confunden con un país', async () => {
+  const { loose } = await import('../js/epg.js');
+  assert.equal(loose('HBO | Family'), 'hbofamily');
+  assert.equal(loose('CL: Canal 13 HD'), 'canal13');
+});
