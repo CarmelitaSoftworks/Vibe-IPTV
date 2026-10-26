@@ -702,6 +702,83 @@ body.no-anim .tile:focus, body.no-anim .tile:hover { transform: none; }
 }
 
 
+/* ===== Tema "Pulso" (estilo consola, azul): fondo azul profundo, mosaicos redondeados con brillo al enfocar,
+   pestañas de texto y botones de esquinas redondeadas. Diseño propio, sin recursos de ninguna marca. ===== */
+:root[data-app-theme="pulse"] {
+  color-scheme: dark;
+  --bg: #0a1a3f; --bg-lines: transparent; --tile-a: rgba(255,255,255,.14); --tile-b: rgba(255,255,255,.07); --tile-edge: rgba(255,255,255,.12);
+  --tile-empty-a: rgba(255,255,255,.05); --tile-empty-b: rgba(255,255,255,.02); --ink: #fff; --ink-soft: #c9d6f2;
+  --accent: #3f7ff0; --accent-deep: #8fb2ff; --focus: #fff; --dock: rgba(4,10,22,.55); --dock-line: rgba(143,178,255,.5);
+  --sheet: #0f1b33; --tile-lines: transparent; --tile-hi: rgba(255,255,255,.08); --row-hover: rgba(255,255,255,.07); --radius: 16px;
+}
+:root[data-app-theme="pulse"] body, :root[data-app-theme="pulse"] .welcome, :root[data-app-theme="pulse"] .settings, :root[data-app-theme="pulse"] .splash {
+  background: radial-gradient(ellipse at 75% 0%, rgba(75,111,190,.55) 0%, transparent 55%), linear-gradient(180deg, #0a1a3f 0%, #02050d 100%);
+}
+:root[data-app-theme="pulse"] .tab, :root[data-app-theme="pulse"] .tabs .pill { background: none; border-color: transparent; color: rgba(255,255,255,.55); }
+:root[data-app-theme="pulse"] .tabs .pill.active { background: none; color: #fff; font-weight: 800; border-color: transparent; }
+:root[data-app-theme="pulse"] .pill { border-radius: 10px; }
+:root[data-app-theme="pulse"] .tile:not(.empty-slot):hover, :root[data-app-theme="pulse"] .tile:focus-visible, :root[data-app-theme="pulse"] .tile:focus {
+  transform: scale(1.08); box-shadow: 0 0 0 3px #fff, 0 0 28px rgba(110,150,255,.75), 0 10px 22px rgba(0,0,0,.45);
+}
+:root[data-app-theme="pulse"] .focus-info { font-size: clamp(1rem, 2vw, 1.6rem); }
+:root[data-app-theme="pulse"] .round-btn { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.35); color: #fff; box-shadow: none; }
+:root[data-app-theme="pulse"] .dock-title { color: #fff; }
+
+/* ===== Tema "Horizonte" (estilo consola, verde): gris carbón, mosaicos de esquinas casi rectas y borde blanco
+   grueso al enfocar, pestañas como botones. Diseño propio. ===== */
+:root[data-app-theme="horizon"] {
+  color-scheme: dark;
+  --bg: #1c1f22; --bg-lines: transparent; --tile-a: #2a2e33; --tile-b: #24282c; --tile-edge: transparent;
+  --tile-empty-a: rgba(255,255,255,.04); --tile-empty-b: rgba(255,255,255,.02); --ink: #f2f4f5; --ink-soft: #a9b0b6;
+  --accent: #3baa4a; --accent-deep: #8ce3a0; --focus: #fff; --dock: rgba(20,23,26,.85); --dock-line: #3baa4a;
+  --sheet: #1b1f22; --tile-lines: transparent; --tile-hi: transparent; --row-hover: rgba(255,255,255,.06); --radius: 6px;
+}
+:root[data-app-theme="horizon"] body, :root[data-app-theme="horizon"] .welcome, :root[data-app-theme="horizon"] .settings, :root[data-app-theme="horizon"] .splash {
+  background: radial-gradient(ellipse at 50% 30%, #1c1f22 0%, #0d0e10 100%);
+}
+:root[data-app-theme="horizon"] .pill, :root[data-app-theme="horizon"] .chip { border-radius: 6px; }
+:root[data-app-theme="horizon"] .tabs .pill { background: none; border-color: transparent; }
+:root[data-app-theme="horizon"] .tabs .pill.active { background: rgba(255,255,255,.16); color: #fff; border-color: transparent; }
+:root[data-app-theme="horizon"] .tile { box-shadow: none; }
+:root[data-app-theme="horizon"] .tile:not(.empty-slot):hover, :root[data-app-theme="horizon"] .tile:focus-visible, :root[data-app-theme="horizon"] .tile:focus {
+  transform: scale(1.04); box-shadow: 0 0 0 4px #fff, 0 10px 24px rgba(0,0,0,.6);
+}
+:root[data-app-theme="horizon"] .round-btn { border-radius: 6px; background: #2a2e33; border-color: transparent; color: #3baa4a; box-shadow: none; }
+:root[data-app-theme="horizon"] .round-btn:focus-visible, :root[data-app-theme="horizon"] .round-btn:hover { box-shadow: 0 0 0 4px #fff; }
+
+/* ===== Tema "Escritorio" (escritorio de principios de los 2000): cielo y colina propios de fondo, la zona de
+   contenido como una ventana color crema con marco azul, y la barra de abajo como barra de tareas. Diseño propio. ===== */
+:root[data-app-theme="desk"] {
+  --bg: #2b66d6; --bg-lines: transparent; --tile-a: #fff; --tile-b: #f4f3ee; --tile-edge: #aca899;
+  --tile-empty-a: #f4f3ee; --tile-empty-b: #ece9d8; --ink: #1b1b1b; --ink-soft: #55585c;
+  --accent: #316ac5; --accent-deep: #1c4fa8; --focus: #316ac5; --dock: #245edb; --dock-line: #3d95ff;
+  --sheet: #fff; --tile-lines: transparent; --tile-hi: transparent; --row-hover: rgba(49,106,197,.12); --radius: 4px;
+}
+:root[data-app-theme="desk"] body, :root[data-app-theme="desk"] .welcome, :root[data-app-theme="desk"] .settings, :root[data-app-theme="desk"] .splash {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 600' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2363b83d'/%3E%3Cstop offset='1' stop-color='%232e7d1e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 400 C280 315 580 335 1000 420 L1000 600 L0 600 Z' fill='url(%23g)'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat,
+    linear-gradient(180deg, #2f6fd8 0%, #6fa8ee 55%, #bfdcf5 75%);
+}
+:root[data-app-theme="desk"] .stage {
+  background: #fff; margin: 0 clamp(8px, 2vw, 24px); border: 4px solid #0054e3; border-top-width: 30px; border-radius: 9px 9px 0 0;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+}
+:root[data-app-theme="desk"] .topbar .pill { border-radius: 3px; background: linear-gradient(#fff, #ece9d8); border-color: #aca899; color: #000; }
+:root[data-app-theme="desk"] .topbar .pill.active { background: #316ac5; color: #fff; border-color: #1c4fa8; }
+:root[data-app-theme="desk"] .tile { box-shadow: none; border-color: transparent; }
+:root[data-app-theme="desk"] .tile:not(.empty-slot):hover, :root[data-app-theme="desk"] .tile:focus-visible, :root[data-app-theme="desk"] .tile:focus {
+  transform: none; background: rgba(49,106,197,.18); box-shadow: 0 0 0 1px #316ac5;
+}
+:root[data-app-theme="desk"] .tile:focus .label { background: #316ac5; color: #fff; }
+:root[data-app-theme="desk"] .focus-info { color: #fff; text-shadow: 1px 1px 2px #000; }
+:root[data-app-theme="desk"] .dock { background: linear-gradient(180deg, #3168d5, #4993e6 10%, #2157d7 30%, #1941a5); }
+:root[data-app-theme="desk"] .dock-shape { display: none; }
+:root[data-app-theme="desk"] .dock-title, :root[data-app-theme="desk"] .dock-clock { color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,.4); }
+:root[data-app-theme="desk"] .round-btn { border-radius: 0 18px 18px 0; aspect-ratio: auto; height: 56%; width: clamp(90px, 12vw, 150px);
+  background: linear-gradient(180deg, #3c9a3c, #5dc15d 15%, #3c9a3c 50%, #2f7f2f); border: none; color: #fff; box-shadow: none; }
+:root[data-app-theme="desk"] .round-btn.right { border-radius: 4px; background: linear-gradient(180deg, #0c59b9, #139ee9 15%, #1290e8 80%, #0d61c7); }
+:root[data-app-theme="desk"] .round-btn:focus-visible, :root[data-app-theme="desk"] .round-btn:hover { box-shadow: 0 0 0 3px #ffd25a; transform: none; }
+
 /* ===== iPhone y iPad ===== */
 /* Los controles respetan la muesca y la barra de inicio (también en horizontal, donde la muesca queda a un lado),
    los botones tienen tamaño de dedo y se ocultan los que iOS no permite: el volumen lo manejan los botones del
