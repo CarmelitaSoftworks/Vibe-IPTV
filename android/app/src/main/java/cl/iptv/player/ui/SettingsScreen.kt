@@ -128,6 +128,9 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Choice("Tamaño del texto", options = listOf("small" to "Pequeño", "normal" to "Normal", "large" to "Grande", "xlarge" to "Muy grande"), get = { it.subSize }, set = { s, v -> s.copy(subSize = v) }),
             Row.TextField("Idiomas preferidos", "Códigos separados por coma, ej: es,en", get = { it.subLangs }, set = { s, v -> s.copy(subLangs = v.ifBlank { "es,en" }) }),
             Row.Info("Fuentes", "OpenSubtitles · SubDL · Podnapisi"),
+            Row.Choice("Subtítulos con IA", "Se generan en el equipo y sin internet a partir del audio del canal (con el motor ExoPlayer). Quedan activados en todos los canales hasta que los apagues",
+                listOf("" to "Desactivados", "es" to "Audio en español", "en" to "Audio en inglés", "pt" to "Audio en portugués"),
+                get = { it.aiSubsLang }, set = { s, v -> s.copy(aiSubsLang = v) }),
             Row.Toggle("Subtítulos automáticos", "En películas y series, si el audio no está en tu idioma: usa la pista interna o busca y carga uno solo (sin clave ni cuenta)",
                 get = { it.autoSubs }, set = { s, v -> s.copy(autoSubs = v) }),
             Row.TextField("API key de SubDL", "Gratis en subdl.com: mucho catálogo en español latino", secret = true, get = { it.subdlKey }, set = { s, v -> s.copy(subdlKey = v) }),
@@ -189,7 +192,7 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
             Row.Info("Reproducción", "ExoPlayer · VLC · MPV"),
             Row.Info("Guía", "XMLTV (compatible con iptv-org/epg)"),
             Row.Info("Subtítulos", "OpenSubtitles · SubDL · Podnapisi"),
-            Row.Info("Subtítulos con IA", "Vosk · Whisper (whisper.cpp)"),
+            Row.Info("Subtítulos con IA", "Vosk"),
             Row.Info("Créditos completos", "github.com/CarmelitaSoftworks/Vibe-IPTV · CREDITOS.md"),
         )),
     )

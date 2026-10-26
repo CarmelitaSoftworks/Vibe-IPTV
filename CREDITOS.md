@@ -37,9 +37,6 @@ También existe gracias a estos proyectos y servicios:
 |---|---|---|
 | [Vosk (Alpha Cephei)](https://alphacephei.com/vosk) | Subtítulos con IA sin internet | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 | [JNA](https://github.com/java-native-access/jna) | Puente nativo que usa Vosk | ![LGPL 2.1 / Apache 2.0](https://img.shields.io/badge/licencia-LGPL%202.1%20%2F%20Apache%202.0-8250df) |
-| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Subtítulos Whisper (versión de prueba) | ![MIT](https://img.shields.io/badge/licencia-MIT-2ea44f) |
-| [ggml](https://github.com/ggml-org/ggml) | Cálculo del modelo en el procesador | ![MIT](https://img.shields.io/badge/licencia-MIT-2ea44f) |
-| [Modelo Whisper (OpenAI)](https://github.com/openai/whisper) | Modelo de voz "base", versión convertida de [whisper.cpp en Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) | ![MIT](https://img.shields.io/badge/licencia-MIT-2ea44f) |
 | [ML Kit (Google)](https://developers.google.com/ml-kit) | Leer datos desde una captura (Android) | ![términos de Google](https://img.shields.io/badge/licencia-t%C3%A9rminos%20de%20Google-6e7781) |
 | [Tesseract.js](https://github.com/naptha/tesseract.js) | Leer datos desde una captura (web) | ![Apache 2.0](https://img.shields.io/badge/licencia-Apache%202.0-1f6feb) |
 | [OpenSubtitles · SubDL · Podnapisi](https://www.opensubtitles.org) | Búsqueda de subtítulos en línea | ![servicios en línea](https://img.shields.io/badge/licencia-servicios%20en%20l%C3%ADnea-6e7781) |

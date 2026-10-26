@@ -85,6 +85,9 @@ object VoskModels {
  * Subtítulos generados en vivo: toma el audio que ya decodificó ExoPlayer (sin grabar nada ni usar el micrófono),
  * lo pasa a 16 kHz mono y lo reconoce con Vosk en un hilo aparte. Todo queda en el equipo.
  *
+ * Antes de reconocerlo, el audio pasa por un filtro de voz (se quitan los graves de la música y los efectos, y lo
+ * muy agudo) y por un control de volumen automático: el modelo pequeño de Vosk reconoce bastante mejor así.
+ *
  * Para que vaya a la par del video aunque el equipo sea lento: el audio se entrega a Vosk en trozos de 0,2 s,
  * el texto parcial se pide como mucho 4 veces por segundo y, si el reconocimiento se atrasa más de 3 s,
  * se descarta lo más antiguo y se reinicia (antes se acumulaba y los subtítulos quedaban muy atrasados o sin sentido).
@@ -177,10 +180,12 @@ class LiveCaptioner {
                     var partialAt = 0L
                     var shown = ""
                     var gain = 1f
+                    val voice = VoiceFilter()
                     while (enabled && gen == generation) {
                         val a = queue.poll(400, TimeUnit.MILLISECONDS) ?: continue
                         queued.addAndGet(-a.size)
-                        if (resetPending) { resetPending = false; rec.reset(); shown = ""; post(gen) { partial = "" } }
+                        if (resetPending) { resetPending = false; rec.reset(); voice.reset(); shown = ""; post(gen) { partial = "" } }
+                        voice.process(a)
                         gain = normalize(a, gain)
                         if (rec.acceptWaveForm(a, a.size)) {
                             val t = clean(JSONObject(rec.result).optString("text"))
@@ -266,6 +271,44 @@ class LiveCaptioner {
         @Synchronized private fun cachedModel(dir: File): org.vosk.Model {
             if (model == null || modelPath != dir.absolutePath) { model?.close(); model = org.vosk.Model(dir.absolutePath); modelPath = dir.absolutePath }
             return model!!
+        }
+    }
+}
+
+/**
+ * Filtro de voz para el reconocimiento: deja pasar de ~120 Hz a ~3,8 kHz (donde está la voz hablada) y atenúa
+ * los graves de la música y los efectos, que en el audio de TV tapan los diálogos. Dos filtros sencillos en serie
+ * (pasa altos y pasa bajos), a 16 kHz; guardan su estado entre trozos para no producir chasquidos.
+ */
+internal class VoiceFilter {
+    private class Biquad(val b0: Double, val b1: Double, val b2: Double, val a1: Double, val a2: Double) {
+        var x1 = 0.0; var x2 = 0.0; var y1 = 0.0; var y2 = 0.0
+        fun step(x: Double): Double {
+            val y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            x2 = x1; x1 = x; y2 = y1; y1 = y
+            return y
+        }
+        fun reset() { x1 = 0.0; x2 = 0.0; y1 = 0.0; y2 = 0.0 }
+    }
+
+    private val high = biquad(120.0, highPass = true)
+    private val low = biquad(3_800.0, highPass = false)
+
+    fun process(a: ShortArray) {
+        for (i in a.indices) a[i] = low.step(high.step(a[i].toDouble())).toInt().coerceIn(-32768, 32767).toShort()
+    }
+
+    fun reset() { high.reset(); low.reset() }
+
+    private companion object {
+        /** Coeficientes de un filtro Butterworth de 2.º orden (fórmulas de R. Bristow-Johnson) a 16 kHz. */
+        fun biquad(freq: Double, highPass: Boolean): Biquad {
+            val w = 2 * Math.PI * freq / 16_000.0
+            val cos = kotlin.math.cos(w); val alpha = kotlin.math.sin(w) / (2 * kotlin.math.sqrt(0.5))
+            val a0 = 1 + alpha
+            val b0 = if (highPass) (1 + cos) / 2 else (1 - cos) / 2
+            val b1 = if (highPass) -(1 + cos) else 1 - cos
+            return Biquad(b0 / a0, b1 / a0, b0 / a0, -2 * cos / a0, (1 - alpha) / a0)
         }
     }
 }

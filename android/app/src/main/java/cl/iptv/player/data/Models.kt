@@ -85,6 +85,8 @@ data class Settings(
     val liveCushion: Boolean = true,
     /** Modo túnel (Android TV): el video y el audio van directo al chip de la TV. Apagado por defecto: depende del equipo. */
     val tunneling: Boolean = false,
+    /** Subtítulos IA: idioma que quedó activado ("" = apagados). Se vuelven a encender solos al abrir el reproductor. */
+    val aiSubsLang: String = "",
     /** Buscar y cargar subtítulos solos en películas y series (fuentes sin clave: OpenSubtitles y Podnapisi). */
     val autoSubs: Boolean = true,
     /** Modo liviano para TV boxes modestos (Xiaomi Mi Box / Mi TV Stick): auto | on | off. */

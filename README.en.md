@@ -75,7 +75,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 
 ### 💬 Subtitles
 - Searches **several sources at once**: OpenSubtitles (the same database as VLC's **VLSub** extension), SubDL and Podnapisi.
-- **Offline AI subtitles** (Android): transcribes Spanish, English or Portuguese audio live with [Vosk](https://alphacephei.com/vosk) (open source). The **AI** build (`vibe-iptv-ia-*.apk`) includes the Spanish model; the regular one downloads it the first time (~40 MB).
+- **Offline AI subtitles** (Android): transcribes Spanish, English or Portuguese audio live with [Vosk](https://alphacephei.com/vosk) (open source). The **AI** build (`vibe-iptv-ia-*.apk`) includes the Spanish model; the regular one downloads it the first time (~40 MB). Voice filter and automatic volume to better understand TV audio, and they stay on for every channel until you turn them off.
 - **Automatic subtitles** (on by default): in movies and series, if the audio isn't in your language, it uses the built-in track or finds and loads one from OpenSubtitles and Podnapisi, **no key or account needed**.
 - **SubDL built in through its official API**: searches by IMDb ID, downloads just the episode from season packs, flags SDH subtitles and lets you **test your key** in Settings.
 - Opens `.zip` files, fixes the encoding of Spanish `.srt` files (Windows-1252), converts `.ass` and lets you **shift the subtitle earlier or later**.
@@ -266,7 +266,7 @@ It's a *vibe coded* project ([how it was made](CREDITS.md#made-with-vibe-coding)
 It exists thanks to these open-source projects and services:
 
 - **🎬 Playback:** ▶️ [ExoPlayer (Media3)](https://github.com/androidx/media) · 🔶 [LibVLC](https://code.videolan.org/videolan/vlc) · 🎞️ [mpv / libmpv](https://github.com/jarnedemeulemeester/libmpv-android) · 🧩 [FFmpeg](https://ffmpeg.org) · 🔊 [Jellyfin FFmpeg decoder](https://github.com/jellyfin/jellyfin-androidx-media) · 📼 [NextLib](https://github.com/anilbeesetti/nextlib) · 🌐 [hls.js](https://github.com/video-dev/hls.js) · 📡 [mpegts.js](https://github.com/xqq/mpegts.js)
-- **💬 Subtitles and AI:** 🎙️ [Vosk](https://alphacephei.com/vosk) · 🔗 [JNA](https://github.com/java-native-access/jna) · 🧠 [whisper.cpp](https://github.com/ggml-org/whisper.cpp) · ⚙️ [ggml](https://github.com/ggml-org/ggml) · 🗣️ [Whisper model (OpenAI)](https://github.com/openai/whisper) · 📷 [ML Kit](https://developers.google.com/ml-kit) · 🔍 [Tesseract.js](https://github.com/naptha/tesseract.js) · 📝 [OpenSubtitles](https://www.opensubtitles.org) · 📝 [SubDL](https://subdl.com) · 📝 [Podnapisi](https://www.podnapisi.net)
+- **💬 Subtitles and AI:** 🎙️ [Vosk](https://alphacephei.com/vosk) · 🔗 [JNA](https://github.com/java-native-access/jna) · 📷 [ML Kit](https://developers.google.com/ml-kit) · 🔍 [Tesseract.js](https://github.com/naptha/tesseract.js) · 📝 [OpenSubtitles](https://www.opensubtitles.org) · 📝 [SubDL](https://subdl.com) · 📝 [Podnapisi](https://www.podnapisi.net)
 - **📺 Guide and playlists:** 🗓️ [iptv-org/epg](https://github.com/iptv-org/epg) · 📥 [OkHttp](https://github.com/square/okhttp)
 - **🎨 Interface:** 🟣 [Kotlin](https://kotlinlang.org) · 🧱 [Jetpack Compose](https://developer.android.com/compose) · 🔄 [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) · 🖼️ [Coil](https://github.com/coil-kt/coil) · 💡 [OwnTV (design inspiration)](https://github.com/ahXN00/OwnTV)
 - **🧪 Testing:** 🤖 [Robolectric](https://github.com/robolectric/robolectric) · 📸 [Roborazzi](https://github.com/takahirom/roborazzi)

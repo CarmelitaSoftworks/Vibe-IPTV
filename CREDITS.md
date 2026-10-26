@@ -37,9 +37,6 @@ It also exists thanks to these projects and services:
 |---|---|---|
 | [Vosk (Alpha Cephei)](https://alphacephei.com/vosk) | Offline AI subtitles | ![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-1f6feb) |
 | [JNA](https://github.com/java-native-access/jna) | Native bridge used by Vosk | ![LGPL 2.1 / Apache 2.0](https://img.shields.io/badge/license-LGPL%202.1%20%2F%20Apache%202.0-8250df) |
-| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Whisper subtitles (test version) | ![MIT](https://img.shields.io/badge/license-MIT-2ea44f) |
-| [ggml](https://github.com/ggml-org/ggml) | Runs the model on the CPU | ![MIT](https://img.shields.io/badge/license-MIT-2ea44f) |
-| [Modelo Whisper (OpenAI)](https://github.com/openai/whisper) | "base" speech model, converted version from [whisper.cpp on Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) | ![MIT](https://img.shields.io/badge/license-MIT-2ea44f) |
 | [ML Kit (Google)](https://developers.google.com/ml-kit) | Read details from a screenshot (Android) | ![Google terms](https://img.shields.io/badge/license-Google%20terms-6e7781) |
 | [Tesseract.js](https://github.com/naptha/tesseract.js) | Read details from a screenshot (web) | ![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-1f6feb) |
 | [OpenSubtitles · SubDL · Podnapisi](https://www.opensubtitles.org) | Online subtitle search | ![online services](https://img.shields.io/badge/license-online%20services-6e7781) |
