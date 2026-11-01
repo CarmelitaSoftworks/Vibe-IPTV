@@ -18,6 +18,7 @@ Listas M3U/M3U8 · Xtream Codes · Guía XMLTV · Pensado para el control remoto
 ![Licencia](https://img.shields.io/badge/licencia-GPLv3-blue)
 ![Código abierto](https://img.shields.io/badge/c%C3%B3digo-abierto-brightgreen)
 ![Compilación](https://github.com/CarmelitaSoftworks/Vibe-IPTV/actions/workflows/compilar-apk.yml/badge.svg)
+[![Apoya en Ko-fi](https://img.shields.io/badge/Ko--fi-apoya%20el%20proyecto-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/carmelitasoftworks)
 
 </div>
 
@@ -257,6 +258,15 @@ docs/      Guía de uso e instalación en servidor propio (español e inglés)
 i18n/      Diccionario español → inglés compartido por la web y Android
 .github/   Compilación automática del APK
 ```
+
+---
+
+## ☕ Apoya el proyecto
+
+Vibe IPTV es gratis, sin anuncios y sin cuentas, y siempre lo será. Si te sirve y quieres apoyar su desarrollo,
+puedes invitar un café en **[Ko-fi](https://ko-fi.com/carmelitasoftworks)**. Es totalmente voluntario: la app es igual para todos.
+
+[![Apoya en Ko-fi](https://img.shields.io/badge/Ko--fi-invita%20un%20caf%C3%A9-ff5e5b?logo=kofi&logoColor=white&style=for-the-badge)](https://ko-fi.com/carmelitasoftworks)
 
 ---
 
