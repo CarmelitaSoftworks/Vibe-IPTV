@@ -414,6 +414,8 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .pick-backdrop { z-index: 31; }
 .pick-sheet { z-index: 32; }
 .pick-list { display: grid; gap: 6px; }
+.pick-notice p { margin: 0 0 8px; font-size: 14px; line-height: 1.45; opacity: .85; }
+.pick-notice { margin-bottom: 10px; }
 .pick-opt {
   display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
   border: 2px solid transparent; background: var(--bg); cursor: pointer; font-weight: 700; color: var(--ink); text-align: left;

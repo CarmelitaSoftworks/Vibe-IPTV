@@ -150,7 +150,10 @@ private fun sections(vm: AppViewModel, ctx: android.content.Context, isTv: Boole
                 listOf("br" to "Abajo a la derecha", "bl" to "Abajo a la izquierda", "tr" to "Arriba a la derecha", "tl" to "Arriba a la izquierda"),
                 get = { it.miniCorner }, set = { s, v -> s.copy(miniCorner = v) }),
             Row.Toggle("Reproducir torrents", "Para extensiones de Stremio y enlaces magnet. Ojo: mientras ves también compartes pedazos del video con otras personas, que ven tu dirección IP; que sea legal depende de lo que veas y de tu país. La subida va limitada y al cerrar el video se deja de compartir y se borra todo",
-                get = { it.torrents }, set = { s, v -> s.copy(torrents = v) }),
+                // Al activarlos primero se muestra el aviso, que hay que aceptar
+                get = { it.torrents }, set = { s, v -> if (v) { vm.showTorrentNotice = true; s } else s.copy(torrents = false) }),
+            Row.Toggle("Torrents: sólo con VPN", "No abre torrents si el internet de la app no va por una VPN, y los detiene al tiro si la VPN se corta. La VPN es otra app (Vibe IPTV no trae una)",
+                get = { it.torrentVpn }, set = { s, v -> s.copy(torrentVpn = v) }),
             Row.Choice("Torrents: subida máxima", "Cuánto compartes con otras personas mientras ves un torrent",
                 listOf("20" to "20 KB/s (mínimo)", "50" to "50 KB/s", "200" to "200 KB/s", "1000" to "1 MB/s"),
                 get = { it.torrentUploadKBps.toString() }, set = { s, v -> s.copy(torrentUploadKBps = v.toIntOrNull() ?: 50) }),

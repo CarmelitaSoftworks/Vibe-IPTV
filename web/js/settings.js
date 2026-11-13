@@ -62,6 +62,7 @@ function sections() {
       { type: 'choice', key: 'liveFormat', label: 'Formato de canales en vivo (Xtream)', options: [['m3u8', 'HLS (.m3u8) — recomendado'], ['ts', 'MPEG-TS (.ts)']] },
       { type: 'toggle', key: 'autoNext', label: 'Siguiente episodio automático' },
       { type: 'toggle', key: 'torrents', label: 'Reproducir torrents', desc: 'Para extensiones de Stremio y enlaces magnet. Ojo: mientras ves también compartes pedazos del video con otras personas, que ven tu dirección IP; que sea legal depende de lo que veas y de tu país. La subida va limitada y al cerrar el video se deja de compartir y se borra todo' },
+      { type: 'toggle', key: 'torrentVpn', label: 'Torrents: sólo con VPN', desc: 'No abre torrents si el internet del equipo no va por una VPN, y los detiene al tiro si la VPN se corta. La VPN es otro programa (Vibe IPTV no trae una)' },
       { type: 'choice', key: 'torrentUp', label: 'Torrents: subida máxima', desc: 'Cuánto compartes con otras personas mientras ves un torrent', options: [['20', '20 KB/s (mínimo)'], ['50', '50 KB/s'], ['200', '200 KB/s'], ['1000', '1 MB/s']] },
       { type: 'toggle', key: 'autoSkipIntro', label: 'Saltar la intro sola', desc: 'En series, cuando ya marcaste dónde termina la intro (botón de la bandera en el reproductor). Si no, aparece el botón "Saltar intro"' },
       { type: 'choice', key: 'hlsQuality', label: 'Calidad en canales con varias calidades', desc: 'Automática: sube o baja según la velocidad de tu internet y avisa cuando cambia', options: [['auto', 'Automática (según el internet)'], ['saver', 'Ahorro de datos (hasta 720p)'], ['max', 'Siempre la mejor']] },
@@ -180,6 +181,7 @@ function activateRow(ref) {
   const row = findRow(ref);
   if (!row) return;
   const s = store.getSettings();
+  if (row.type === 'toggle' && row.key === 'torrents' && !s.torrents) return openTorrentNotice(ref);   // primero el aviso
   if (row.type === 'toggle') { save(row.key, !s[row.key]); refocus(ref); return; }
   if (row.type === 'action') { row.run(); refocus(ref); return; }
   if (row.type === 'danger') {
@@ -200,6 +202,28 @@ function activateRow(ref) {
 function refocus(ref) { renderAll(); $('setPanel').querySelector(`[data-row="${ref}"]`)?.focus(); }
 
 // ---- Ventanas para elegir opción o escribir un valor ----
+/** Aviso antes de activar los torrents (los mismos textos que en Android). */
+export const TORRENT_NOTICE = [
+  'Vibe IPTV es sólo un reproductor: no trae, no busca ni recomienda contenido. Lo que veas es tu responsabilidad.',
+  'Con un torrent, mientras ves también compartes pedazos del video con otras personas, y ellas ven tu dirección IP (y tu proveedor de internet puede ver que usas torrents).',
+  'Ver o compartir contenido con derechos de autor sin permiso puede ser ilegal en tu país. Usa torrents sólo con contenido que tengas derecho a ver.',
+  'Una VPN oculta tu IP a las otras personas. Con «sólo con VPN» la app no abre torrents sin VPN y los detiene si la VPN se corta.',
+  'La subida va limitada y al cerrar el video (o al abrir la app de nuevo) se deja de compartir y se borra todo lo bajado.',
+];
+function openTorrentNotice(ref) {
+  $('pickTitle').textContent = t('Antes de activar los torrents');
+  $('pickHint').hidden = true;
+  const opts = [['vpn', 'Acepto · sólo con VPN (recomendado)'], ['on', 'Acepto · sin VPN'], ['no', 'Cancelar']];
+  $('pickBody').innerHTML = `<div class="pick-notice">${TORRENT_NOTICE.map((p) => `<p>${esc(t(p))}</p>`).join('')}</div>
+    <div class="pick-list">${opts.map(([v, l]) => `<button class="pick-opt" data-nav data-v="${v}"><span>${esc(t(l))}</span></button>`).join('')}</div>`;
+  $('pickBody').querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => {
+    if (b.dataset.v !== 'no') { save('torrentVpn', b.dataset.v === 'vpn'); save('torrents', true); }
+    closePick(); refocus(ref);
+  }));
+  showPick();
+  $('pickBody').querySelector('.pick-opt')?.focus();
+}
+
 function openPicker(row, ref) {
   const s = store.getSettings();
   $('pickTitle').textContent = row.label;

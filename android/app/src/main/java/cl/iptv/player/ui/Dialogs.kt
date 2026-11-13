@@ -382,3 +382,31 @@ fun ProfilesDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         PinDialog(onDismiss = { askPinFor = null }) { pin -> if (vm.switchProfile(target, pin)) { askPinFor = null; onDismiss(); true } else false }
     }
 }
+
+/** Aviso antes de activar los torrents: qué significa compartir, la IP y que lo legal depende de cada uno. */
+@Composable
+fun TorrentNoticeSheet(onAccept: (vpn: Boolean) -> Unit, onDismiss: () -> Unit) {
+    val c = LocalIptv.current
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { delay(80); runCatching { fr.requestFocus() } }
+    Sheet("Antes de activar los torrents", onDismiss, wide = true) {
+        for (p in TORRENT_NOTICE) {
+            Text(p, color = c.inkSoft, fontSize = 14.sp, modifier = Modifier.padding(bottom = 8.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        ActionButton("Acepto · sólo con VPN (recomendado)", Modifier.fillMaxWidth().focusRequester(fr)) { onAccept(true) }
+        Spacer(Modifier.height(6.dp))
+        ActionButton("Acepto · sin VPN", Modifier.fillMaxWidth(), ghost = true) { onAccept(false) }
+        Spacer(Modifier.height(6.dp))
+        ActionButton("Cancelar", Modifier.fillMaxWidth(), ghost = true, onClick = onDismiss)
+    }
+}
+
+/** Textos del aviso (los mismos que la app de PC). */
+val TORRENT_NOTICE = listOf(
+    "Vibe IPTV es sólo un reproductor: no trae, no busca ni recomienda contenido. Lo que veas es tu responsabilidad.",
+    "Con un torrent, mientras ves también compartes pedazos del video con otras personas, y ellas ven tu dirección IP (y tu proveedor de internet puede ver que usas torrents).",
+    "Ver o compartir contenido con derechos de autor sin permiso puede ser ilegal en tu país. Usa torrents sólo con contenido que tengas derecho a ver.",
+    "Una VPN oculta tu IP a las otras personas. Con «sólo con VPN» la app no abre torrents sin VPN y los detiene si la VPN se corta.",
+    "La subida va limitada y al cerrar el video (o al abrir la app de nuevo) se deja de compartir y se borra todo lo bajado.",
+)

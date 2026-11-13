@@ -101,7 +101,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Sincronizar subtítulos**: *Más → Sincronizar subtítulos*, de medio en medio segundo, en todos los motores.
 - **Imágenes reales de cada episodio** (una escena del capítulo) en vez de la portada repetida.
 - **Extensiones de Stremio** (Android y PC): agrega extensiones por su dirección `manifest.json` y sus catálogos se ven como una lista más; al elegir algo eliges entre los videos que entregan (enlaces directos y, si los activas, torrents). No trae ni recomienda extensiones.
-- **Torrents** (opcional, Android y PC): enlaces magnet y torrents de extensiones se ven mientras bajan, con adelantar. Desactivado por defecto; al ver también compartes pedazos con otras personas (ven tu IP), con subida limitada, y al cerrar se borra todo.
+- **Torrents** (opcional, Android y PC): enlaces magnet y torrents de extensiones se ven mientras bajan, con adelantar. Desactivado por defecto; al ver también compartes pedazos con otras personas (ven tu IP), con subida limitada. Aviso que se acepta al activarlos, opción **sólo con VPN** (los detiene si la VPN se corta) y borrado automático al cerrar.
 - **Saltar intro** en series: botón al principio del episodio; marca una vez *Aquí termina la intro* y en los demás episodios salta justo ahí (o solo, si lo activas).
 - **Canales recientes**: botón en el reproductor con los últimos 5 canales vistos.
 - **Enviar a la TV** (Android): con Vibe IPTV abierto en el celular y en la TV, en la misma red Wi-Fi, *Más → Enviar a la TV* lo reproduce allá (las películas siguen desde el mismo minuto).

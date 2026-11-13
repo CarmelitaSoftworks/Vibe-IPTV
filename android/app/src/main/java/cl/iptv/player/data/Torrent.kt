@@ -60,8 +60,12 @@ object TorrentStream {
      * Abre el torrent y devuelve la dirección local para el reproductor. [onStatus] cuenta en qué va (buscando pares,
      * preparando…). Cierra el torrent anterior.
      */
-    suspend fun open(ctx: Context, magnet: String, uploadKBps: Int, onStatus: (String) -> Unit = {}): String = withContext(Dispatchers.IO) {
+    suspend fun open(
+        ctx: Context, magnet: String, uploadKBps: Int, requireVpn: Boolean = false,
+        onVpnLost: () -> Unit = {}, onStatus: (String) -> Unit = {},
+    ): String = withContext(Dispatchers.IO) {
         stop()
+        if (requireVpn && !vpnOn(ctx)) throw IOException("No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes")
         val dir = File(ctx.cacheDir, "torrent").apply { deleteRecursively(); mkdirs() }
         val sm = synchronized(lock) {
             session ?: SessionManager(false).also { s ->
@@ -92,6 +96,7 @@ object TorrentStream {
         for (p in maxOf(pieceOf(a, 0), lastPiece - 1)..lastPiece) runCatching { handle.setPieceDeadline(p, 500) }
         onStatus("Preparando el video…")
         val port = startServer()
+        if (requireVpn) watchVpn(ctx, a, onVpnLost)
         "http://127.0.0.1:$port/${java.net.URLEncoder.encode(a.name, "UTF-8").replace("+", "%20")}"
     }
 
@@ -113,6 +118,30 @@ object TorrentStream {
                 handle.swig().connect_peer(org.libtorrent4j.swig.tcp_endpoint(org.libtorrent4j.swig.address.from_string(host, ec), port))
             }
         }
+    }
+
+    /**
+     * ¿El internet de esta app va por una VPN? Se pregunta por la red que usa esta app (no la del equipo): si la VPN
+     * deja fuera a Vibe IPTV (túnel dividido), cuenta como sin VPN.
+     */
+    fun vpnOn(ctx: Context): Boolean = runCatching {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        cm.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true
+    }.getOrDefault(false)
+
+    /** Corte de seguridad: si la VPN se cae mientras se ve, se detiene el torrent al tiro (antes de compartir sin ella). */
+    private fun watchVpn(ctx: Context, a: Active, onLost: () -> Unit) {
+        Thread({
+            while (active === a) {
+                if (!vpnOn(ctx)) { if (active === a) { stop(); onLost() }; break }
+                Thread.sleep(1500)
+            }
+        }, "vibe-torrent-vpn").apply { isDaemon = true }.start()
+    }
+
+    /** Borra lo que haya quedado de una vez anterior (si la app se cerró de golpe mientras se veía un torrent). */
+    fun cleanLeftovers(ctx: Context) {
+        if (active == null) runCatching { File(ctx.cacheDir, "torrent").deleteRecursively() }
     }
 
     /** Estado para el diagnóstico: personas conectadas y velocidades. */

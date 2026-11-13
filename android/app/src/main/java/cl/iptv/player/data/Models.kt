@@ -109,6 +109,8 @@ data class Settings(
      */
     val torrents: Boolean = false,
     val torrentUploadKBps: Int = 50,
+    /** Torrents sólo si el internet de la app va por una VPN (y se detienen si se cae). */
+    val torrentVpn: Boolean = false,
     /** Mini reproductor dentro de la app: tamaño (small | medium | large) y esquina (br | bl | tr | tl). */
     val miniSize: String = "medium",
     val miniCorner: String = "br",

@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS = {
   // Series: saltar la intro sola cuando ya se marcó dónde termina
   autoSkipIntro: false,
   // Torrents (extensiones de Stremio y enlaces magnet): desactivado; subida máxima en KB/s
-  torrents: false, torrentUp: '50',
+  torrents: false, torrentUp: '50', torrentVpn: false,
   // Subtítulos automáticos en películas y series
   autoSubs: true,
   // Fichas: mostrar antes de reproducir películas; clave opcional de TMDB

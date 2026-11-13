@@ -971,7 +971,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!settings.torrents) { message = "Para ver torrents actívalos en Ajustes → Reproducción → Reproducir torrents"; return }
         viewModelScope.launch {
             loading = "Conectando con el torrent…"
-            val r = runCatching { TorrentStream.open(getApplication(), item.url, settings.torrentUploadKBps) { s -> loading = s } }
+            val r = runCatching {
+                TorrentStream.open(getApplication(), item.url, settings.torrentUploadKBps, requireVpn = settings.torrentVpn,
+                    onVpnLost = { viewModelScope.launch { message = "Se cortó la VPN: el torrent se detuvo para no compartir sin ella" } }) { s -> loading = s }
+            }
             loading = null
             r.onSuccess { local -> logEvent("Torrent abierto: ${item.name}"); then(item.copy(url = local)) }
                 .onFailure { message = "No se pudo abrir el torrent: ${it.message}" }
@@ -1101,6 +1104,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var pairCode by mutableStateOf<Pair<String, String>?>(null)
     /** En el celular: ventana "Pasar mis listas a la TV". */
     var showSendSources by mutableStateOf(false)
+    /** Aviso que se acepta antes de activar los torrents. */
+    var showTorrentNotice by mutableStateOf(false)
+    fun acceptTorrents(vpn: Boolean) {
+        showTorrentNotice = false
+        updateSettings(settings.copy(torrents = true, torrentVpn = vpn))
+    }
     fun cancelPair() { castReceiver?.cancelPair(); pairCode = null }
     private fun receiveSources(list: List<Source>, from: String) {
         if (list.isEmpty()) { message = "No llegó ninguna lista válida"; return }
@@ -1370,6 +1379,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // (Antes estaba en medio y open() usaba "recent", declarado más abajo y todavía nulo: la app se cerraba
     // en cada inicio con una lista guardada.)
     init {
+        TorrentStream.cleanLeftovers(getApplication())
         applyLite()
         autoConfigure()
         val last = sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull()

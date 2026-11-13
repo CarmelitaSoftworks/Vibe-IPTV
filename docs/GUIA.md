@@ -115,6 +115,9 @@ Vibe IPTV puede usar **extensiones de Stremio** (el formato abierto de complemen
 - **Activar:** Ajustes → Reproducción → **Reproducir torrents** (viene apagado). Sirve para los torrents que entregan las extensiones de Stremio (aparecen con 🧲, después de los enlaces directos) y para enlaces `magnet:` en tus listas.
 - **Cómo funciona:** el video se baja en orden mientras lo ves y se puede adelantar (se piden primero los pedazos de donde saltaste). Al principio tarda unos segundos en encontrar a quién pedirle el video. En la información del reproductor (botón INFO / tecla I) ves cuántas personas hay y la velocidad.
 - **Ojo:** mientras ves, también **compartes pedazos del video con otras personas, y ellas ven tu dirección IP**. Que sea legal depende de lo que veas y de tu país. La subida va limitada (Ajustes → *Torrents: subida máxima*, 50 KB/s por defecto) y **al cerrar el video se deja de compartir y se borra todo lo bajado**.
+- **Al activarlos** aparece un aviso que hay que aceptar: Vibe IPTV es sólo un reproductor, lo que veas es tu responsabilidad, y ver o compartir contenido con derechos de autor sin permiso puede ser ilegal en tu país.
+- **VPN:** Vibe IPTV no trae una VPN (es otra app que instalas aparte), pero con **Torrents: sólo con VPN** (Ajustes → Reproducción) no abre torrents si tu internet no va por una VPN, y **los detiene al tiro si la VPN se corta**. En Android se reconoce cualquier VPN (si tu VPN deja fuera a Vibe IPTV, cuenta como sin VPN). En el PC se reconoce por el nombre del adaptador de red (tun, tap, wg, ppp, "vpn"…): si la tuya no se reconoce, la app avisa que no hay VPN.
+- **Borrado automático:** al cerrar el video se borra todo lo bajado; si la app se cerró de golpe, se borra al abrirla de nuevo.
 - **En el PC** los torrents necesitan la app de PC (`iniciar.bat` o la versión portable); en la web abierta desde GitHub Pages no funcionan.
 
 ## 6. Reproductor y canales de TV de cable (AC-3, MP2, MPEG-2)

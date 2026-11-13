@@ -99,6 +99,7 @@ fun App(vm: AppViewModel) {
 
         // Pasar listas desde el celular: en el celular, la ventana para enviar; en la TV, el código a escribir
         if (vm.showSendSources) SendSourcesSheet(vm) { vm.showSendSources = false }
+        if (vm.showTorrentNotice) TorrentNoticeSheet(onAccept = vm::acceptTorrents) { vm.showTorrentNotice = false }
         vm.pairCode?.let { (code, from) -> PairCodeOverlay(code, from) { vm.cancelPair() } }
 
         // Mensajes breves (equivalente a un toast)

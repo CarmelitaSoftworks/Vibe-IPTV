@@ -610,11 +610,18 @@ const PASSWORD = process.env.VIBE_PASSWORD || '';
 // Se baja el archivo de video del torrent con prioridad a lo que se está viendo y se entrega al reproductor como un
 // video normal (con adelantar). Mientras se ve también se comparten pedazos con otras personas (ven tu IP): la subida va
 // limitada y al cerrar el video (o 3 minutos sin pedidos) se deja de compartir y se borra lo bajado.
-let torrentClient = null, torrentCurrent = null, torrentIdle = null;
+let torrentClient = null, torrentCurrent = null, torrentIdle = null, torrentVpnTimer = null, torrentVpnLost = false;
 const TORRENT_DIR = path.join(os.tmpdir(), 'vibe-torrent');
 const VIDEO_EXT = /\.(mp4|mkv|avi|m4v|mov|webm|ts|wmv|flv|mpg|mpeg)$/i;
+// ¿Hay una VPN conectada? Se reconoce por el nombre del adaptador de red (tun, tap, wg, ppp, ipsec, "vpn"…) con una
+// dirección activa. Es una aproximación: si tu VPN usa otro nombre no se reconoce y la app avisa que no hay VPN.
+const VPN_IF = /(^|[^a-z])(tun|tap|wg|utun|ppp|ipsec|vpn|wireguard)/i;
+function vpnOn() {
+  return Object.entries(os.networkInterfaces()).some(([name, addrs]) => VPN_IF.test(name) && (addrs || []).some((a) => !a.internal));
+}
 function torrentClose() {
   clearTimeout(torrentIdle);
+  clearInterval(torrentVpnTimer);
   if (torrentClient) { try { torrentClient.destroy(); } catch {} }
   torrentClient = null; torrentCurrent = null;
   fs.rm(TORRENT_DIR, { recursive: true, force: true }, () => {});
@@ -626,7 +633,7 @@ async function handleTorrent(req, res, reqUrl) {
   if (p === '/proxy/torrent/close') { torrentClose(); return json(200, { ok: true }); }
   if (p === '/proxy/torrent/status') {
     const t = torrentCurrent?.torrent;
-    return json(200, t ? { peers: t.numPeers, down: t.downloadSpeed, up: t.uploadSpeed, progress: t.progress } : {});
+    return json(200, t ? { peers: t.numPeers, down: t.downloadSpeed, up: t.uploadSpeed, progress: t.progress } : { vpnLost: torrentVpnLost });
   }
   if (p === '/proxy/torrent/open') {
     let WebTorrent;
@@ -635,7 +642,10 @@ async function handleTorrent(req, res, reqUrl) {
     if (!/^magnet:\?/i.test(magnet)) return json(400, { error: 'Enlace magnet no válido' });
     const up = Math.max(1, Number(reqUrl.searchParams.get('up')) || 50) * 1024;
     const wantIdx = Number((/[?&]vibe_file=(\d+)/.exec(magnet) || [])[1]);
+    const needVpn = reqUrl.searchParams.get('vpn') === '1';
     torrentClose();
+    torrentVpnLost = false;
+    if (needVpn && !vpnOn()) return json(409, { error: L('No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes', 'No VPN is connected: connect it or turn off "Torrents: only with VPN" in Settings') });
     torrentClient = new WebTorrent({ uploadLimit: up });
     torrentClient.on('error', (e) => console.warn('[torrent]', e.message));
     const id = crypto.randomBytes(6).toString('hex');
@@ -653,6 +663,8 @@ async function handleTorrent(req, res, reqUrl) {
       for (const f of files) if (f !== file) f.deselect();            // sólo el video elegido
       torrentCurrent = { id, torrent, file };
       torrentTouch();
+      // Corte de seguridad: si la VPN se cae mientras se ve, se detiene al tiro (antes de compartir sin ella)
+      if (needVpn) torrentVpnTimer = setInterval(() => { if (!vpnOn()) { console.warn('[torrent] se cortó la VPN: detenido'); torrentClose(); torrentVpnLost = true; } }, 1500);
       console.log(`[torrent] ${file.name} (${(file.length / 1048576).toFixed(0)} MB)`);
       return json(200, { url: `/proxy/torrent/stream/${id}/${encodeURIComponent(file.name)}`, name: file.name });
     } catch (e) { torrentClose(); return json(502, { error: e.message }); }
@@ -705,6 +717,8 @@ if (require.main === module) {
   server.on('error', (e) => {
     console.error(e.code === 'EADDRINUSE' ? L(`El puerto ${PORT} ya está en uso: ¿la app ya está abierta en otra ventana?`, `Port ${PORT} is already in use: is the app already open in another window?`) : e.message);
   });
+  // Lo que haya quedado de torrents de una vez anterior (si la app se cerró de golpe) se borra al iniciar
+  fs.rm(TORRENT_DIR, { recursive: true, force: true }, () => {});
   server.listen(PORT, HOST, () => {
     console.log(`Vibe IPTV ${L('en', 'at')} http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
     if (HOST === '0.0.0.0') {

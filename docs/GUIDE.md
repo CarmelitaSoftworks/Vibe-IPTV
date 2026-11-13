@@ -115,6 +115,9 @@ Vibe IPTV can use **Stremio extensions** (Stremio's open add-on format) as one m
 - **Turn on:** Settings → Playback → **Play torrents** (off by default). It works for torrents provided by Stremio extensions (shown with 🧲, after the direct links) and for `magnet:` links in your lists.
 - **How it works:** the video downloads in order while you watch and you can seek (the pieces where you jumped are requested first). At the start it takes a few seconds to find people sharing it. The player info (INFO button / I key) shows how many peers there are and the speed.
 - **Note:** while watching you also **share pieces of the video with other people, and they can see your IP address**. Whether it is legal depends on what you watch and your country. Upload is limited (Settings → *Torrents: max upload*, 50 KB/s by default) and **when you close the video sharing stops and everything downloaded is deleted**.
+- **When you turn them on** a notice appears that you must accept: Vibe IPTV is only a player, what you watch is your responsibility, and watching or sharing copyrighted content without permission may be illegal in your country.
+- **VPN:** Vibe IPTV doesn't include a VPN (it's a separate app you install), but with **Torrents: only with VPN** (Settings → Playback) it won't open torrents unless your internet goes through a VPN, and **stops them right away if the VPN drops**. On Android any VPN is recognized (if your VPN excludes Vibe IPTV, it counts as no VPN). On PC it's recognized by the network adapter name (tun, tap, wg, ppp, "vpn"…): if yours isn't recognized, the app says there's no VPN.
+- **Automatic deletion:** everything downloaded is deleted when you close the video; if the app was closed abruptly, it's deleted the next time it opens.
 - **On PC** torrents need the PC app (`iniciar.bat` or the portable version); they don't work in the web version opened from GitHub Pages.
 
 ## 6. Player and cable-TV channels (AC-3, MP2, MPEG-2)
