@@ -107,6 +107,7 @@ export class XtreamClient {
       const season = Number(e.season) || 0;
       out.push({
         id: `e${e.id}`, kind: 'movie', season, episode: Number(e.episode_num) || 0, seriesName: info?.info?.name || '',
+        seriesId,                                  // de qué serie es (su ficha da el título original para subtítulos)
         name: `T${season} E${e.episode_num} · ${e.title || ''}`.trim(),
         logo: e.info?.movie_image || info?.info?.cover || '', group: `Temporada ${season}`,
         url: this.episodeUrl(e.id, e.container_extension),

@@ -33,34 +33,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Búsqueda de subtítulos con todo lo que se sabe del archivo, para cuando el nombre de la lista no sirve:
      * el título original y el año que da el proveedor (Xtream) y, con la clave de OpenSubtitles, la huella del archivo.
+     * [typed]: lo escribiste en la búsqueda (manda eso, no el título del proveedor). [withHash]: sólo en la búsqueda a
+     * mano (la huella abre 2 conexiones cortas al proveedor y muchas cuentas admiten una sola).
      */
-    suspend fun subtitleQuery(item: Item, title: String = cleanTitle(item.seriesName.ifBlank { item.name })): SubtitleSources.Query {
+    suspend fun subtitleQuery(item: Item, typed: String? = null, withHash: Boolean = false): SubtitleSources.Query {
+        val listTitle = cleanTitle(item.seriesName.ifBlank { item.name })
         val year0 = Regex("\\b(19[3-9]\\d|20[0-4]\\d)\\b").find(item.name)?.value.orEmpty()
         val isSeries = item.seriesName.isNotBlank() || item.season > 0
-        var q = SubtitleSources.Query(title, isSeries, item.season, item.episode, year0)
-        val x = xtream
-        if (x != null) {
-            // Película de Xtream: su ficha trae el nombre original y la fecha; episodio: la ficha de su serie
-            val info = withContext(Dispatchers.IO) {
-                when {
-                    item.id.startsWith("v") -> x.info(item)
-                    isSeries -> series?.let { x.info(it) }
-                    else -> null
-                }
-            }
-            if (info != null) {
-                val alts = listOf("o_name", "original_name", "name", "title").map { info.optString(it).trim() }
-                    .filter { it.isNotBlank() && it != "null" }.map { cleanTitle(it) }.filter { it.length >= 2 && !it.equals(title, true) }.distinct()
-                val date = listOf("releasedate", "releaseDate", "release_date", "year").map { info.optString(it) }.firstOrNull { it.length >= 4 }.orEmpty()
-                q = q.copy(alts = alts, year = q.year.ifBlank { Regex("(19|20)\\d\\d").find(date)?.value.orEmpty() })
-            }
-        }
-        // Huella del archivo (necesita la clave de OpenSubtitles): sólo en películas y episodios, no en canales
-        if (settings.osApiKey.isNotBlank() && item.kind != Kind.LIVE && !item.url.substringBefore('?').endsWith(".m3u8", true)) {
-            withContext(Dispatchers.IO) { SubtitleSources.osHash(item.url, item.userAgent, item.referrer) }
-                ?.let { (h, size) -> q = q.copy(hash = h, size = size); logEvent("Subtítulos: huella del archivo $h") }
+        val base = SubtitleSources.Query(typed?.takeIf { it.isNotBlank() } ?: listTitle, isSeries, item.season, item.episode, year0)
+        val userTyped = typed != null && typed.isNotBlank() && !typed.equals(listTitle, true)
+        val (provider, provYear) = if (userTyped) emptyList<String>() to "" else providerTitles(item, isSeries)
+        // Lo más confiable va en title (lo que se busca por texto): el título original del proveedor; el de la lista queda de respaldo
+        var q = if (provider.isEmpty()) base
+            else base.copy(title = provider.first(), alts = (provider.drop(1) + listTitle).filter { !it.equals(provider.first(), true) }.distinct(),
+                year = base.year.ifBlank { provYear })
+        if (withHash && settings.osApiKey.isNotBlank() && item.kind != Kind.LIVE && !item.url.substringBefore('?').endsWith(".m3u8", true)
+            && xtreamAccount?.maxConnections != 1) {
+            val fp = hashCache[item.url] ?: withContext(Dispatchers.IO) { SubtitleSources.osHash(item.url, item.userAgent, item.referrer) }
+                ?.also { hashCache[item.url] = it; logEvent("Subtítulos: huella del archivo ${it.first}") }
+            if (fp != null) q = q.copy(hash = fp.first, size = fp.second)
         }
         return q
+    }
+    /** Ya calculado en esta sesión: no se repite al volver a pulsar Buscar. */
+    private val hashCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
+    private val providerCache = java.util.concurrent.ConcurrentHashMap<String, Pair<List<String>, String>>()
+
+    /** Título original (y otros nombres) y año de la ficha del proveedor: de la película, o de la serie del episodio. */
+    private suspend fun providerTitles(item: Item, isSeries: Boolean): Pair<List<String>, String> {
+        val x = xtream ?: return emptyList<String>() to ""
+        // El episodio sabe de qué serie es; si no (listas viejas en caché), sólo la serie abierta si el episodio es de ella
+        val seriesItem = when {
+            !isSeries -> null
+            item.seriesId != null -> Item("s${item.seriesId}", Kind.SERIES, item.seriesName, seriesId = item.seriesId)
+            else -> series?.takeIf { s -> episodes.any { it.id == item.id } && s.seriesId != null }
+        }
+        val key = when { item.id.startsWith("v") -> item.id; seriesItem != null -> seriesItem.id; else -> return emptyList<String>() to "" }
+        providerCache[key]?.let { return it }
+        val info = withContext(Dispatchers.IO) { if (seriesItem != null) x.info(seriesItem) else x.info(item) } ?: return emptyList<String>() to ""
+        val names = listOf("o_name", "original_name", "name", "title").map { info.optString(it).trim() }
+            .filter { it.isNotBlank() && it != "null" }.map { cleanTitle(it) }.filter { it.length >= 2 }.distinct()
+        val date = listOf("releasedate", "releaseDate", "release_date", "year").map { info.optString(it) }.firstOrNull { it.length >= 4 }.orEmpty()
+        return (names to (Regex("(19|20)\\d\\d").find(date)?.value.orEmpty())).also { providerCache[key] = it }
     }
 
     var sources by mutableStateOf(store.sources()); private set
@@ -923,7 +937,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Serie a la que pertenece un episodio (para recordar dónde termina su intro). */
     private fun introKey(item: Item): String? {
         val src = source ?: return null
-        val s = item.seriesId?.toString() ?: resume[item.id]?.parent?.ifBlank { null } ?: series?.id ?: item.seriesName.ifBlank { null } ?: return null
+        // "s123": el mismo formato que el id de la serie, así sirven las marcas ya guardadas
+        val s = item.seriesId?.let { "s$it" } ?: resume[item.id]?.parent?.ifBlank { null } ?: series?.id ?: item.seriesName.ifBlank { null } ?: return null
         return "${src.id}:$s"
     }
     fun introEnd(item: Item): Long = introKey(item)?.let { store.introEnd(it) } ?: 0L

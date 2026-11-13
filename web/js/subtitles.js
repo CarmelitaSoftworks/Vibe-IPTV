@@ -65,14 +65,20 @@ const yearOf = (name) => (/\b(19[3-9]\d|20[0-4]\d)\b/.exec(name || '') || [])[1]
  */
 export async function searchSubtitles(item, query, meta = {}) {
   const s = getSettings();
-  const title = query || cleanTitle(item.seriesName || item.name);
+  const listTitle = cleanTitle(item.seriesName || item.name);
+  // Lo que escribiste manda; si no, el título original del proveedor y el de la lista queda de respaldo
+  const typed = query && query.toLowerCase() !== listTitle.toLowerCase();
+  const provider = typed ? [] : (meta.alts || []).map(cleanTitle).filter(Boolean);
+  const title = typed ? query : provider[0] || listTitle;
+  const alts = [...new Set([...provider.slice(1), listTitle])].filter((t) => t && t.toLowerCase() !== title.toLowerCase());
   if (proxyBase()) {
     const p = new URLSearchParams({
       title, langs: (s.subLangs || 'es,en').replace(/\s+/g, ''),
       type: item.seriesName || item.season ? 'series' : 'movie',
-      season: item.season || '', episode: item.episode || '', year: yearOf(item.name) || meta.year || '',
-      alts: (meta.alts || []).map(cleanTitle).filter((t) => t && t.toLowerCase() !== title.toLowerCase()).join('|'),
-      url: item.kind === 'live' ? '' : item.url || '', ua: item.userAgent || '', ref: item.referrer || '',
+      season: item.season || '', episode: item.episode || '', year: yearOf(item.name) || (typed ? '' : meta.year || ''),
+      alts: alts.join('|'),
+      // Huella del archivo sólo en la búsqueda a mano: abre 2 conexiones cortas al proveedor (muchas cuentas admiten una)
+      url: item.kind === 'live' || !meta.withHash ? '' : item.url || '', ua: item.userAgent || '', ref: item.referrer || '',
       osKey: s.osApiKey || '', subdlKey: s.subdlKey || '', strict: meta.strict ? '1' : '',
     });
     const res = await fetch(`${proxyBase()}/proxy/subs/search?${p}`);

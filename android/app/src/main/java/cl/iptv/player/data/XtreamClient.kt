@@ -204,6 +204,8 @@ class XtreamClient(server: String, private val user: String, private val pass: S
                     name = "T$season E$ep · ${e.optString("title")}",
                     logo = e.optJSONObject("info")?.optString("movie_image")?.ifBlank { cover } ?: cover,
                     group = "Temporada $season", season = season, episode = ep, seriesName = seriesName,
+                    // De qué serie es (para su ficha: título original y año, al buscar subtítulos)
+                    seriesId = seriesId,
                     url = episodeUrl(e.optString("id"), e.optString("container_extension")),
                 )
             }

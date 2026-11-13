@@ -1397,7 +1397,7 @@ private fun SubtitlesDialog(
     fun doSearch() {
         status = "Buscando en OpenSubtitles, SubDL y Podnapisi…"
         scope.launch {
-            runCatching { src.search(vm.subtitleQuery(item, query)) }
+            runCatching { src.search(vm.subtitleQuery(item, typed = query, withHash = true)) }
                 .onSuccess { found = it; status = if (it.results.isEmpty()) "Sin resultados. Prueba con el título original (en inglés)." else null }
                 .onFailure { status = it.message }
         }

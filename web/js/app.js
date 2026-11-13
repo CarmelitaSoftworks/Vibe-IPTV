@@ -900,13 +900,15 @@ const subsMetaCache = new Map();
 async function subtitleMeta(item) {
   const xt = state.xt;
   if (!xt || !item) return {};
-  const key = String(item.id).startsWith('v') ? `v:${item.id}` : state.series?.seriesId ? `s:${state.series.seriesId}` : '';
+  // El episodio sabe de qué serie es; si no, sólo la serie abierta si el episodio es de ella
+  const seriesId = item.seriesId || (state.series?.seriesId && (state.episodes || []).some((e) => e.id === item.id) ? state.series.seriesId : null);
+  const key = String(item.id).startsWith('v') ? `v:${item.id}` : seriesId ? `s:${seriesId}` : '';
   if (!key) return {};
   if (subsMetaCache.has(key)) return subsMetaCache.get(key);
   let info = null;
   try {
     info = key.startsWith('v:') ? (await xt.api('get_vod_info', { vod_id: String(item.id).slice(1) }))?.info
-      : (await xt.api('get_series_info', { series_id: state.series.seriesId }))?.info;
+      : (await xt.api('get_series_info', { series_id: seriesId }))?.info;
   } catch { info = null; }
   const meta = info ? {
     alts: [...new Set(['o_name', 'original_name', 'name', 'title'].map((k) => String(info[k] || '').trim()).filter((v) => v && v !== 'null'))],
@@ -1374,7 +1376,7 @@ async function searchSubs() {
   const box = $('subsResults');
   box.innerHTML = '<p class="hint">Buscando…</p>';
   try {
-    const { results, errors } = await subs.searchSubtitles(state.playing || { name: '' }, $('subsQuery').value.trim(), await subtitleMeta(state.playing));
+    const { results, errors } = await subs.searchSubtitles(state.playing || { name: '' }, $('subsQuery').value.trim(), { ...(await subtitleMeta(state.playing)), withHash: true });
     box.innerHTML = results.length ? '' : '<p class="hint">Sin resultados. Prueba con el título original (en inglés) o sin el año.</p>';
     results.slice(0, 60).forEach((r) => {
       const b = document.createElement('button');

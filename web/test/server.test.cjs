@@ -40,3 +40,12 @@ test('subtítulos: huella de OpenSubtitles igual a otra implementación y calcul
     assert.equal(pedidos, 2);
   } finally { srv.close(); }
 });
+
+test('subtítulos: elige la película correcta del catálogo (automática nunca una cualquiera)', () => {
+  const { pickMeta } = require('../server/subtitles.js');
+  const e = (name, year, id) => ({ name, year, id });
+  assert.equal(pickMeta([e('Inception', '2010', 'tt1'), e('Otra', '2010', 'tt2')], 'El origen', '2010', true).id, 'tt1');
+  assert.equal(pickMeta([e('Algo', '2009', 'tt3'), e('Otra', '2010', 'tt2')], 'Pelicula 123', '2010', true), null);
+  assert.equal(pickMeta([e('Die Hard', '1988', 'tt4')], 'Duro de matar', '', true), null);
+  assert.equal(pickMeta([e('Die Hard', '1988', 'tt4')], 'Duro de matar', '', false).id, 'tt4');
+});

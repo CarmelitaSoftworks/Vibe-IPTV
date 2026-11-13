@@ -31,17 +31,27 @@ class SubtitleSources(private val settings: () -> Settings) {
 
     data class Query(
         val title: String, val series: Boolean, val season: Int = 0, val episode: Int = 0, val year: String = "",
-        /** Otros nombres para buscar si el de la lista no se encuentra: el título original que da el proveedor Xtream. */
+        /**
+         * Otros nombres para encontrar la película en el catálogo si [title] no alcanza. [title] es lo que se busca por
+         * texto: el título original del proveedor si lo hay, o lo que escribiste en la búsqueda; aquí queda el de la lista.
+         */
         val alts: List<String> = emptyList(),
         /** Huella del archivo (OpenSubtitles): reconoce la película aunque no tenga un nombre que sirva. */
         val hash: String = "", val size: Long = 0,
-        /** Carga automática: sólo una película que calce de verdad (en la búsqueda a mano se elige de la lista). */
+        /**
+         * Carga automática: sólo resultados de una película identificada con seguridad (por su código IMDb o por la
+         * huella del archivo). Nada de búsquedas por texto parecido: mejor no cargar nada que cargar otra película.
+         */
         val strict: Boolean = false,
     )
     data class Result(val provider: String, val source: String, val id: String, val lang: String, val label: String, val downloads: Int,
                       /** "S01E05": elige ese episodio si la descarga es un paquete de temporada. */
-                      val episode: String = "")
+                      val episode: String = "",
+                      /** Coincide con la huella del archivo: va primero (calza justo con ese video). */
+                      val exact: Boolean = false)
     data class Found(val results: List<Result>, val errors: Map<String, String>)
+    /** Un resultado del catálogo (Cinemeta): nombre, año ("2010" o "2008–2013") y código IMDb. */
+    data class CatalogEntry(val name: String, val year: String, val id: String)
 
     private val ua = "VibeIPTVAndroid v1.0"
     private val names = mapOf("stremio" to "OpenSubtitles", "opensubtitles" to "OpenSubtitles (cuenta)", "subdl" to "SubDL", "podnapisi" to "Podnapisi")
@@ -62,23 +72,18 @@ class SubtitleSources(private val settings: () -> Settings) {
     private fun json(url: String, build: Request.Builder.() -> Unit = {}) = JSONObject(String(call(url, build)))
 
     // ---------- Proveedores ----------
-    /** Código IMDb: primero con el título original del proveedor (más fiable), después con el nombre de la lista. */
+    /** Código IMDb: primero con [Query.title] (título original o lo escrito), después con los otros nombres. */
     private fun imdbFor(q: Query): String? {
-        for (t in (q.alts + q.title).map { it.trim() }.filter { it.length >= 2 }.distinct()) imdbForTitle(t, q)?.let { return it }
+        for (t in (listOf(q.title) + q.alts).map { it.trim() }.filter { it.length >= 2 }.distinct()) imdbForTitle(t, q)?.let { return it }
         return null
     }
 
     private fun imdbForTitle(title: String, q: Query): String? {
         val type = if (q.series) "series" else "movie"
         val metas = json("https://v3-cinemeta.strem.io/catalog/$type/top/search=${java.net.URLEncoder.encode(title, "UTF-8").replace("+", "%20")}.json").optJSONArray("metas") ?: return null
-        // Sólo un resultado que calce: mismo año, o (sin año) que comparta palabras con el título. Antes se tomaba el
-        // primero aunque no tuviera nada que ver ("Pelicula 123" traía subtítulos de otra película)
         val list = (0 until metas.length()).mapNotNull { metas.optJSONObject(it) }
-        fun yearOk(m: JSONObject) = q.year.isNotBlank() && m.optString("releaseInfo").startsWith(q.year)
-        val pick = list.firstOrNull { yearOk(it) && sharesWords(title, it.optString("name")) } ?: list.firstOrNull { yearOk(it) }
-            ?: if (q.year.isBlank()) list.firstOrNull { sharesWords(title, it.optString("name")) } else null
-            ?: if (!q.strict) list.firstOrNull() else null       // a mano: lo más parecido, tú eliges
-        return pick?.let { it.optString("imdb_id").ifBlank { it.optString("id") } }?.ifBlank { null }
+        return pickMeta(list.map { CatalogEntry(it.optString("name"), it.optString("releaseInfo"), it.optString("imdb_id").ifBlank { it.optString("id") }) },
+            title, q.year, q.strict)?.id?.ifBlank { null }
     }
 
     private fun stremio(q: Query): List<Result> {
@@ -96,12 +101,14 @@ class SubtitleSources(private val settings: () -> Settings) {
     private fun opensubtitles(q: Query): List<Result> {
         val key = settings().osApiKey
         // Con la huella del archivo se busca por ella (encuentra la película aunque el nombre no sirva); sin huella, por nombre
-        if (q.hash.isNotBlank()) {
-            val byHash = runCatching { opensubtitlesBy(key, q) { addQueryParameter("moviehash", q.hash) } }.getOrDefault(emptyList())
-            val exact = byHash.filter { it.label.startsWith(MATCH) }
-            if (exact.isNotEmpty()) return exact + opensubtitlesBy(key, q) { addQueryParameter("query", (q.alts.firstOrNull() ?: q.title)) }.filter { r -> exact.none { it.id == r.id } }
-        }
-        return opensubtitlesBy(key, q) { addQueryParameter("query", (q.alts.firstOrNull() ?: q.title)) }
+        val exact = if (q.hash.isNotBlank()) runCatching { opensubtitlesBy(key, q) { addQueryParameter("moviehash", q.hash) } }
+            .getOrDefault(emptyList()).filter { it.exact } else emptyList()
+        // Carga automática: sólo lo que calza con el archivo (la búsqueda por texto puede traer otra película)
+        if (q.strict) return exact
+        // Si la segunda búsqueda falla (límite diario, sin respuesta), igual quedan los que calzan con el archivo
+        val byName = if (exact.isNotEmpty()) runCatching { opensubtitlesBy(key, q) { addQueryParameter("query", q.title) } }.getOrDefault(emptyList())
+            else opensubtitlesBy(key, q) { addQueryParameter("query", q.title) }
+        return exact + byName.filter { r -> exact.none { it.id == r.id } }
     }
 
     private fun opensubtitlesBy(key: String, q: Query, by: okhttp3.HttpUrl.Builder.() -> Unit): List<Result> {
@@ -110,7 +117,8 @@ class SubtitleSources(private val settings: () -> Settings) {
             .apply {
                 if (q.season > 0) addQueryParameter("season_number", q.season.toString())
                 if (q.episode > 0) addQueryParameter("episode_number", q.episode.toString())
-                if (q.year.isNotBlank()) addQueryParameter("year", q.year)
+                // En episodios el año es el de la serie: filtraría las temporadas siguientes
+                if (q.year.isNotBlank() && !q.series) addQueryParameter("year", q.year)
             }.build().toString()
         val data = json(url) { header("Api-Key", key) }.optJSONArray("data") ?: return emptyList()
         val out = ArrayList<Result>()
@@ -120,9 +128,9 @@ class SubtitleSources(private val settings: () -> Settings) {
             for (j in 0 until files.length()) {
                 val f = files.optJSONObject(j) ?: continue
                 // Coincide con la huella del archivo: calza justo con ese video (mismo corte y velocidad)
-                val exact = if (a.optBoolean("moviehash_match")) MATCH else ""
+                val exact = a.optBoolean("moviehash_match")
                 out += Result("opensubtitles", names.getValue("opensubtitles"), f.optLong("file_id").toString(), a.optString("language"),
-                    exact + a.optString("release").ifBlank { f.optString("file_name") }, a.optInt("download_count") + if (exact.isNotEmpty()) 1_000_000 else 0)
+                    (if (exact) MATCH else "") + a.optString("release").ifBlank { f.optString("file_name") }, a.optInt("download_count"), exact = exact)
             }
         }
         return out
@@ -134,10 +142,11 @@ class SubtitleSources(private val settings: () -> Settings) {
      */
     private fun subdl(q: Query): List<Result> {
         val imdb = runCatching { imdbFor(q) }.getOrNull()
+        if (q.strict && imdb == null) return emptyList()           // carga automática: sólo con la película identificada
         fun query(byImdb: Boolean): JSONObject {
             val url = "https://api.subdl.com/api/v1/subtitles".toHttpUrl().newBuilder()
                 .addQueryParameter("api_key", settings().subdlKey)
-                .apply { if (byImdb && imdb != null) addQueryParameter("imdb_id", imdb) else addQueryParameter("film_name", q.alts.firstOrNull() ?: q.title) }
+                .apply { if (byImdb && imdb != null) addQueryParameter("imdb_id", imdb) else addQueryParameter("film_name", q.title) }
                 .addQueryParameter("languages", langs().joinToString(",") { subdlLang(it) })
                 .addQueryParameter("subs_per_page", "30")
                 .addQueryParameter("type", if (q.series) "tv" else "movie")
@@ -146,7 +155,7 @@ class SubtitleSources(private val settings: () -> Settings) {
                 .apply {
                     if (q.season > 0) addQueryParameter("season_number", q.season.toString())
                     if (q.episode > 0) addQueryParameter("episode_number", q.episode.toString())
-                    if (q.year.isNotBlank() && !(byImdb && imdb != null)) addQueryParameter("year", q.year)
+                    if (q.year.isNotBlank() && !q.series && !(byImdb && imdb != null)) addQueryParameter("year", q.year)
                 }.build().toString()
             return try { json(url) } catch (e: IOException) {
                 // La API responde 4xx con un JSON de error: mostrar el motivo real
@@ -155,7 +164,7 @@ class SubtitleSources(private val settings: () -> Settings) {
             }
         }
         var o = query(byImdb = imdb != null)
-        if (imdb != null && (o.optJSONArray("subtitles")?.length() ?: 0) == 0) o = query(byImdb = false)
+        if (imdb != null && !q.strict && (o.optJSONArray("subtitles")?.length() ?: 0) == 0) o = query(byImdb = false)
         if (o.has("status") && !o.optBoolean("status")) {
             val err = o.optString("error")
             if (err.contains("can't find", true) || err.contains("not found", true)) return emptyList()
@@ -209,12 +218,13 @@ class SubtitleSources(private val settings: () -> Settings) {
     }
 
     private fun podnapisi(q: Query): List<Result> {
+        if (q.strict) return emptyList()                           // sólo busca por texto: en la carga automática no
         val b = "https://www.podnapisi.net/subtitles/search/advanced".toHttpUrl().newBuilder()
-            .addQueryParameter("keywords", q.alts.firstOrNull() ?: q.title).addQueryParameter("movie_type", if (q.series) "tv-series" else "movie")
+            .addQueryParameter("keywords", q.title).addQueryParameter("movie_type", if (q.series) "tv-series" else "movie")
         langs().forEach { b.addQueryParameter("language", it) }
         if (q.season > 0) b.addQueryParameter("seasons", q.season.toString())
         if (q.episode > 0) b.addQueryParameter("episodes", q.episode.toString())
-        if (q.year.isNotBlank()) b.addQueryParameter("year", q.year)
+        if (q.year.isNotBlank() && !q.series) b.addQueryParameter("year", q.year)
         val data = json(b.build().toString()).optJSONArray("data") ?: return emptyList()
         return (0 until data.length()).mapNotNull { data.optJSONObject(it) }.map { d ->
             val rel = d.optJSONArray("custom_releases")?.optString(0).orEmpty()
@@ -238,7 +248,7 @@ class SubtitleSources(private val settings: () -> Settings) {
             jobs.map { (name, fn) -> async { runCatching(fn).onFailure { errors[names.getValue(name)] = it.message ?: "error" }.getOrDefault(emptyList()) } }.awaitAll().flatten()
         }
         val order = langs()
-        val sorted = results.sortedWith(compareBy<Result>({ order.indexOf(it.lang).let { i -> if (i < 0) 99 else i } }, { -it.downloads }))
+        val sorted = results.sortedWith(compareBy<Result>({ order.indexOf(it.lang).let { i -> if (i < 0) 99 else i } }, { !it.exact }, { -it.downloads }))
         Found(sorted, errors.toMap())
     }
 
@@ -294,6 +304,21 @@ class SubtitleSources(private val settings: () -> Settings) {
 
     /** Los .srt en español suelen venir en Windows-1252: sin esto salen "Ã±". */
     companion object {
+        /**
+         * Qué resultado del catálogo es la película buscada. Con el mismo año y palabras en común, seguro; sin año,
+         * con palabras en común. Carga automática ([strict]): además vale el primero del catálogo si es del mismo año
+         * (el catálogo conoce los nombres traducidos: "El origen" es "Inception"), pero nunca uno cualquiera de ese año
+         * más abajo en la lista. A mano: si nada calza, el primero (tú ves la lista y eliges).
+         */
+        internal fun pickMeta(list: List<CatalogEntry>, title: String, year: String, strict: Boolean): CatalogEntry? {
+            fun yearOk(m: CatalogEntry) = year.isNotBlank() && m.year.startsWith(year)
+            list.firstOrNull { yearOk(it) && sharesWords(title, it.name) }?.let { return it }
+            if (year.isBlank()) list.firstOrNull { sharesWords(title, it.name) }?.let { return it }
+            list.firstOrNull()?.takeIf { yearOk(it) }?.let { return it }
+            if (!strict) return list.firstOrNull { yearOk(it) } ?: list.firstOrNull()
+            return null
+        }
+
         private val STOP = setOf("el", "la", "los", "las", "de", "del", "the", "of", "a", "and", "y", "en", "un", "una")
         /** ¿El nombre del catálogo trae las palabras importantes del título? Todas si son 1 o 2; si son más, 2 de cada 3. */
         internal fun sharesWords(title: String, name: String): Boolean {
