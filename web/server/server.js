@@ -503,11 +503,14 @@ async function handleProxy(req, res, reqUrl) {
     const q = Object.fromEntries(reqUrl.searchParams);
     try {
       if (reqUrl.pathname.endsWith('/search')) {
+        // Huella del archivo (con clave de OpenSubtitles): reconoce la película aunque su nombre no sirva
+        const fp = q.osKey && /^https?:\/\//i.test(q.url || '') && !/\.m3u8(\?|$)/i.test(q.url) ? await subtitles.osHash(q.url, q.ua, q.ref) : null;
         const out = await subtitles.search({
           title: q.title || '', type: q.type || 'movie', season: q.season || '', episode: q.episode || '', year: q.year || '', imdb: q.imdb || '',
+          strict: q.strict === '1', alts: (q.alts || '').split('|').map((t) => t.trim()).filter(Boolean).slice(0, 4), hash: fp?.hash || '',
           langs: (q.langs || 'es,en').toLowerCase().split(/[\s,]+/).filter(Boolean), osKey: q.osKey || '', subdlKey: q.subdlKey || '',
         });
-        console.log(`[subtítulos] "${q.title}": ${out.results.length} resultados${Object.keys(out.errors).length ? ' · ' + Object.entries(out.errors).map(([k, v]) => `${k}: ${v}`).join(' · ') : ''}`);
+        console.log(`[subtítulos] "${q.title}"${q.alts ? ` (también "${q.alts}")` : ''}${fp ? ` · huella ${fp.hash}` : ''}: ${out.results.length} resultados${Object.keys(out.errors).length ? ' · ' + Object.entries(out.errors).map(([k, v]) => `${k}: ${v}`).join(' · ') : ''}`);
         res.writeHead(200, { ...CORS, 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify(out));
       }

@@ -548,7 +548,7 @@ fun PlayerScreen(vm: AppViewModel) {
             return@LaunchedEffect
         }
         val year = Regex("\\b(19[3-9]\\d|20[0-4]\\d)\\b").find(item.name)?.value.orEmpty()
-        val q = SubtitleSources.Query(cleanTitle(item.seriesName.ifBlank { item.name }), item.seriesName.isNotBlank() || item.season > 0, item.season, item.episode, year)
+        val q = runCatching { vm.subtitleQuery(item).copy(strict = true) }.getOrElse { SubtitleSources.Query(cleanTitle(item.seriesName.ifBlank { item.name }), item.seriesName.isNotBlank() || item.season > 0, item.season, item.episode, year, strict = true) }
         val found = runCatching { vm.subtitleSources.search(q) }.getOrNull() ?: return@LaunchedEffect
         val best = found.results.firstOrNull { it.lang == want } ?: run { vm.logEvent("Subtítulos automáticos: sin resultados en '$want' para ${q.title}"); return@LaunchedEffect }
         if (vm.playing?.id != item.id) return@LaunchedEffect
@@ -1397,7 +1397,7 @@ private fun SubtitlesDialog(
     fun doSearch() {
         status = "Buscando en OpenSubtitles, SubDL y Podnapisi…"
         scope.launch {
-            runCatching { src.search(SubtitleSources.Query(query, item.seriesName.isNotBlank() || item.season > 0, item.season, item.episode, year)) }
+            runCatching { src.search(vm.subtitleQuery(item, query)) }
                 .onSuccess { found = it; status = if (it.results.isEmpty()) "Sin resultados. Prueba con el título original (en inglés)." else null }
                 .onFailure { status = it.message }
         }

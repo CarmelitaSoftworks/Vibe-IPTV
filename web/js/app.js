@@ -892,6 +892,30 @@ function playCurrent() {
 }
 
 /* ---------- subtítulos automáticos (OpenSubtitles vía Stremio y Podnapisi: sin clave) ---------- */
+/**
+ * Título original y año que da el proveedor (Xtream), para buscar subtítulos cuando el nombre de la lista no sirve.
+ * Película: su ficha (get_vod_info); episodio: la ficha de su serie.
+ */
+const subsMetaCache = new Map();
+async function subtitleMeta(item) {
+  const xt = state.xt;
+  if (!xt || !item) return {};
+  const key = String(item.id).startsWith('v') ? `v:${item.id}` : state.series?.seriesId ? `s:${state.series.seriesId}` : '';
+  if (!key) return {};
+  if (subsMetaCache.has(key)) return subsMetaCache.get(key);
+  let info = null;
+  try {
+    info = key.startsWith('v:') ? (await xt.api('get_vod_info', { vod_id: String(item.id).slice(1) }))?.info
+      : (await xt.api('get_series_info', { series_id: state.series.seriesId }))?.info;
+  } catch { info = null; }
+  const meta = info ? {
+    alts: [...new Set(['o_name', 'original_name', 'name', 'title'].map((k) => String(info[k] || '').trim()).filter((v) => v && v !== 'null'))],
+    year: (/(19|20)\d\d/.exec(['releasedate', 'releaseDate', 'release_date', 'year'].map((k) => String(info[k] || '')).find((v) => v.length >= 4) || '') || [])[0] || '',
+  } : {};
+  subsMetaCache.set(key, meta);
+  return meta;
+}
+
 async function autoSubtitles(item) {
   if (item.kind === 'live' || !cfg().autoSubs || String(item.id).startsWith('cu_') || !proxyBase()) return;
   await new Promise((r) => video.addEventListener('playing', r, { once: true }));
@@ -907,7 +931,7 @@ async function autoSubtitles(item) {
   if (own) { if (own.mode !== 'showing') subs.selectTrack(video, own); return; }
   if (tracks.some((t) => t.mode === 'showing')) return;
   try {
-    const { results } = await subs.searchSubtitles(item);
+    const { results } = await subs.searchSubtitles(item, '', { ...(await subtitleMeta(item)), strict: true });
     const best = results.find((r) => r.lang === want);
     if (!best || state.playing !== item) return;
     subs.attachVtt(video, await subs.downloadSubtitle(best), `${best.source}: ${best.label}`.slice(0, 48), best.lang);
@@ -1350,7 +1374,7 @@ async function searchSubs() {
   const box = $('subsResults');
   box.innerHTML = '<p class="hint">Buscando…</p>';
   try {
-    const { results, errors } = await subs.searchSubtitles(state.playing || { name: '' }, $('subsQuery').value.trim());
+    const { results, errors } = await subs.searchSubtitles(state.playing || { name: '' }, $('subsQuery').value.trim(), await subtitleMeta(state.playing));
     box.innerHTML = results.length ? '' : '<p class="hint">Sin resultados. Prueba con el título original (en inglés) o sin el año.</p>';
     results.slice(0, 60).forEach((r) => {
       const b = document.createElement('button');

@@ -57,6 +57,7 @@ export default {
   "☆ Añadir a favoritos": "☆ Add to favorites",
   "☆ Favorito": "☆ Favorite",
   "✎ Organizar categorías": "✎ Organize categories",
+  "✓ Calza con este archivo · {}": "✓ Matches this file · {}",
   "✓ Listo": "✓ Done",
   "✕ Salir": "✕ Exit",
   "✨ Desactivar subtítulos IA": "✨ Turn off AI subtitles",

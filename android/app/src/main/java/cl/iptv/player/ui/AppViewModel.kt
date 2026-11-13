@@ -30,6 +30,39 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val subtitles = OpenSubtitles { settings }
     val subtitleSources = SubtitleSources { settings }
 
+    /**
+     * Búsqueda de subtítulos con todo lo que se sabe del archivo, para cuando el nombre de la lista no sirve:
+     * el título original y el año que da el proveedor (Xtream) y, con la clave de OpenSubtitles, la huella del archivo.
+     */
+    suspend fun subtitleQuery(item: Item, title: String = cleanTitle(item.seriesName.ifBlank { item.name })): SubtitleSources.Query {
+        val year0 = Regex("\\b(19[3-9]\\d|20[0-4]\\d)\\b").find(item.name)?.value.orEmpty()
+        val isSeries = item.seriesName.isNotBlank() || item.season > 0
+        var q = SubtitleSources.Query(title, isSeries, item.season, item.episode, year0)
+        val x = xtream
+        if (x != null) {
+            // Película de Xtream: su ficha trae el nombre original y la fecha; episodio: la ficha de su serie
+            val info = withContext(Dispatchers.IO) {
+                when {
+                    item.id.startsWith("v") -> x.info(item)
+                    isSeries -> series?.let { x.info(it) }
+                    else -> null
+                }
+            }
+            if (info != null) {
+                val alts = listOf("o_name", "original_name", "name", "title").map { info.optString(it).trim() }
+                    .filter { it.isNotBlank() && it != "null" }.map { cleanTitle(it) }.filter { it.length >= 2 && !it.equals(title, true) }.distinct()
+                val date = listOf("releasedate", "releaseDate", "release_date", "year").map { info.optString(it) }.firstOrNull { it.length >= 4 }.orEmpty()
+                q = q.copy(alts = alts, year = q.year.ifBlank { Regex("(19|20)\\d\\d").find(date)?.value.orEmpty() })
+            }
+        }
+        // Huella del archivo (necesita la clave de OpenSubtitles): sólo en películas y episodios, no en canales
+        if (settings.osApiKey.isNotBlank() && item.kind != Kind.LIVE && !item.url.substringBefore('?').endsWith(".m3u8", true)) {
+            withContext(Dispatchers.IO) { SubtitleSources.osHash(item.url, item.userAgent, item.referrer) }
+                ?.let { (h, size) -> q = q.copy(hash = h, size = size); logEvent("Subtítulos: huella del archivo $h") }
+        }
+        return q
+    }
+
     var sources by mutableStateOf(store.sources()); private set
     var settings by mutableStateOf(store.settings()); private set
     var source by mutableStateOf<Source?>(null); private set

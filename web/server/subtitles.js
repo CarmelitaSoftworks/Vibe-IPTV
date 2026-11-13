@@ -25,14 +25,60 @@ async function get(url, opts = {}) {
 const getJson = async (url, opts) => (await get(url, opts)).json();
 
 // ---------- Proveedores ----------
+// Código IMDb: primero con el título original que da el proveedor (Xtream), después con el nombre de la lista
 async function imdbFor(q) {
   if (q.imdb) return q.imdb;
+  const titles = [...new Set([...(q.alts || []), q.title].map((t) => String(t || '').trim()).filter((t) => t.length >= 2))];
+  for (const t of titles) { const id = await imdbForTitle(t, q); if (id) return id; }
+  return null;
+}
+async function imdbForTitle(title, q) {
   const type = q.type === 'series' ? 'series' : 'movie';
-  const r = await getJson(`https://v3-cinemeta.strem.io/catalog/${type}/top/search=${encodeURIComponent(q.title)}.json`);
+  const r = await getJson(`https://v3-cinemeta.strem.io/catalog/${type}/top/search=${encodeURIComponent(title)}.json`);
   const metas = r.metas || [];
-  const byYear = q.year && metas.find((m) => String(m.releaseInfo || m.year || '').startsWith(String(q.year)));
-  const m = byYear || metas[0];
+  // Sólo un resultado que calce: mismo año, o (sin año) que comparta palabras con el título. Antes se tomaba el
+  // primero aunque no tuviera nada que ver ("Pelicula 123" traía subtítulos de otra película)
+  const yearOk = (m) => q.year && String(m.releaseInfo || m.year || '').startsWith(String(q.year));
+  const m = metas.find((x) => yearOk(x) && sharesWords(title, x.name)) || metas.find(yearOk)
+    || (!q.year && metas.find((x) => sharesWords(title, x.name)))
+    || (!q.strict && metas[0]);                       // a mano: lo más parecido, tú eliges
   return m ? (m.imdb_id || m.id) : null;
+}
+const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const STOP = new Set(['el', 'la', 'los', 'las', 'de', 'del', 'the', 'of', 'a', 'and', 'y', 'en', 'un', 'una']);
+/** ¿El nombre del catálogo trae las palabras importantes del título? Todas si son 1 o 2; si son más, 2 de cada 3. */
+function sharesWords(title, name) {
+  const w = fold(title).split(' ').filter((x) => x.length >= 2 && !STOP.has(x));
+  if (!w.length) return false;
+  const n = new Set(fold(name).split(' '));
+  const hit = w.filter((x) => n.has(x)).length;
+  return w.length <= 2 ? hit === w.length : hit * 3 >= w.length * 2;
+}
+
+// ---------- Huella del archivo (OpenSubtitles): reconoce la película aunque su nombre no sirva ----------
+const MATCH = '✓ Calza con este archivo · ';
+const CHUNK = 65536;
+/** Tamaño + suma de los números de 8 bytes del principio y el final (sólo se piden esos 2 pedazos de 64 KB). */
+function hashOf(size, head, tail) {
+  let h = BigInt(size);
+  for (const part of [head, tail]) for (let i = 0; i < CHUNK; i += 8) h = (h + part.readBigUInt64LE(i)) & 0xFFFFFFFFFFFFFFFFn;
+  return h.toString(16).padStart(16, '0');
+}
+async function osHash(url, ua = '', ref = '') {
+  const piece = async (range) => {
+    const res = await fetch(url, { headers: { Range: `bytes=${range}`, 'User-Agent': ua || UA, ...(ref ? { Referer: ref } : {}) }, signal: AbortSignal.timeout(TIMEOUT) });
+    if (res.status !== 206) { res.body?.cancel?.(); throw new Error(`sin pedazos (HTTP ${res.status})`); }
+    const total = Number((res.headers.get('content-range') || '').split('/')[1]);
+    const buf = Buffer.from(await res.arrayBuffer()).subarray(0, CHUNK);
+    return { buf, total };
+  };
+  try {
+    const a = await piece(`0-${CHUNK - 1}`);
+    if (!(a.total >= CHUNK * 2) || a.buf.length < CHUNK) return null;
+    const b = await piece(`${a.total - CHUNK}-${a.total - 1}`);
+    if (b.buf.length < CHUNK) return null;
+    return { hash: hashOf(a.total, a.buf, b.buf), size: a.total };
+  } catch { return null; }
 }
 
 async function stremio(q) {
@@ -49,15 +95,28 @@ async function stremio(q) {
 
 async function opensubtitles(q) {
   if (!q.osKey) throw new Error('falta la API key (Ajustes → Subtítulos)');
-  const p = new URLSearchParams({ query: q.title, languages: q.langs.join(',') });
+  // Con la huella del archivo se busca primero por ella: encuentra la película aunque el nombre no sirva
+  if (q.hash) {
+    const exact = (await opensubtitlesBy(q, { moviehash: q.hash }).catch(() => [])).filter((r) => r.label.startsWith(MATCH));
+    if (exact.length) return [...exact, ...(await opensubtitlesBy(q, { query: (q.alts || [])[0] || q.title }).catch(() => [])).filter((r) => !exact.some((e) => e.id === r.id))];
+  }
+  return opensubtitlesBy(q, { query: (q.alts || [])[0] || q.title });
+}
+
+async function opensubtitlesBy(q, by) {
+  const p = new URLSearchParams({ ...by, languages: q.langs.join(',') });
   if (q.season) p.set('season_number', q.season);
   if (q.episode) p.set('episode_number', q.episode);
   if (q.year) p.set('year', q.year);
   const r = await getJson(`https://api.opensubtitles.com/api/v1/subtitles?${p}`, { headers: { 'Api-Key': q.osKey } });
-  return (r.data || []).flatMap((d) => (d.attributes.files || []).map((f) => ({
-    provider: 'opensubtitles', id: String(f.file_id), lang: d.attributes.language,
-    label: d.attributes.release || f.file_name || 'Subtítulo', downloads: d.attributes.download_count || 0,
-  })));
+  return (r.data || []).flatMap((d) => (d.attributes.files || []).map((f) => {
+    // Coincide con la huella del archivo: calza justo con ese video (mismo corte y velocidad)
+    const exact = d.attributes.moviehash_match ? MATCH : '';
+    return {
+      provider: 'opensubtitles', id: String(f.file_id), lang: d.attributes.language,
+      label: exact + (d.attributes.release || f.file_name || 'Subtítulo'), downloads: (d.attributes.download_count || 0) + (exact ? 1e6 : 0),
+    };
+  }));
 }
 
 // SubDL, API oficial (https://subdl.com/api-doc): por código IMDb si se encuentra, si no por título;
@@ -73,7 +132,7 @@ function subdlLangCode(code, name) {
 async function subdlQuery(q, imdb) {
   const p = new URLSearchParams({ api_key: q.subdlKey, languages: q.langs.map(subdlLang).join(','), subs_per_page: '30',
     type: q.type === 'series' ? 'tv' : 'movie', hi: '1', releases: '1', unpack: '1', client: 'custom_integration' });
-  if (imdb) p.set('imdb_id', imdb); else { p.set('film_name', q.title); if (q.year) p.set('year', q.year); }
+  if (imdb) p.set('imdb_id', imdb); else { p.set('film_name', (q.alts || [])[0] || q.title); if (q.year) p.set('year', q.year); }
   if (q.season) p.set('season_number', q.season);
   if (q.episode) p.set('episode_number', q.episode);
   try { return await getJson(`https://api.subdl.com/api/v1/subtitles?${p}`); }
@@ -117,7 +176,7 @@ async function subdlAccount(key) {
 }
 
 async function podnapisi(q) {
-  const p = new URLSearchParams({ keywords: q.title, movie_type: q.type === 'series' ? 'tv-series' : 'movie' });
+  const p = new URLSearchParams({ keywords: (q.alts || [])[0] || q.title, movie_type: q.type === 'series' ? 'tv-series' : 'movie' });
   for (const l of q.langs) p.append('language', l);
   if (q.season) p.set('seasons', q.season);
   if (q.episode) p.set('episodes', q.episode);
@@ -220,4 +279,4 @@ async function download(provider, id, keys = {}) {
   return srtToVtt(text);
 }
 
-module.exports = { search, download, subdlAccount, decodeText, srtToVtt, assToVtt, unzipBest };
+module.exports = { search, download, subdlAccount, decodeText, srtToVtt, assToVtt, unzipBest, osHash, hashOf };

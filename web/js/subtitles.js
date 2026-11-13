@@ -59,15 +59,21 @@ const yearOf = (name) => (/\b(19[3-9]\d|20[0-4]\d)\b/.exec(name || '') || [])[1]
  * Sin servidor (vista previa) sólo queda OpenSubtitles con clave.
  * Devuelve { results: [{provider, source, id, lang, label, downloads}], errors: {fuente: motivo} }.
  */
-export async function searchSubtitles(item, query) {
+/**
+ * meta: lo que da el proveedor para cuando el nombre de la lista no sirve ({ alts: [título original…], year }).
+ * El servidor también calcula la huella del archivo (con la clave de OpenSubtitles) a partir de su dirección.
+ */
+export async function searchSubtitles(item, query, meta = {}) {
   const s = getSettings();
   const title = query || cleanTitle(item.seriesName || item.name);
   if (proxyBase()) {
     const p = new URLSearchParams({
       title, langs: (s.subLangs || 'es,en').replace(/\s+/g, ''),
       type: item.seriesName || item.season ? 'series' : 'movie',
-      season: item.season || '', episode: item.episode || '', year: yearOf(item.name),
-      osKey: s.osApiKey || '', subdlKey: s.subdlKey || '',
+      season: item.season || '', episode: item.episode || '', year: yearOf(item.name) || meta.year || '',
+      alts: (meta.alts || []).map(cleanTitle).filter((t) => t && t.toLowerCase() !== title.toLowerCase()).join('|'),
+      url: item.kind === 'live' ? '' : item.url || '', ua: item.userAgent || '', ref: item.referrer || '',
+      osKey: s.osApiKey || '', subdlKey: s.subdlKey || '', strict: meta.strict ? '1' : '',
     });
     const res = await fetch(`${proxyBase()}/proxy/subs/search?${p}`);
     if (!res.ok) throw new Error(decodeURIComponent(res.headers.get('x-proxy-error') || `error ${res.status}`));
