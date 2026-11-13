@@ -698,15 +698,32 @@ async function loadAddons(src, errs = []) {
   addonsCache = { key: src.id + src.url, list };
   return list;
 }
+/** Abre un enlace magnet en el servidor local y sigue con la dirección del video (se ve como un archivo normal). */
+async function openTorrent(item, then) {
+  if (!cfg().torrents) return toast(t('Para ver torrents actívalos en Ajustes → Reproducción → Reproducir torrents'), 6000);
+  if (!proxyBase()) return toast(t('Los torrents necesitan la app de PC (iniciar.bat o la versión portable)'), 6000);
+  loader(true, t('Conectando con el torrent…'));
+  try {
+    const res = await fetch(`${proxyBase()}/proxy/torrent/open?${new URLSearchParams({ magnet: item.url, up: cfg().torrentUp || '50' })}`);
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || `error ${res.status}`);
+    logEvent(`Torrent abierto: ${item.name}`);
+    then({ ...item, url: proxyBase() + j.url });
+  } catch (e) { toast(`${t('No se pudo abrir el torrent')}: ${e.message}`, 6000); }
+  finally { loader(false); }
+}
+const closeTorrent = () => { if (proxyBase()) fetch(`${proxyBase()}/proxy/torrent/close`).catch(() => {}); };
+
 /** Pide los videos de un elemento de extensión; con uno solo sigue directo, con varios deja elegir. */
 async function withStream(item, then) {
   loader(true, t('Buscando videos…'));
   let r;
-  try { r = await stremio.streams(await loadAddons(state.source), item); }
+  try { r = await stremio.streams(await loadAddons(state.source), item, !!cfg().torrents); }
   catch (e) { return toast(`${t('No se pudieron pedir los videos')}: ${e.message}`); }
   finally { loader(false); }
-  const use = (s) => then({ ...item, url: s.url, userAgent: s.userAgent || item.userAgent, referrer: s.referrer || item.referrer });
-  if (!r.list.length) return toast(r.torrents ? t('Para esto las extensiones sólo entregan torrents: Vibe IPTV reproduce enlaces de video directos') : t(`Ninguna de tus extensiones entrega videos para «${item.name}»`), 6000);
+  const use = (s) => (s.torrent ? openTorrent({ ...item, url: s.url }, then)
+    : then({ ...item, url: s.url, userAgent: s.userAgent || item.userAgent, referrer: s.referrer || item.referrer }));
+  if (!r.list.length) return toast(r.torrents ? t('Para esto las extensiones sólo entregan torrents: actívalos en Ajustes → Reproducción → Reproducir torrents') : t(`Ninguna de tus extensiones entrega videos para «${item.name}»`), 6000);
   if (r.list.length === 1) return use(r.list[0]);
   $('streamTitle').textContent = item.name;
   $('streamHint').textContent = t(`Elige un video (${r.list.length} opciones)`);
@@ -738,6 +755,11 @@ async function loadEpisodeStills(series) {
 async function activate(idx) {
   const item = state.view[idx];
   if (!item) return;
+  // Enlace magnet en una lista: se abre el torrent y se reproduce desde el servidor local
+  if (/^magnet:/i.test(item.url || '')) {
+    const list = state.view.filter((i) => i.kind === item.kind);
+    return openTorrent(item, (resolved) => { const l = list.map((x) => (x.id === resolved.id ? resolved : x)); openPlayer(resolved, l, l.findIndex((x) => x.id === resolved.id)); });
+  }
   // Película o canal de una extensión: primero se piden los videos (y se elige uno si hay varios)
   if (stremio.needsStream(item)) {
     const list = state.view.filter((i) => i.kind === item.kind);
@@ -1089,6 +1111,15 @@ function zap(delta) {
 }
 function playIndexAt(i) {
   if (i < 0 || i >= state.playList.length || i === state.playIndex) return;
+  // Siguiente o anterior que es un enlace magnet: se abre el torrent antes de cambiar
+  if (/^magnet:/i.test(state.playList[i].url || '')) {
+    return openTorrent(state.playList[i], (resolved) => {
+      const j = state.playList.findIndex((x) => x.id === resolved.id);
+      if (j >= 0) { state.playList[j] = resolved; playIndexAt(j); }
+    });
+  }
+  // Se pasó a algo que no es el torrent abierto: se deja de compartir y se borra lo bajado
+  if (String(state.playing?.url || '').includes('/proxy/torrent/stream/') && !String(state.playList[i].url || '').includes('/proxy/torrent/stream/')) closeTorrent();
   // Siguiente o anterior de una extensión: se piden sus videos antes de cambiar
   if (stremio.needsStream(state.playList[i])) {
     return withStream(state.playList[i], (resolved) => {
@@ -1244,6 +1275,7 @@ function menuSleep() {
 
 function closePlayer() {
   savePosition(state.playing);
+  if (String(state.playing?.url || '').includes('/proxy/torrent/stream/')) closeTorrent();    // deja de compartir y borra lo bajado
   player.destroy();
   closePlayerMenu(); $('pListPanel').hidden = true;
   if (!$('pInfo').hidden) toggleInfo();

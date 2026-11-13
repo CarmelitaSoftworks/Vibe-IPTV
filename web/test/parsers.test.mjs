@@ -153,3 +153,11 @@ test('extensiones de Stremio: direcciones, ids y qué atiende cada una', async (
   assert.equal(st.serves(a, 'stream', 'movie', 'kitsu:1'), false);   // otro tipo de id
   assert.equal(st.needsStream({ id: 'stm:movie:tt1', kind: 'movie', url: '' }), true);
 });
+
+test('torrents: enlace magnet desde una extensión', async () => {
+  const st = await import('../js/stremio.js');
+  const m = st.magnet('ABC123', ['tracker:udp://tracker.ejemplo:1337/announce', 'dht:abc123'], 'Película');
+  assert.ok(m.startsWith('magnet:?xt=urn:btih:abc123&dn=Pel'));
+  assert.ok(m.includes('&tr=udp%3A%2F%2Ftracker.ejemplo%3A1337%2Fannounce'));
+  assert.ok(!m.includes('dht'));
+});

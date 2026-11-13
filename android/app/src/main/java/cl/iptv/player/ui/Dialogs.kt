@@ -210,7 +210,7 @@ fun SourcesDialog(
         if (type == SourceType.STREMIO) {
             Field(url, { url = it }, "Direcciones de las extensiones (manifest.json), separadas por espacio o coma", keyboard = KeyboardType.Uri)
             Text("Sus catálogos se ven como categorías; al elegir algo se piden los videos a las extensiones que los entregan. " +
-                "Vibe IPTV no trae extensiones ni recomienda ninguna: agrega sólo las que tengas derecho a usar. Se reproducen enlaces de video directos (no torrents).",
+                "Vibe IPTV no trae extensiones ni recomienda ninguna: agrega sólo las que tengas derecho a usar. Se reproducen enlaces de video directos y, si los activas en Ajustes, torrents.",
                 color = c.inkSoft, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
         } else if (type == SourceType.M3U) {
             Field(url, { url = it; if (it.isNotBlank()) fileUri = null }, "URL de la lista .m3u / .m3u8", keyboard = KeyboardType.Uri, highlight = "url" in filled)

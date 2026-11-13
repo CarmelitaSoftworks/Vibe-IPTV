@@ -55,6 +55,14 @@ class StremioTest {
     }
     @After fun stop() = server.close()
 
+    @Test fun enlaceMagnet() {
+        val m = TorrentStream.magnet("ABC123", listOf("tracker:udp://tracker.ejemplo:1337/announce", "dht:abc123"), "Película")
+        assertTrue(m.startsWith("magnet:?xt=urn:btih:abc123&dn=Pel"))
+        assertTrue(m.contains("&tr=udp%3A%2F%2Ftracker.ejemplo%3A1337%2Fannounce"))
+        assertTrue(!m.contains("dht"))
+        assertTrue(TorrentStream.isTorrent(m))
+    }
+
     @Test fun direccionesQueSePegan() {
         assertEquals("https://x.ejemplo/abc", Stremio.normalize("stremio://x.ejemplo/abc/manifest.json"))
         assertEquals("https://x.ejemplo", Stremio.normalize("x.ejemplo/manifest.json"))
@@ -76,6 +84,10 @@ class StremioTest {
         val (streams, torrents) = Stremio.streams(listOf(addon), movie)
         assertEquals(2, streams.size); assertEquals(1, torrents)              // el torrent no se usa
         assertEquals("UA prueba", streams[0].userAgent); assertEquals("http://ref.ejemplo/", streams[0].referrer)
+        // Con los torrents activados (Ajustes) también aparecen, después de los enlaces directos
+        val (withT, skipped) = Stremio.streams(listOf(addon), movie, torrents = true)
+        assertEquals(3, withT.size); assertEquals(0, skipped)
+        assertTrue(withT.last().torrent && withT.last().url.startsWith("magnet:?xt=urn:btih:abc123"))
         val subs = Stremio.subtitles(listOf(addon), "movie", "tt1")
         assertEquals("spa", subs.single().lang)
     }

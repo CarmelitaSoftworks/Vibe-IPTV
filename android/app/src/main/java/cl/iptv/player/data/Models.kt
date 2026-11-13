@@ -103,6 +103,12 @@ data class Settings(
     val audioDelayMs: Int = 0,
     /** Ocultar los canales en vivo que no respondieron en "Revisar canales caídos". */
     val hideDead: Boolean = false,
+    /**
+     * Torrents (extensiones de Stremio y enlaces magnet): desactivado por defecto. Al verlos también se comparten pedazos
+     * con otras personas (ven tu IP): la subida va limitada a [torrentUploadKBps] y al cerrar el video se borra todo.
+     */
+    val torrents: Boolean = false,
+    val torrentUploadKBps: Int = 50,
     /** Mini reproductor dentro de la app: tamaño (small | medium | large) y esquina (br | bl | tr | tl). */
     val miniSize: String = "medium",
     val miniCorner: String = "br",

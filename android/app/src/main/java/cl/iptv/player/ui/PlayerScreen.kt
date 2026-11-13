@@ -1349,6 +1349,7 @@ fun PlayerScreen(vm: AppViewModel) {
                             cl.iptv.player.data.Decoders.isSoftwareName(videoDecoder) -> "Software · $videoDecoder"
                             else -> "Chip del equipo · $videoDecoder"
                         })
+                        cl.iptv.player.data.TorrentStream.status()?.let { add("Torrent" to it) }
                         if (!useAlt) bandwidth.bitrateEstimate.takeIf { it > 0 }?.let { add("Velocidad de descarga" to "%.1f Mb/s".format(it / 1e6)) }
                     }
                     (listOf("Motor" to engineName[engine].orEmpty()) + diag + k?.info().orEmpty().filter { it.first != "Búfer" } +

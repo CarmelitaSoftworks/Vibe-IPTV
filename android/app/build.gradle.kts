@@ -143,6 +143,12 @@ kotlin {
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.06.00")
     implementation(composeBom)
+    // Torrents (opcional, desactivado por defecto en Ajustes): libtorrent para cada tipo de equipo
+    val libtorrent = "2.1.0-39"
+    implementation("org.libtorrent4j:libtorrent4j:$libtorrent")
+    implementation("org.libtorrent4j:libtorrent4j-android-arm:$libtorrent")
+    implementation("org.libtorrent4j:libtorrent4j-android-arm64:$libtorrent")
+    implementation("org.libtorrent4j:libtorrent4j-android-x86_64:$libtorrent")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")

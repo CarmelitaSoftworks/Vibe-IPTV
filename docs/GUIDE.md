@@ -107,8 +107,15 @@ Vibe IPTV can use **Stremio extensions** (Stremio's open add-on format) as one m
 - **How they look:** the extensions' catalogs show up as categories in Movies, Series and Live TV, with artwork; series bring their episodes with an image for each. Favorites, Search, *Continue watching* and every theme work.
 - **When you pick something** the app asks the extensions that provide videos (they can be other ones in the same list): if there's one it starts by itself; if there are several you choose in a window. With ▲▼ in the player you go to the next episode or movie and its videos are requested.
 - **Subtitles:** what comes from extensions already carries its IMDb code, so the subtitle search finds the exact movie; subtitles from extensions that provide them are added too.
-- **Limits:** **direct video links** (http/https) are played. Extensions that only provide torrents don't work (Vibe IPTV doesn't download or share torrents). Search-only extensions (no catalog to browse) don't show anything yet.
+- **Limits:** **direct video links** (http/https) are played and, if you turn them on, **torrents** (see below). Search-only extensions (no catalog to browse) don't show anything yet.
 - **Important:** Vibe IPTV doesn't include or recommend any extension. Add only those you have the right to use, just like your lists.
+
+### Torrents (optional)
+
+- **Turn on:** Settings → Playback → **Play torrents** (off by default). It works for torrents provided by Stremio extensions (shown with 🧲, after the direct links) and for `magnet:` links in your lists.
+- **How it works:** the video downloads in order while you watch and you can seek (the pieces where you jumped are requested first). At the start it takes a few seconds to find people sharing it. The player info (INFO button / I key) shows how many peers there are and the speed.
+- **Note:** while watching you also **share pieces of the video with other people, and they can see your IP address**. Whether it is legal depends on what you watch and your country. Upload is limited (Settings → *Torrents: max upload*, 50 KB/s by default) and **when you close the video sharing stops and everything downloaded is deleted**.
+- **On PC** torrents need the PC app (`iniciar.bat` or the portable version); they don't work in the web version opened from GitHub Pages.
 
 ## 6. Player and cable-TV channels (AC-3, MP2, MPEG-2)
 

@@ -493,6 +493,7 @@ async function handleProxy(req, res, reqUrl) {
   if (reqUrl.pathname === '/proxy/hls/start') return handleHlsStart(req, res, reqUrl);
   if (reqUrl.pathname === '/proxy/gunzip') return handleGunzip(req, res, reqUrl);
   if (reqUrl.pathname.startsWith('/proxy/hls/')) return handleHlsFile(req, res, reqUrl);
+  if (reqUrl.pathname.startsWith('/proxy/torrent/')) return handleTorrent(req, res, reqUrl);
   if (reqUrl.pathname === '/proxy/subs/subdl-account') {
     try {
       const msg = await subtitles.subdlAccount(reqUrl.searchParams.get('key') || '');
@@ -605,6 +606,76 @@ function serveStatic(req, res, reqUrl) {
 // Contraseña opcional (VIBE_PASSWORD) para servidores propios accesibles fuera de casa.
 // El navegador la pide una vez y la reenvía sola en cada petición (también en el video).
 const PASSWORD = process.env.VIBE_PASSWORD || '';
+// ---- Torrents (opcional, se activa en Ajustes → Reproducción) ----
+// Se baja el archivo de video del torrent con prioridad a lo que se está viendo y se entrega al reproductor como un
+// video normal (con adelantar). Mientras se ve también se comparten pedazos con otras personas (ven tu IP): la subida va
+// limitada y al cerrar el video (o 3 minutos sin pedidos) se deja de compartir y se borra lo bajado.
+let torrentClient = null, torrentCurrent = null, torrentIdle = null;
+const TORRENT_DIR = path.join(os.tmpdir(), 'vibe-torrent');
+const VIDEO_EXT = /\.(mp4|mkv|avi|m4v|mov|webm|ts|wmv|flv|mpg|mpeg)$/i;
+function torrentClose() {
+  clearTimeout(torrentIdle);
+  if (torrentClient) { try { torrentClient.destroy(); } catch {} }
+  torrentClient = null; torrentCurrent = null;
+  fs.rm(TORRENT_DIR, { recursive: true, force: true }, () => {});
+}
+function torrentTouch() { clearTimeout(torrentIdle); torrentIdle = setTimeout(torrentClose, 180000); }
+async function handleTorrent(req, res, reqUrl) {
+  const json = (code, o) => { res.writeHead(code, { ...CORS, 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(o)); };
+  const p = reqUrl.pathname;
+  if (p === '/proxy/torrent/close') { torrentClose(); return json(200, { ok: true }); }
+  if (p === '/proxy/torrent/status') {
+    const t = torrentCurrent?.torrent;
+    return json(200, t ? { peers: t.numPeers, down: t.downloadSpeed, up: t.uploadSpeed, progress: t.progress } : {});
+  }
+  if (p === '/proxy/torrent/open') {
+    let WebTorrent;
+    try { WebTorrent = require('webtorrent'); } catch { return json(501, { error: L('Falta el componente de torrents: vuelve a abrir la app con iniciar.bat o usa la versión portable', 'The torrent component is missing') }); }
+    const magnet = reqUrl.searchParams.get('magnet') || '';
+    if (!/^magnet:\?/i.test(magnet)) return json(400, { error: 'Enlace magnet no válido' });
+    const up = Math.max(1, Number(reqUrl.searchParams.get('up')) || 50) * 1024;
+    const wantIdx = Number((/[?&]vibe_file=(\d+)/.exec(magnet) || [])[1]);
+    torrentClose();
+    torrentClient = new WebTorrent({ uploadLimit: up });
+    torrentClient.on('error', (e) => console.warn('[torrent]', e.message));
+    const id = crypto.randomBytes(6).toString('hex');
+    try {
+      const torrent = await new Promise((ok, ko) => {
+        const t = torrentClient.add(magnet.replace(/&vibe_file=\d+/, ''), { path: path.join(TORRENT_DIR, id) });
+        const timer = setTimeout(() => ko(new Error('No se encontraron personas compartiendo este torrent (prueba otra opción)')), 60000);
+        t.on('metadata', () => { clearTimeout(timer); ok(t); });
+        t.on('error', (e) => { clearTimeout(timer); ko(e); });
+      });
+      const files = torrent.files;
+      const file = (Number.isInteger(wantIdx) && files[wantIdx]) || files.filter((f) => VIDEO_EXT.test(f.name)).sort((a, b) => b.length - a.length)[0]
+        || files.slice().sort((a, b) => b.length - a.length)[0];
+      if (!file) throw new Error('El torrent no trae archivos');
+      for (const f of files) if (f !== file) f.deselect();            // sólo el video elegido
+      torrentCurrent = { id, torrent, file };
+      torrentTouch();
+      console.log(`[torrent] ${file.name} (${(file.length / 1048576).toFixed(0)} MB)`);
+      return json(200, { url: `/proxy/torrent/stream/${id}/${encodeURIComponent(file.name)}`, name: file.name });
+    } catch (e) { torrentClose(); return json(502, { error: e.message }); }
+  }
+  const m = /^\/proxy\/torrent\/stream\/([0-9a-f]+)\//.exec(p);
+  if (m && torrentCurrent?.id === m[1]) {
+    torrentTouch();
+    const f = torrentCurrent.file, size = f.length;
+    const r = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+    const start = r && r[1] ? Number(r[1]) : 0, end = r && r[2] ? Math.min(Number(r[2]), size - 1) : size - 1;
+    if (start >= size) { res.writeHead(416, { ...CORS, 'Content-Range': `bytes */${size}` }); return res.end(); }
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    const type = { mp4: 'video/mp4', m4v: 'video/mp4', mkv: 'video/x-matroska', webm: 'video/webm', ts: 'video/mp2t', avi: 'video/x-msvideo', mov: 'video/quicktime' }[ext] || 'application/octet-stream';
+    res.writeHead(r ? 206 : 200, { ...CORS, 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, ...(r ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}) });
+    if (req.method === 'HEAD') return res.end();
+    const stream = f.createReadStream({ start, end });             // WebTorrent pide primero estas piezas
+    stream.on('error', () => res.destroy());
+    req.on('close', () => stream.destroy());
+    return stream.pipe(res);
+  }
+  return json(404, { error: 'No encontrado' });
+}
+
 function authorized(req) {
   if (!PASSWORD) return true;
   const m = /^Basic\s+(.+)$/i.exec(req.headers.authorization || '');

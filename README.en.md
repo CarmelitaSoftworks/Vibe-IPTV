@@ -100,7 +100,8 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Sound** (Settings → Sound or *More → Sound*): *Clear voices*, *More bass* and *Night* equalizer, and **even volume** across channels and ads (Android).
 - **Sync subtitles**: *More → Sync subtitles*, in half-second steps, on every engine.
 - **Real images for each episode** (a scene from it) instead of the repeated cover.
-- **Stremio extensions** (Android and PC): add extensions by their `manifest.json` address and their catalogs show up as one more list; when you pick something you choose among the videos they provide (direct links; no torrents). No extensions are included or recommended.
+- **Stremio extensions** (Android and PC): add extensions by their `manifest.json` address and their catalogs show up as one more list; when you pick something you choose among the videos they provide (direct links and, if you turn them on, torrents). No extensions are included or recommended.
+- **Torrents** (optional, Android and PC): magnet links and torrents from extensions play while they download, with seeking. Off by default; while watching you also share pieces with other people (they see your IP), with limited upload, and everything is deleted when you close the video.
 - **Skip intro** in series: a button at the start of the episode; mark *Intro ends here* once and the other episodes jump right there (or automatically, if you turn it on).
 - **Recent channels**: a player button with the last 5 channels watched.
 - **Send to TV** (Android): with Vibe IPTV open on the phone and the TV, on the same Wi-Fi, *More → Send to TV* plays it there (movies continue from the same minute).

@@ -893,6 +893,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Película o canal de una extensión: primero se piden los videos (y se elige uno si hay varios)
         if (Stremio.needsStream(item)) { withStream(item) { activate(it, fromList) }; return }
+        // Enlace magnet en una lista: se abre el torrent y se reproduce desde el equipo
+        if (TorrentStream.isTorrent(item.url)) { openTorrent(item) { activate(it, fromList) }; return }
         if (item.kind == Kind.SERIES) {
             if (item.episodes.isNotEmpty()) { episodes = item.episodes; series = item; query = ""; recompute(true); loadEpisodeStills(item); return }
             val x = xtream ?: return
@@ -957,7 +959,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun pickStream(st: Stremio.Stream) {
         val p = streamPick ?: return
         streamPick = null
-        p.then(p.item.copy(url = st.url, userAgent = st.userAgent, referrer = st.referrer))
+        useStream(p.item, st, p.then)
+    }
+    /** Un video elegido: directo, o un torrent que primero se abre (y se entrega al reproductor desde el equipo). */
+    private fun useStream(item: Item, st: Stremio.Stream, then: (Item) -> Unit) {
+        if (!st.torrent) { then(item.copy(url = st.url, userAgent = st.userAgent, referrer = st.referrer)); return }
+        openTorrent(item.copy(url = st.url), then)
+    }
+    /** Abre un enlace magnet: busca a quién pedirle el video y lo deja listo para el reproductor. */
+    private fun openTorrent(item: Item, then: (Item) -> Unit) {
+        if (!settings.torrents) { message = "Para ver torrents actívalos en Ajustes → Reproducción → Reproducir torrents"; return }
+        viewModelScope.launch {
+            loading = "Conectando con el torrent…"
+            val r = runCatching { TorrentStream.open(getApplication(), item.url, settings.torrentUploadKBps) { s -> loading = s } }
+            loading = null
+            r.onSuccess { local -> logEvent("Torrent abierto: ${item.name}"); then(item.copy(url = local)) }
+                .onFailure { message = "No se pudo abrir el torrent: ${it.message}" }
+        }
     }
 
     /** Pide los videos de un elemento de extensión; con uno solo sigue directo, con varios deja elegir. */
@@ -965,16 +983,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val src = source ?: return
         viewModelScope.launch {
             loading = "Buscando videos…"
-            val r = runCatching { Stremio.streams(stremioAddons(src), item) }
+            val r = runCatching { Stremio.streams(stremioAddons(src), item, torrents = settings.torrents) }
             loading = null
             val (list, torrents) = r.getOrElse { message = "No se pudieron pedir los videos: ${it.message}"; return@launch }
             when {
-                list.isEmpty() -> message = if (torrents > 0) "Para esto las extensiones sólo entregan torrents: Vibe IPTV reproduce enlaces de video directos"
+                list.isEmpty() -> message = if (torrents > 0) "Para esto las extensiones sólo entregan torrents: actívalos en Ajustes → Reproducción → Reproducir torrents"
                     else "Ninguna de tus extensiones entrega videos para «${item.name}»"
-                list.size == 1 -> then(item.copy(url = list[0].url, userAgent = list[0].userAgent, referrer = list[0].referrer))
+                list.size == 1 -> useStream(item, list[0], then)
                 else -> streamPick = StreamPick(item, list, then)
             }
         }
+    }
+
+    override fun onCleared() {
+        TorrentStream.shutdown()
+        super.onCleared()
     }
 
     /** Canal visto antes del actual (botón "Canal anterior" / tecla LAST del control). */
@@ -984,6 +1007,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (index !in playList.indices || index == playIndex) return
         // Siguiente o anterior de una extensión: se piden sus videos antes de cambiar
         val target = playList[index]
+        if (TorrentStream.isTorrent(target.url)) {
+            openTorrent(target) { resolved ->
+                val i = playList.indexOfFirst { it.id == resolved.id }.takeIf { it >= 0 } ?: return@openTorrent
+                playList = playList.toMutableList().also { it[i] = resolved }
+                playAt(i)
+            }
+            return
+        }
         if (Stremio.needsStream(target)) {
             withStream(target) { resolved ->
                 val i = playList.indexOfFirst { it.id == resolved.id }.takeIf { it >= 0 } ?: return@withStream
@@ -992,6 +1023,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             return
         }
+        // Se pasó a algo que no es el torrent abierto: se deja de compartir y se borra lo bajado
+        if (!target.url.startsWith("http://127.0.0.1:")) TorrentStream.stop()
         previousIndex = playIndex
         playIndex = index
         playing?.let { store.lastItemId = it.id; addRecent(it) }
@@ -1324,6 +1357,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val menuVisible: Boolean get() = screen == Screen.MENU || mini
 
     fun closePlayer() {
+        TorrentStream.stop()          // deja de compartir y borra lo bajado
         mini = false
         returnFocusId = playing?.id
         screen = Screen.MENU

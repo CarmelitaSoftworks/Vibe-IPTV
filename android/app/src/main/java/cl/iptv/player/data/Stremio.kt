@@ -38,7 +38,9 @@ object Stremio {
             return (ts.isEmpty() || type in ts) && (ps.isNullOrEmpty() || ps.any { id.startsWith(it) })
         }
     }
-    data class Stream(val url: String, val title: String, val addon: String, val userAgent: String = "", val referrer: String = "")
+    data class Stream(val url: String, val title: String, val addon: String, val userAgent: String = "", val referrer: String = "",
+                      /** Enlace magnet (sólo si se activaron los torrents en Ajustes). */
+                      val torrent: Boolean = false)
 
     /** Lo que se puede pegar (stremio://…, con o sin manifest.json) → dirección base de la extensión. */
     fun normalize(input: String): String {
@@ -160,20 +162,29 @@ object Stremio {
     }
 
     // ---------- Videos ----------
-    /** Los enlaces de video que entregan las extensiones para este elemento (sólo http/https: los torrents no se usan). */
-    suspend fun streams(addons: List<Addon>, item: Item): Pair<List<Stream>, Int> = coroutineScope {
+    /**
+     * Los enlaces de video que entregan las extensiones para este elemento. Los torrents sólo si [torrents] (Ajustes →
+     * Reproducción → Reproducir torrents); si no, se cuentan para avisar.
+     */
+    suspend fun streams(addons: List<Addon>, item: Item, torrents: Boolean = false): Pair<List<Stream>, Int> = coroutineScope {
         val (type, id) = parse(item.id) ?: return@coroutineScope emptyList<Stream>() to 0
-        val torrents = java.util.concurrent.atomic.AtomicInteger()
+        val skipped = java.util.concurrent.atomic.AtomicInteger()
         val lists = addons.filter { it.serves("stream", type, id) }.map { a ->
             async(Dispatchers.IO) {
                 runCatching {
                     val arr = get("${a.base}/stream/$type/$id.json").optJSONArray("streams") ?: JSONArray()
                     (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.mapNotNull { s ->
                         val url = s.optString("url")
-                        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) {
-                            if (s.has("infoHash")) torrents.incrementAndGet()
-                            return@mapNotNull null
+                        val hash = s.optString("infoHash")
+                        if (hash.isNotBlank() && !url.startsWith("http", true)) {
+                            if (!torrents) { skipped.incrementAndGet(); return@mapNotNull null }
+                            val sources = s.optJSONArray("sources").strings().orEmpty()
+                            val title = listOf(s.optString("name"), s.optString("title").ifBlank { s.optString("description") })
+                                .map { it.replace('\n', ' ').trim() }.filter { it.isNotBlank() }.joinToString(" · ")
+                            val file = if (s.has("fileIdx")) "&vibe_file=${s.optInt("fileIdx")}" else ""
+                            return@mapNotNull Stream(TorrentStream.magnet(hash, sources, item.name) + file, "🧲 " + title.ifBlank { "Torrent" }, a.name, torrent = true)
                         }
+                        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return@mapNotNull null
                         val headers = s.optJSONObject("behaviorHints")?.optJSONObject("proxyHeaders")?.optJSONObject("request")
                         fun h(name: String) = headers?.keys()?.asSequence()?.firstOrNull { it.equals(name, true) }?.let { headers.optString(it) }.orEmpty()
                         val title = listOf(s.optString("name"), s.optString("title").ifBlank { s.optString("description") })
@@ -183,7 +194,8 @@ object Stremio {
                 }.getOrDefault(emptyList())
             }
         }.awaitAll()
-        lists.flatten().distinctBy { it.url } to torrents.get()
+        // Los enlaces directos primero (empiezan al tiro); los torrents después
+        lists.flatten().distinctBy { it.url }.sortedBy { it.torrent } to skipped.get()
     }
 
     // ---------- Subtítulos ----------

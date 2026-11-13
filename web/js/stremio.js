@@ -104,8 +104,14 @@ export async function episodes(addons, series) {
   }).sort((x, y) => (x.season || 1e9) - (y.season || 1e9) || x.episode - y.episode);
 }
 
-/** Los enlaces de video de las extensiones (sólo http/https: los torrents no se usan). */
-export async function streams(addons, item) {
+/** Enlace magnet a partir del hash y los rastreadores ("tracker:udp://…" de Stremio). */
+export function magnet(hash, sources = [], name = '') {
+  const tr = [...new Set(sources.map((s) => String(s).replace(/^tracker:/, '')).filter((t) => /^(udp|https?|wss):\/\//.test(t)))];
+  return `magnet:?xt=urn:btih:${String(hash).toLowerCase()}${name ? `&dn=${encodeURIComponent(name)}` : ''}${tr.map((t) => `&tr=${encodeURIComponent(t)}`).join('')}`;
+}
+
+/** Los enlaces de video de las extensiones. Los torrents sólo si se activaron (Ajustes); si no, se cuentan para avisar. */
+export async function streams(addons, item, withTorrents = false) {
   const p = parse(item.id);
   if (!p) return { list: [], torrents: 0 };
   const [type, id] = p;
@@ -114,7 +120,12 @@ export async function streams(addons, item) {
     try {
       const r = await getJson(`${a.base}/stream/${type}/${id}.json`);
       return (r.streams || []).flatMap((s) => {
-        if (!/^https?:\/\//i.test(s.url || '')) { if (s.infoHash) torrents++; return []; }
+        if (s.infoHash && !/^https?:/i.test(s.url || '')) {
+          if (!withTorrents) { torrents++; return []; }
+          const title = [s.name, s.title || s.description].map((x) => String(x || '').replace(/\n/g, ' ').trim()).filter(Boolean).join(' · ');
+          return [{ url: magnet(s.infoHash, s.sources || [], item.name) + (Number.isInteger(s.fileIdx) ? `&vibe_file=${s.fileIdx}` : ''), title: `🧲 ${title || 'Torrent'}`, addon: a.name, torrent: true }];
+        }
+        if (!/^https?:\/\//i.test(s.url || '')) return [];
         const h = s.behaviorHints?.proxyHeaders?.request || {};
         const hv = (n) => Object.entries(h).find(([k]) => k.toLowerCase() === n)?.[1] || '';
         const title = [s.name, s.title || s.description].map((x) => String(x || '').replace(/\n/g, ' ').trim()).filter(Boolean).join(' · ');
@@ -123,7 +134,8 @@ export async function streams(addons, item) {
     } catch { return []; }
   }));
   const seen = new Set();
-  return { list: lists.flat().filter((s) => !seen.has(s.url) && seen.add(s.url)), torrents };
+  // Los enlaces directos primero (empiezan al tiro); los torrents después
+  return { list: lists.flat().filter((s) => !seen.has(s.url) && seen.add(s.url)).sort((a, b) => (a.torrent ? 1 : 0) - (b.torrent ? 1 : 0)), torrents };
 }
 
 /** Subtítulos que entregan las extensiones (por id IMDb: "tt…" o "tt…:temporada:episodio"). */

@@ -107,8 +107,15 @@ Vibe IPTV puede usar **extensiones de Stremio** (el formato abierto de complemen
 - **Cómo se ven:** los catálogos de las extensiones aparecen como categorías en Películas, Series y TV en vivo, con carátula; las series traen sus episodios con la imagen de cada uno. Funcionan Favoritos, Buscar, *Seguir viendo* y todos los temas.
 - **Al elegir algo** la app pide los videos a las extensiones que los entregan (pueden ser otras de la misma lista): si hay uno, empieza solo; si hay varios, eliges cuál en una ventana. Con ▲▼ en el reproductor se pasa al siguiente episodio o película y se piden sus videos.
 - **Subtítulos:** lo que viene de extensiones ya trae su código IMDb, así que la búsqueda de subtítulos encuentra la película exacta; además se suman los subtítulos de las extensiones que los entregan.
-- **Límites:** se reproducen **enlaces de video directos** (http/https). Las extensiones que sólo entregan torrents no funcionan (Vibe IPTV no descarga ni comparte torrents). Las que sólo tienen búsqueda (sin catálogo para recorrer) no muestran nada todavía.
+- **Límites:** se reproducen **enlaces de video directos** (http/https) y, si los activas, **torrents** (ver abajo). Las que sólo tienen búsqueda (sin catálogo para recorrer) no muestran nada todavía.
 - **Importante:** Vibe IPTV no trae extensiones ni recomienda ninguna. Agrega sólo las que tengas derecho a usar, igual que con tus listas.
+
+### Torrents (opcional)
+
+- **Activar:** Ajustes → Reproducción → **Reproducir torrents** (viene apagado). Sirve para los torrents que entregan las extensiones de Stremio (aparecen con 🧲, después de los enlaces directos) y para enlaces `magnet:` en tus listas.
+- **Cómo funciona:** el video se baja en orden mientras lo ves y se puede adelantar (se piden primero los pedazos de donde saltaste). Al principio tarda unos segundos en encontrar a quién pedirle el video. En la información del reproductor (botón INFO / tecla I) ves cuántas personas hay y la velocidad.
+- **Ojo:** mientras ves, también **compartes pedazos del video con otras personas, y ellas ven tu dirección IP**. Que sea legal depende de lo que veas y de tu país. La subida va limitada (Ajustes → *Torrents: subida máxima*, 50 KB/s por defecto) y **al cerrar el video se deja de compartir y se borra todo lo bajado**.
+- **En el PC** los torrents necesitan la app de PC (`iniciar.bat` o la versión portable); en la web abierta desde GitHub Pages no funcionan.
 
 ## 6. Reproductor y canales de TV de cable (AC-3, MP2, MPEG-2)
 
