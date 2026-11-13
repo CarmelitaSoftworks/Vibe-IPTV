@@ -611,15 +611,29 @@ const PASSWORD = process.env.VIBE_PASSWORD || '';
 // video normal (con adelantar). Mientras se ve también se comparten pedazos con otras personas (ven tu IP): la subida va
 // limitada y al cerrar el video (o 3 minutos sin pedidos) se deja de compartir y se borra lo bajado.
 let torrentClient = null, torrentCurrent = null, torrentIdle = null, torrentVpnTimer = null, torrentVpnLost = false;
+let torrentGen = 0;            // cambia en cada cierre: un torrent que terminó de abrir tarde sabe que ya no corresponde
 const TORRENT_DIR = path.join(os.tmpdir(), 'vibe-torrent');
 const VIDEO_EXT = /\.(mp4|mkv|avi|m4v|mov|webm|ts|wmv|flv|mpg|mpeg)$/i;
-// ¿Hay una VPN conectada? Se reconoce por el nombre del adaptador de red (tun, tap, wg, ppp, ipsec, "vpn"…) con una
-// dirección activa. Es una aproximación: si tu VPN usa otro nombre no se reconoce y la app avisa que no hay VPN.
-const VPN_IF = /(^|[^a-z])(tun|tap|wg|utun|ppp|ipsec|vpn|wireguard)/i;
-function vpnOn() {
-  return Object.entries(os.networkInterfaces()).some(([name, addrs]) => VPN_IF.test(name) && (addrs || []).some((a) => !a.internal));
+// ¿El internet del equipo sale por una VPN? No basta con que exista un adaptador de VPN (macOS siempre tiene "utun"
+// del sistema, Windows "Teredo Tunneling", y una VPN con túnel dividido no lleva el tráfico): se pregunta al sistema
+// por qué dirección propia saldría un paquete hacia internet (sin enviar nada) y se mira el nombre del adaptador que
+// tiene esa dirección. Si tu VPN usa un nombre que no se reconoce, la app avisa que no hay VPN (nunca al revés).
+const VPN_IF = /(^|[^a-z])(tun|tap|wg|utun|ppp|ipsec)|vpn|wireguard/i;
+function vpnIfaceFor(ip, ifaces = os.networkInterfaces()) {
+  return Object.entries(ifaces).find(([, addrs]) => (addrs || []).some((a) => a.address === ip))?.[0] || '';
 }
+const isVpnIface = (name) => VPN_IF.test(name) && !/teredo|isatap|6to4/i.test(name);
+function outboundIp() {
+  return new Promise((ok) => {
+    const s = require('dgram').createSocket('udp4');
+    const done = (ip) => { try { s.close(); } catch {} ok(ip); };
+    s.on('error', () => done(''));
+    s.connect(53, '1.1.1.1', () => { try { done(s.address().address); } catch { done(''); } });   // UDP: sólo elige la ruta
+  });
+}
+async function vpnOn() { const ip = await outboundIp(); return !!ip && isVpnIface(vpnIfaceFor(ip)); }
 function torrentClose() {
+  torrentGen++;
   clearTimeout(torrentIdle);
   clearInterval(torrentVpnTimer);
   if (torrentClient) { try { torrentClient.destroy(); } catch {} }
@@ -645,17 +659,33 @@ async function handleTorrent(req, res, reqUrl) {
     const needVpn = reqUrl.searchParams.get('vpn') === '1';
     torrentClose();
     torrentVpnLost = false;
-    if (needVpn && !vpnOn()) return json(409, { error: L('No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes', 'No VPN is connected: connect it or turn off "Torrents: only with VPN" in Settings') });
-    torrentClient = new WebTorrent({ uploadLimit: up });
-    torrentClient.on('error', (e) => console.warn('[torrent]', e.message));
+    const noVpn = L('No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes', 'No VPN is connected: connect it or turn off "Torrents: only with VPN" in Settings');
+    if (needVpn && !(await vpnOn())) return json(409, { error: noVpn });
+    torrentClose();                                                   // por si otro pedido abrió algo mientras se revisaba
+    const gen = torrentGen;
+    const client = torrentClient = new WebTorrent({ uploadLimit: up });
+    client.on('error', (e) => console.warn('[torrent]', e.message));
+    // Corte de seguridad desde el primer momento (también mientras se buscan personas): si la VPN se cae, se detiene
+    // al tiro. Sólo vigila este torrent: al cerrarlo (o abrir otro) se apaga solo.
+    if (needVpn) {
+      const timer = torrentVpnTimer = setInterval(async () => {
+        if (gen !== torrentGen) return clearInterval(timer);
+        if (!(await vpnOn()) && gen === torrentGen) { console.warn('[torrent] se cortó la VPN: detenido'); torrentClose(); torrentVpnLost = true; }
+      }, 1500);
+    }
     const id = crypto.randomBytes(6).toString('hex');
     try {
       const torrent = await new Promise((ok, ko) => {
-        const t = torrentClient.add(magnet.replace(/&vibe_file=\d+/, ''), { path: path.join(TORRENT_DIR, id) });
-        const timer = setTimeout(() => ko(new Error('No se encontraron personas compartiendo este torrent (prueba otra opción)')), 60000);
-        t.on('metadata', () => { clearTimeout(timer); ok(t); });
-        t.on('error', (e) => { clearTimeout(timer); ko(e); });
+        const t = client.add(magnet.replace(/&vibe_file=\d+/, ''), { path: path.join(TORRENT_DIR, id) });
+        let timer, watch;
+        const end = (fn) => { clearTimeout(timer); clearInterval(watch); fn(); };
+        timer = setTimeout(() => end(() => ko(new Error('No se encontraron personas compartiendo este torrent (prueba otra opción)'))), 60000);
+        watch = setInterval(() => { if (gen !== torrentGen) end(() => ko(new Error(torrentVpnLost ? noVpn : L('Se cerró antes de abrir', 'Closed before opening')))); }, 500);   // se cerró mientras tanto
+        t.on('metadata', () => end(() => ok(t)));
+        t.on('error', (e) => end(() => ko(e)));
+        client.on('error', (e) => end(() => ko(e)));
       });
+      if (gen !== torrentGen) throw new Error(torrentVpnLost ? noVpn : L('Se cerró antes de abrir', 'Closed before opening'));
       const files = torrent.files;
       const file = (Number.isInteger(wantIdx) && files[wantIdx]) || files.filter((f) => VIDEO_EXT.test(f.name)).sort((a, b) => b.length - a.length)[0]
         || files.slice().sort((a, b) => b.length - a.length)[0];
@@ -663,11 +693,13 @@ async function handleTorrent(req, res, reqUrl) {
       for (const f of files) if (f !== file) f.deselect();            // sólo el video elegido
       torrentCurrent = { id, torrent, file };
       torrentTouch();
-      // Corte de seguridad: si la VPN se cae mientras se ve, se detiene al tiro (antes de compartir sin ella)
-      if (needVpn) torrentVpnTimer = setInterval(() => { if (!vpnOn()) { console.warn('[torrent] se cortó la VPN: detenido'); torrentClose(); torrentVpnLost = true; } }, 1500);
       console.log(`[torrent] ${file.name} (${(file.length / 1048576).toFixed(0)} MB)`);
       return json(200, { url: `/proxy/torrent/stream/${id}/${encodeURIComponent(file.name)}`, name: file.name });
-    } catch (e) { torrentClose(); return json(502, { error: e.message }); }
+    } catch (e) {
+      if (gen === torrentGen) torrentClose();                          // no cerrar otro torrent que se abrió después
+      else try { client.destroy(); } catch {}
+      return json(502, { error: e.message });
+    }
   }
   const m = /^\/proxy\/torrent\/stream\/([0-9a-f]+)\//.exec(p);
   if (m && torrentCurrent?.id === m[1]) {
@@ -717,9 +749,10 @@ if (require.main === module) {
   server.on('error', (e) => {
     console.error(e.code === 'EADDRINUSE' ? L(`El puerto ${PORT} ya está en uso: ¿la app ya está abierta en otra ventana?`, `Port ${PORT} is already in use: is the app already open in another window?`) : e.message);
   });
-  // Lo que haya quedado de torrents de una vez anterior (si la app se cerró de golpe) se borra al iniciar
-  fs.rm(TORRENT_DIR, { recursive: true, force: true }, () => {});
   server.listen(PORT, HOST, () => {
+    // Lo que haya quedado de torrents de una vez anterior (si la app se cerró de golpe) se borra al iniciar; recién
+    // aquí, con el puerto ya tomado: una segunda copia abierta por error no borra lo que la primera está mostrando
+    fs.rm(TORRENT_DIR, { recursive: true, force: true }, () => {});
     console.log(`Vibe IPTV ${L('en', 'at')} http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
     if (HOST === '0.0.0.0') {
       const ips = Object.values(require('os').networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal).map((n) => n.address);
@@ -740,4 +773,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, rewriteM3u8, tsCodecs, authorized };
+module.exports = { server, rewriteM3u8, tsCodecs, authorized, isVpnIface, vpnIfaceFor };

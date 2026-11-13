@@ -977,7 +977,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             loading = null
             r.onSuccess { local -> logEvent("Torrent abierto: ${item.name}"); then(item.copy(url = local)) }
-                .onFailure { message = "No se pudo abrir el torrent: ${it.message}" }
+                .onFailure { message = "No se pudo abrir el torrent: ${tr(it.message ?: "")}" }    // el motivo también se traduce
         }
     }
 
@@ -1379,7 +1379,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // (Antes estaba en medio y open() usaba "recent", declarado más abajo y todavía nulo: la app se cerraba
     // en cada inicio con una lista guardada.)
     init {
-        TorrentStream.cleanLeftovers(getApplication())
+        // Restos de un torrent si la app se cerró de golpe (pueden ser GB: fuera del hilo de la pantalla)
+        viewModelScope.launch(Dispatchers.IO) { TorrentStream.cleanLeftovers(getApplication()) }
         applyLite()
         autoConfigure()
         val last = sources.firstOrNull { it.id == store.lastSourceId } ?: sources.firstOrNull()

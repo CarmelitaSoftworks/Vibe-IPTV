@@ -35,6 +35,10 @@ object TorrentStream {
 
     private var session: SessionManager? = null
     @Volatile private var active: Active? = null
+    /** Cambia en cada cierre: un torrent que se estaba abriendo sabe que ya no corresponde (se cerró o se cortó la VPN). */
+    @Volatile private var gen = 0
+    @Volatile private var vpnLost = false
+    @Volatile private var opening = false
     private var server: ServerSocket? = null
     private val lock = Any()
 
@@ -51,6 +55,8 @@ object TorrentStream {
         }
     }
 
+    const val NO_VPN = "No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes"
+
     fun isTorrent(url: String) = url.startsWith("magnet:", true)
 
     /** Índice del archivo pedido en el enlace (vibe_file=N), si lo trae. */
@@ -65,39 +71,56 @@ object TorrentStream {
         onVpnLost: () -> Unit = {}, onStatus: (String) -> Unit = {},
     ): String = withContext(Dispatchers.IO) {
         stop()
-        if (requireVpn && !vpnOn(ctx)) throw IOException("No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes")
-        val dir = File(ctx.cacheDir, "torrent").apply { deleteRecursively(); mkdirs() }
-        val sm = synchronized(lock) {
-            session ?: SessionManager(false).also { s ->
-                val pack = SettingsPack().uploadRateLimit(uploadKBps.coerceAtLeast(1) * 1024)
-                s.start(SessionParams(pack))
-                session = s
+        if (requireVpn && !vpnOn(ctx)) throw IOException(NO_VPN)
+        val myGen = gen
+        vpnLost = false
+        opening = true
+        // Corte de seguridad desde el primer momento (también mientras se buscan personas y bajan las primeras piezas)
+        if (requireVpn) watchVpn(ctx, myGen, onVpnLost)
+        fun check() { if (gen != myGen) throw IOException(if (vpnLost) NO_VPN else "Se cerró antes de abrir") }
+        try {
+            val dir = File(ctx.cacheDir, "torrent").apply { deleteRecursively(); mkdirs() }
+            val sm = synchronized(lock) {
+                check()                                               // (si la VPN ya se cortó, no se crea otro motor)
+                session ?: SessionManager(false).also { s ->
+                    val pack = SettingsPack().uploadRateLimit(uploadKBps.coerceAtLeast(1) * 1024)
+                    s.start(SessionParams(pack))
+                    session = s
+                }
             }
-        }
-        sm.uploadRateLimit(uploadKBps.coerceAtLeast(1) * 1024)
-        onStatus("Buscando a quién pedirle el video…")
-        val bytes = sm.fetchMagnet(magnet.substringBefore("&vibe_file="), 60, dir)
-            ?: throw IOException("No se encontraron personas compartiendo este torrent (prueba otra opción)")
-        val ti = TorrentInfo.bdecode(bytes)
-        val fs = ti.files()
-        val idx = fileIdxOf(magnet)?.takeIf { it in 0 until fs.numFiles() }
-            ?: (0 until fs.numFiles()).filter { Regex(".*\\.($VIDEO)$", RegexOption.IGNORE_CASE).matches(fs.filePath(it)) }.maxByOrNull { fs.fileSize(it) }
-            ?: (0 until fs.numFiles()).maxByOrNull { fs.fileSize(it) } ?: throw IOException("El torrent no trae archivos")
-        val prios = Array(fs.numFiles()) { if (it == idx) Priority.DEFAULT else Priority.IGNORE }
-        sm.download(ti, dir, null, prios, null, TorrentFlags.SEQUENTIAL_DOWNLOAD)
-        val handle = sm.find(ti.infoHash()) ?: throw IOException("No se pudo empezar el torrent")
-        addSources(handle, magnet)
-        val a = Active(handle, ti, dir, File(dir, fs.filePath(idx)), fs.fileOffset(idx), fs.fileSize(idx), ti.pieceLength(),
-            fs.filePath(idx).substringAfterLast('/'))
-        active = a
-        // Primero el principio y el final del archivo (muchos videos guardan ahí el índice para poder adelantar)
-        prioritize(a, 0, ahead = 12)
-        val lastPiece = pieceOf(a, a.size - 1)
-        for (p in maxOf(pieceOf(a, 0), lastPiece - 1)..lastPiece) runCatching { handle.setPieceDeadline(p, 500) }
-        onStatus("Preparando el video…")
-        val port = startServer()
-        if (requireVpn) watchVpn(ctx, a, onVpnLost)
-        "http://127.0.0.1:$port/${java.net.URLEncoder.encode(a.name, "UTF-8").replace("+", "%20")}"
+            sm.uploadRateLimit(uploadKBps.coerceAtLeast(1) * 1024)
+            onStatus("Buscando a quién pedirle el video…")
+            val bytes = sm.fetchMagnet(magnet.substringBefore("&vibe_file="), 60, dir)
+            check()
+            if (bytes == null) throw IOException("No se encontraron personas compartiendo este torrent (prueba otra opción)")
+            val ti = TorrentInfo.bdecode(bytes)
+            val fs = ti.files()
+            val idx = fileIdxOf(magnet)?.takeIf { it in 0 until fs.numFiles() }
+                ?: (0 until fs.numFiles()).filter { Regex(".*\\.($VIDEO)$", RegexOption.IGNORE_CASE).matches(fs.filePath(it)) }.maxByOrNull { fs.fileSize(it) }
+                ?: (0 until fs.numFiles()).maxByOrNull { fs.fileSize(it) } ?: throw IOException("El torrent no trae archivos")
+            val prios = Array(fs.numFiles()) { if (it == idx) Priority.DEFAULT else Priority.IGNORE }
+            // Con el candado: el corte por VPN no puede pasar justo entre la revisión y el inicio de la bajada
+            val a = synchronized(lock) {
+                check()
+                sm.download(ti, dir, null, prios, null, TorrentFlags.SEQUENTIAL_DOWNLOAD)
+                val handle = sm.find(ti.infoHash()) ?: throw IOException("No se pudo empezar el torrent")
+                addSources(handle, magnet)
+                Active(handle, ti, dir, File(dir, fs.filePath(idx)), fs.fileOffset(idx), fs.fileSize(idx), ti.pieceLength(),
+                    fs.filePath(idx).substringAfterLast('/')).also { active = it }
+            }
+            // Primero el principio y el final del archivo (muchos videos guardan ahí el índice para poder adelantar)
+            prioritize(a, 0, ahead = 12)
+            val lastPiece = pieceOf(a, a.size - 1)
+            for (p in maxOf(pieceOf(a, 0), lastPiece - 1)..lastPiece) runCatching { a.handle.setPieceDeadline(p, 500) }
+            onStatus("Preparando el video…")
+            val port = startServer()
+            check()
+            "http://127.0.0.1:$port/${java.net.URLEncoder.encode(a.name, "UTF-8").replace("+", "%20")}"
+        } catch (e: Throwable) {
+            // Se cortó la VPN mientras se abría: el motor se apaga aquí (no se pudo mientras buscaba personas)
+            if (gen != myGen && vpnLost) shutdown() else if (gen == myGen) stop()
+            throw e
+        } finally { opening = false }
     }
 
     /**
@@ -129,12 +152,26 @@ object TorrentStream {
         cm.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true
     }.getOrDefault(false)
 
-    /** Corte de seguridad: si la VPN se cae mientras se ve, se detiene el torrent al tiro (antes de compartir sin ella). */
-    private fun watchVpn(ctx: Context, a: Active, onLost: () -> Unit) {
+    /**
+     * Corte de seguridad: si la VPN se cae, se apaga el motor completo al tiro (no sólo este torrent: también la red de
+     * pares y la conexión que recibe pedidos), antes de compartir sin ella. Vigila hasta que se cierra este torrent.
+     */
+    private fun watchVpn(ctx: Context, myGen: Int, onLost: () -> Unit) {
         Thread({
-            while (active === a) {
-                if (!vpnOn(ctx)) { if (active === a) { stop(); onLost() }; break }
-                Thread.sleep(1500)
+            while (gen == myGen) {
+                if (!vpnOn(ctx)) {
+                    if (gen == myGen) {
+                        vpnLost = true
+                        // Primero se frena todo (rápido y seguro aunque esté buscando personas)…
+                        runCatching { session?.pause() }; runCatching { session?.stopDht() }
+                        stop()
+                        // …y el motor se apaga del todo; si se estaba abriendo, lo apaga open() al volver de la búsqueda
+                        if (!opening) shutdown()
+                        onLost()
+                    }
+                    break
+                }
+                Thread.sleep(1000)
             }
         }, "vibe-torrent-vpn").apply { isDaemon = true }.start()
     }
@@ -154,6 +191,7 @@ object TorrentStream {
 
     /** Deja de compartir, borra lo bajado y cierra el servidor local. */
     fun stop() {
+        gen++
         val a = active
         active = null
         runCatching { server?.close() }

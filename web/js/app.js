@@ -709,17 +709,23 @@ async function openTorrent(item, then) {
     if (!res.ok) throw new Error(j.error || `error ${res.status}`);
     logEvent(`Torrent abierto: ${item.name}`);
     then({ ...item, url: proxyBase() + j.url });
-    if (cfg().torrentVpn) watchTorrentVpn(j.url);
-  } catch (e) { toast(`${t('No se pudo abrir el torrent')}: ${e.message}`, 6000); }
+    if (cfg().torrentVpn) watchTorrentVpn();
+  } catch (e) { toast(`${t('No se pudo abrir el torrent')}: ${t(e.message)}`, 6000); }
   finally { loader(false); }
 }
-/** Con «sólo con VPN»: si el servidor detuvo el torrent porque se cortó la VPN, se avisa. */
-function watchTorrentVpn(url) {
-  const timer = setInterval(async () => {
-    if (!String(state.playing?.url || '').endsWith(url)) return clearInterval(timer);
-    const s = await fetch(`${proxyBase()}/proxy/torrent/status`).then((r) => r.json()).catch(() => ({}));
+/**
+ * Con «sólo con VPN»: si el servidor detuvo el torrent porque se cortó la VPN, se avisa (aunque el reproductor ya haya
+ * mostrado su error o se haya cerrado). Se deja de mirar cuando el servidor ya no tiene el torrent abierto.
+ */
+let torrentVpnWatch = null;
+function watchTorrentVpn() {
+  clearInterval(torrentVpnWatch);
+  const timer = torrentVpnWatch = setInterval(async () => {
+    const s = await fetch(`${proxyBase()}/proxy/torrent/status`).then((r) => r.json()).catch(() => null);
+    if (!s) return;
     if (s.vpnLost) { clearInterval(timer); toast(t('Se cortó la VPN: el torrent se detuvo para no compartir sin ella'), 8000); }
-  }, 3000);
+    else if (s.peers === undefined) clearInterval(timer);         // se cerró normalmente
+  }, 1500);
 }
 const closeTorrent = () => { if (proxyBase()) fetch(`${proxyBase()}/proxy/torrent/close`).catch(() => {}); };
 

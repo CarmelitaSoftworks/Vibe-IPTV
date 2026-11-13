@@ -49,3 +49,15 @@ test('subtítulos: elige la película correcta del catálogo (automática nunca 
   assert.equal(pickMeta([e('Die Hard', '1988', 'tt4')], 'Duro de matar', '', true), null);
   assert.equal(pickMeta([e('Die Hard', '1988', 'tt4')], 'Duro de matar', '', false).id, 'tt4');
 });
+
+test('Torrents: VPN según el adaptador por el que sale internet', () => {
+  const { execFileSync } = require('child_process');
+  const out = execFileSync(process.execPath, ['-e', `
+    const { isVpnIface, vpnIfaceFor } = require('./server/server.js');
+    const ifs = { en0: [{ address: '192.168.1.5' }], utun3: [{ address: 'fe80::1' }], wg0: [{ address: '10.8.0.2' }] };
+    console.log(JSON.stringify([isVpnIface('wg0'), isVpnIface('tun0'), isVpnIface('OpenVPN Connect'), isVpnIface('Teredo Tunneling Pseudo-Interface'),
+      isVpnIface('en0'), isVpnIface('Ethernet'), isVpnIface('Wi-Fi'), vpnIfaceFor('192.168.1.5', ifs), vpnIfaceFor('10.8.0.2', ifs), vpnIfaceFor('1.2.3.4', ifs)]));
+    process.exit(0);
+  `], { cwd: __dirname + '/..', encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(out.trim().split('\n').pop()), [true, true, true, false, false, false, false, 'en0', 'wg0', '']);
+});
