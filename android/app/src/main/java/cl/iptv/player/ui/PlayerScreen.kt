@@ -1425,7 +1425,9 @@ private fun SubtitlesDialog(
                     }
                 }
             }
-            found?.errors?.takeIf { it.isNotEmpty() }?.let { errs ->
+            // Avisos de las fuentes (sin clave, sin respuesta) sólo si no se encontró nada: si OpenSubtitles ya trajo
+            // resultados, "SubDL: agrega una API key" parecía un error de la búsqueda
+            found?.takeIf { it.results.isEmpty() }?.errors?.takeIf { it.isNotEmpty() }?.let { errs ->
                 Text(errs.entries.joinToString(" · ") { "${it.key}: ${it.value}" }, color = c.inkSoft, fontSize = 12.sp)
             }
         }

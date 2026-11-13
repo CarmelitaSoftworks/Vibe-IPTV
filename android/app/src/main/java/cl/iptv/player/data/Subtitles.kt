@@ -94,6 +94,8 @@ class OpenSubtitles(private val settings: () -> Settings) {
 
 /** "ES| Matrix (1999) [4K]" -> "Matrix" */
 fun cleanTitle(name: String): String = name
+    // Nombres de archivo ("Inception.2010.1080p"): puntos y guiones bajos son espacios
+    .let { if (' ' !in it.trim()) it.replace(Regex("[._]+"), " ") else it }
     .replace(Regex("^[A-Z]{2,3}\\s*[|:\\-]\\s*"), "")
     .replace(Regex("\\[[^\\]]*\\]|\\([^)]*\\)"), " ")
     .replace(Regex("\\b(4k|fhd|uhd|hd|sd|1080p|720p|multi|lat|cast|sub|vose)\\b", RegexOption.IGNORE_CASE), " ")

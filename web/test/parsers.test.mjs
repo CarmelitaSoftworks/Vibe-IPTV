@@ -125,3 +125,10 @@ test('guía: marcas con "|" o "-" no se confunden con un país', async () => {
   assert.equal(loose('HBO | Family'), 'hbofamily');
   assert.equal(loose('CL: Canal 13 HD'), 'canal13');
 });
+
+test('subtítulos: nombres de archivo con puntos se buscan como texto', async () => {
+  const { cleanTitle } = await import('../js/subtitles.js');
+  assert.equal(cleanTitle('Inception.2010.1080p'), 'Inception 2010');
+  assert.equal(cleanTitle('ES| Matrix (1999) [4K]'), 'Matrix');
+  assert.equal(cleanTitle('Blade Runner 2049'), 'Blade Runner 2049');
+});

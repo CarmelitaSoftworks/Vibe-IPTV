@@ -41,7 +41,9 @@ async function ensureLogin() {
 
 // Limpia el nombre de un canal/película para buscar ("ES| Matrix (1999) [4K]" -> "Matrix")
 export function cleanTitle(name) {
-  return name
+  const n = String(name || '').trim();
+  // Nombres de archivo ("Inception.2010.1080p"): puntos y guiones bajos son espacios
+  return (n.includes(' ') ? n : n.replace(/[._]+/g, ' '))
     .replace(/^[A-Z]{2,3}\s*[|:\-]\s*/, '')
     .replace(/\[[^\]]*\]|\([^)]*\)/g, ' ')
     .replace(/\b(4k|fhd|uhd|hd|sd|1080p|720p|multi|lat|cast|sub|vose)\b/gi, ' ')

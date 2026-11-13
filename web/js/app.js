@@ -1365,7 +1365,8 @@ async function searchSubs() {
       box.appendChild(b);
     });
     const errs = Object.entries(errors || {});
-    if (errs.length) box.insertAdjacentHTML('beforeend', `<p class="hint">${errs.map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</p>`);
+    // Avisos de las fuentes sólo si no se encontró nada (con resultados parecían un error de la búsqueda)
+    if (errs.length && !results.length) box.insertAdjacentHTML('beforeend', `<p class="hint">${errs.map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</p>`);
   } catch (e) { box.innerHTML = `<p class="error">${esc(e.message)}</p>`; }
 }
 
