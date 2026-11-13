@@ -99,6 +99,7 @@ All the code is out in the open: you can review it, build it yourself, modify it
 - **Pause and rewind live TV** (Android, ExoPlayer, .ts channels): the app keeps the last minutes of the channel on the device (10, 15 or 30, Settings → Playback). ◄ rewinds 10 s, ⏯ pauses and ► or *Back to live* returns. Uses a single connection to the provider.
 - **Sound** (Settings → Sound or *More → Sound*): *Clear voices*, *More bass* and *Night* equalizer, and **even volume** across channels and ads (Android).
 - **Sync subtitles**: *More → Sync subtitles*, in half-second steps, on every engine.
+- **Real images for each episode** (a scene from it) instead of the repeated cover.
 - **Skip intro** in series: a button at the start of the episode; mark *Intro ends here* once and the other episodes jump right there (or automatically, if you turn it on).
 - **Recent channels**: a player button with the last 5 channels watched.
 - **Send to TV** (Android): with Vibe IPTV open on the phone and the TV, on the same Wi-Fi, *More → Send to TV* plays it there (movies continue from the same minute).

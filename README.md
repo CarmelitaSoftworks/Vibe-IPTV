@@ -99,6 +99,7 @@ Todo el código está a la vista: puedes revisarlo, compilarlo tú mismo, modifi
 - **Pausar y retroceder la TV en vivo** (Android, ExoPlayer, canales .ts): la app guarda en el equipo los últimos minutos del canal (10, 15 o 30, Ajustes → Reproducción). ◄ retrocede 10 s, ⏯ pausa y ► o *Volver al directo* regresa. Con una sola conexión al proveedor.
 - **Sonido** (Ajustes → Sonido o *Más → Sonido*): ecualizador *Voces claras*, *Más graves* y *Noche*, y **volumen parejo** entre canales y comerciales (Android).
 - **Sincronizar subtítulos**: *Más → Sincronizar subtítulos*, de medio en medio segundo, en todos los motores.
+- **Imágenes reales de cada episodio** (una escena del capítulo) en vez de la portada repetida.
 - **Saltar intro** en series: botón al principio del episodio; marca una vez *Aquí termina la intro* y en los demás episodios salta justo ahí (o solo, si lo activas).
 - **Canales recientes**: botón en el reproductor con los últimos 5 canales vistos.
 - **Enviar a la TV** (Android): con Vibe IPTV abierto en el celular y en la TV, en la misma red Wi-Fi, *Más → Enviar a la TV* lo reproduce allá (las películas siguen desde el mismo minuto).

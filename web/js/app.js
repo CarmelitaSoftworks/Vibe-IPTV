@@ -11,6 +11,7 @@ import * as subs from './subtitles.js';
 import { demoM3U, demoEpg, DEMO_SOURCE } from './demo.js';
 import { readScreenshot } from './ocr.js';
 import { openGuide, catchupUrl, exportBackup, importBackup, saveFile } from './extras.js';
+import { episodeStills } from './stills.js';
 
 // En la versión artefacto (vista previa en línea) se define __ARTIFACT__ al empaquetar
 const IS_ARTIFACT = typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__;
@@ -672,6 +673,18 @@ function updateFocusInfo(item) {
   $('fiEpg').textContent = extra;
 }
 
+/** Imagen real de cada episodio: se muestran enseguida con la del proveedor y se cambian cuando llegan. */
+async function loadEpisodeStills(series) {
+  const eps = state.episodes || [];
+  if (!eps.some((e) => e.season > 0 && e.episode > 0)) return;
+  const meta = await subtitleMeta(series).catch(() => ({}));
+  const year = (/\b(19[3-9]\d|20[0-4]\d)\b/.exec(series.name) || [])[1] || meta.year || '';
+  const stills = await episodeStills([...(meta.alts || []), subs.cleanTitle(series.name)], year);
+  if (!Object.keys(stills).length || state.series !== series) return;
+  state.episodes = eps.map((e) => (stills[`${e.season}:${e.episode}`] ? { ...e, logo: stills[`${e.season}:${e.episode}`] } : e));
+  refresh(false);
+}
+
 async function activate(idx) {
   const item = state.view[idx];
   if (!item) return;
@@ -683,6 +696,7 @@ async function activate(idx) {
       state.query = '';
       $('tabs').hidden = true; $('crumb').hidden = false; $('crumbTitle').textContent = item.name;
       refresh(true); focusFirstTile();
+      loadEpisodeStills(item);
     } catch (e) { toast(e.message); } finally { loader(false); }
     return;
   }

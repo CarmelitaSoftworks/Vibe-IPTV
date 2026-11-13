@@ -132,3 +132,11 @@ test('subtítulos: nombres de archivo con puntos se buscan como texto', async ()
   assert.equal(cleanTitle('ES| Matrix (1999) [4K]'), 'Matrix');
   assert.equal(cleanTitle('Blade Runner 2049'), 'Blade Runner 2049');
 });
+
+test('imágenes de episodios: sólo de la serie que calza (nunca de otra)', async () => {
+  const { pickSeries } = await import('../js/stills.js');
+  const bb = { name: 'Breaking Bad', releaseInfo: '2008–2013', imdb_id: 'tt0903747' };
+  assert.equal(pickSeries([bb], 'Breaking Bad', '')?.imdb_id, 'tt0903747');
+  assert.equal(pickSeries([{ name: 'Money Heist', releaseInfo: '2017–2021' }], 'La casa de papel', '2017')?.name, 'Money Heist');
+  assert.equal(pickSeries([{ name: 'Otra serie', releaseInfo: '2015' }], 'Serie 123', ''), null);
+});

@@ -862,7 +862,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun activate(item: Item, fromList: List<Item>? = null) {
         if (item.kind == Kind.SERIES) {
-            if (item.episodes.isNotEmpty()) { episodes = item.episodes; series = item; query = ""; recompute(true); return }
+            if (item.episodes.isNotEmpty()) { episodes = item.episodes; series = item; query = ""; recompute(true); loadEpisodeStills(item); return }
             val x = xtream ?: return
             val id = item.seriesId ?: return
             viewModelScope.launch {
@@ -871,6 +871,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     episodes = x.episodes(id)
                     series = item; query = ""
                     recompute(true)
+                    loadEpisodeStills(item)
                 } catch (e: Exception) { message = e.message }
                 loading = null
             }
@@ -885,6 +886,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         addRecent(item)
         screen = Screen.PLAYER
         mini = false
+    }
+
+    /**
+     * Imagen real de cada episodio (una escena del capítulo) en vez de la portada repetida o una imagen genérica.
+     * Los episodios se muestran enseguida con la del proveedor y se cambian cuando llegan (ver data/EpisodeStills.kt).
+     */
+    private fun loadEpisodeStills(s: Item) {
+        if (episodes.none { it.season > 0 && it.episode > 0 }) return
+        viewModelScope.launch {
+            val (prov, provYear) = runCatching { providerTitles(s, isSeries = true) }.getOrDefault(emptyList<String>() to "")
+            val year = Regex("\\b(19[3-9]\\d|20[0-4]\\d)\\b").find(s.name)?.value ?: provYear
+            val stills = EpisodeStills.find(prov + cleanTitle(s.name), year)
+            if (stills.isEmpty() || series?.id != s.id) return@launch
+            episodes = episodes.map { e -> stills[EpisodeStills.key(e.season, e.episode)]?.let { e.copy(logo = it) } ?: e }
+            recompute(false)
+        }
     }
 
     /** Canal visto antes del actual (botón "Canal anterior" / tecla LAST del control). */
