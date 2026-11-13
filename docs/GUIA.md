@@ -99,6 +99,17 @@ Al abrir una lista aparece el **Inicio** con tres mosaicos grandes (TV en vivo, 
   - Rápido: números de canal, guía bajo los mosaicos, siguiente episodio automático, animaciones.
   - Listas y guía · Apariencia (**idioma** español/inglés; el menú es **blanco por defecto**; tema oscuro y color de acento opcionales; tamaño de mosaicos) · Reproducción · Subtítulos · Red (sólo web) · Inicio de la app (última lista, pantalla de listas o último canal) · Datos · Acerca de.
 
+## 5b. Extensiones de Stremio
+
+Vibe IPTV puede usar **extensiones de Stremio** (el formato abierto de complementos de Stremio) como una lista más.
+
+- **Agregarlas:** Mis listas → *Agregar lista* → **Extensiones Stremio**, y pega la dirección de cada extensión (la que termina en `manifest.json`; también sirve la `stremio://…`), separadas por espacio o coma. Varias extensiones forman una sola lista.
+- **Cómo se ven:** los catálogos de las extensiones aparecen como categorías en Películas, Series y TV en vivo, con carátula; las series traen sus episodios con la imagen de cada uno. Funcionan Favoritos, Buscar, *Seguir viendo* y todos los temas.
+- **Al elegir algo** la app pide los videos a las extensiones que los entregan (pueden ser otras de la misma lista): si hay uno, empieza solo; si hay varios, eliges cuál en una ventana. Con ▲▼ en el reproductor se pasa al siguiente episodio o película y se piden sus videos.
+- **Subtítulos:** lo que viene de extensiones ya trae su código IMDb, así que la búsqueda de subtítulos encuentra la película exacta; además se suman los subtítulos de las extensiones que los entregan.
+- **Límites:** se reproducen **enlaces de video directos** (http/https). Las extensiones que sólo entregan torrents no funcionan (Vibe IPTV no descarga ni comparte torrents). Las que sólo tienen búsqueda (sin catálogo para recorrer) no muestran nada todavía.
+- **Importante:** Vibe IPTV no trae extensiones ni recomienda ninguna. Agrega sólo las que tengas derecho a usar, igual que con tus listas.
+
 ## 6. Reproductor y canales de TV de cable (AC-3, MP2, MPEG-2)
 
 **Controles (web):** anterior/siguiente, ±10 s, volumen, lista lateral de canales con la guía (◄ en un canal en vivo), subtítulos, audio, calidad, formato de pantalla (ajustar, rellenar, estirar, zoom), velocidad, información técnica (motor, resolución, códecs, búfer), favorito, imagen en imagen, "Abrir en VLC" y pantalla completa. Teclas: M silencio, I información, L lista, +/− volumen.

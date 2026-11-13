@@ -12,6 +12,7 @@ import { demoM3U, demoEpg, DEMO_SOURCE } from './demo.js';
 import { readScreenshot } from './ocr.js';
 import { openGuide, catchupUrl, exportBackup, importBackup, saveFile } from './extras.js';
 import { episodeStills } from './stills.js';
+import * as stremio from './stremio.js';
 
 // En la versión artefacto (vista previa en línea) se define __ARTIFACT__ al empaquetar
 const IS_ARTIFACT = typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__;
@@ -227,7 +228,14 @@ async function openSource(src) {
   loader(true, `Cargando ${src.name}…`);
   try {
     let epgUrl = src.epgUrl;
-    if (src.type === 'xtream') {
+    if (src.type === 'stremio') {
+      state.xt = null;
+      const errs = [];
+      state.addons = await loadAddons(src, errs);
+      state.items = await stremio.loadAll(state.addons, (m) => errs.push(m));
+      if (errs.length) { logEvent(`Extensiones: ${errs.join(' · ')}`); toast(`${t('Algunas extensiones no respondieron')}: ${errs.join(' · ').slice(0, 160)}`, 6000); }
+      if (!state.items.length) throw new Error(state.addons.length ? 'Las extensiones no tienen catálogos para mostrar (las que sólo entregan videos se usan al elegir algo de otra extensión)' : 'No se pudo abrir ninguna extensión');
+    } else if (src.type === 'xtream') {
       state.xt = new XtreamClient(src, store.getSettings().liveFormat);
       await state.xt.login();
       if (state.xt.workingBase && state.xt.workingBase !== normalizeServer(src.server)) {
@@ -273,7 +281,7 @@ function renderSourceList() {
   for (const s of list) {
     const row = document.createElement('div');
     row.className = 'source-row' + (state.source?.id === s.id ? ' current' : '');
-    row.innerHTML = `<div class="meta"><b>${esc(s.name)}</b><small>${s.type === 'xtream' ? `Xtream · ${esc(s.server)}` : esc(s.url || 'Archivo local')}</small></div>
+    row.innerHTML = `<div class="meta"><b>${esc(s.name)}</b><small>${s.type === 'xtream' ? `Xtream · ${esc(s.server)}` : s.type === 'stremio' ? `${t('Extensiones Stremio')} · ${stremio.urls(s.url).length}` : esc(s.url || 'Archivo local')}</small></div>
       <button class="btn" data-nav data-a="open">Abrir</button>
       <button class="btn ghost" data-nav data-a="edit">Editar</button>
       <button class="btn danger" data-nav data-a="del">Borrar</button>`;
@@ -304,6 +312,9 @@ function setFormType(type) {
   f.querySelector(`input[name=type][value=${type}]`).checked = true;
   f.querySelector('.only-m3u').hidden = type !== 'm3u';
   f.querySelector('.only-xtream').hidden = type !== 'xtream';
+  f.querySelector('.only-stremio').hidden = type !== 'stremio';
+  f.querySelector('.shot-row').hidden = type === 'stremio';
+  f.elements.epgUrl.hidden = type === 'stremio';
 }
 function fillForm(s) {
   const f = $('sourceForm');
@@ -311,6 +322,8 @@ function fillForm(s) {
   $('fileName').textContent = '';
   $('formTitle').textContent = s ? 'Editar lista' : 'Agregar lista';
   for (const k of ['id', 'name', 'url', 'server', 'username', 'password', 'epgUrl']) f.elements[k].value = s?.[k] || '';
+  f.elements.addons.value = s?.type === 'stremio' ? s.url || '' : '';
+  if (s?.type === 'stremio') f.elements.url.value = '';
   setFormType(s?.type || 'm3u');
   $('formError').hidden = true;
   $('formNote').hidden = true;
@@ -361,7 +374,10 @@ async function submitSource(e) {
   const type = f.querySelector('input[name=type]:checked').value;
   const src = { id: v('id') || 's' + Date.now().toString(36), name: v('name'), type, epgUrl: v('epgUrl') };
   try {
-    if (type === 'm3u') {
+    if (type === 'stremio') {
+      src.url = v('addons');
+      if (!src.url) throw new Error('Pega la dirección de al menos una extensión (termina en manifest.json)');
+    } else if (type === 'm3u') {
       src.url = v('url');
       const file = f.elements.file.files[0];
       if (!src.url && !file && !v('id')) throw new Error('Indica la URL o carga un archivo');
@@ -370,7 +386,7 @@ async function submitSource(e) {
       Object.assign(src, { server: v('server'), username: v('username'), password: f.elements.password.value });
       if (!src.server || !src.username) throw new Error('Completa servidor, usuario y contraseña');
     }
-    if (!src.name) src.name = type === 'xtream' ? src.server.replace(/^https?:\/\//, '') : 'Mi lista';
+    if (!src.name) src.name = type === 'xtream' ? src.server.replace(/^https?:\/\//, '') : type === 'stremio' ? 'Mis extensiones' : 'Mi lista';
     store.upsertSource(src);
     openSource(src);
   } catch (err) { $('formError').textContent = err.message; $('formError').hidden = false; }
@@ -399,7 +415,7 @@ function renderWelcome() {
     const b = document.createElement('button');
     b.className = 'saved-card' + (state.source?.id === s.id ? ' current' : '');
     b.dataset.nav = '';
-    const kind = s.demo ? 'Demostración' : s.type === 'xtream' ? 'Xtream Codes' : s.url ? 'Lista M3U' : 'Archivo M3U';
+    const kind = s.demo ? 'Demostración' : s.type === 'xtream' ? 'Xtream Codes' : s.type === 'stremio' ? 'Extensiones Stremio' : s.url ? 'Lista M3U' : 'Archivo M3U';
     b.innerHTML = `<span class="saved-kind">${kind}${state.source?.id === s.id ? ' · abierta' : ''}</span><b>${esc(s.name)}</b><small>${esc(s.type === 'xtream' ? s.server : s.url || (s.demo ? 'Canales, películas y series de prueba' : 'Guardada en este equipo'))}</small>`;
     b.onclick = () => openSource(s);
     box.appendChild(b);
@@ -673,6 +689,40 @@ function updateFocusInfo(item) {
   $('fiEpg').textContent = extra;
 }
 
+/* ---------- Extensiones de Stremio ---------- */
+let addonsCache = null;
+/** Las extensiones de la lista (sus manifiestos se leen una vez por lista abierta). */
+async function loadAddons(src, errs = []) {
+  if (addonsCache && addonsCache.key === src.id + src.url) return addonsCache.list;
+  const list = (await Promise.all(stremio.urls(src.url).map((u) => stremio.manifest(u).catch((e) => { errs.push(`${u.replace(/^https?:\/\//, '').split('/')[0]}: ${e.message}`); return null; })))).filter(Boolean);
+  addonsCache = { key: src.id + src.url, list };
+  return list;
+}
+/** Pide los videos de un elemento de extensión; con uno solo sigue directo, con varios deja elegir. */
+async function withStream(item, then) {
+  loader(true, t('Buscando videos…'));
+  let r;
+  try { r = await stremio.streams(await loadAddons(state.source), item); }
+  catch (e) { return toast(`${t('No se pudieron pedir los videos')}: ${e.message}`); }
+  finally { loader(false); }
+  const use = (s) => then({ ...item, url: s.url, userAgent: s.userAgent || item.userAgent, referrer: s.referrer || item.referrer });
+  if (!r.list.length) return toast(r.torrents ? t('Para esto las extensiones sólo entregan torrents: Vibe IPTV reproduce enlaces de video directos') : t(`Ninguna de tus extensiones entrega videos para «${item.name}»`), 6000);
+  if (r.list.length === 1) return use(r.list[0]);
+  $('streamTitle').textContent = item.name;
+  $('streamHint').textContent = t(`Elige un video (${r.list.length} opciones)`);
+  const box = $('streamList');
+  box.innerHTML = '';
+  r.list.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'btn' + (i ? ' ghost' : ''); b.dataset.nav = '';
+    b.textContent = `${s.title} — ${s.addon}`;
+    b.onclick = () => { closeSheets(false); use(s); };
+    box.appendChild(b);
+  });
+  openSheet('streamSheet');
+  setTimeout(() => box.querySelector('button')?.focus(), 60);
+}
+
 /** Imagen real de cada episodio: se muestran enseguida con la del proveedor y se cambian cuando llegan. */
 async function loadEpisodeStills(series) {
   const eps = state.episodes || [];
@@ -688,10 +738,19 @@ async function loadEpisodeStills(series) {
 async function activate(idx) {
   const item = state.view[idx];
   if (!item) return;
+  // Película o canal de una extensión: primero se piden los videos (y se elige uno si hay varios)
+  if (stremio.needsStream(item)) {
+    const list = state.view.filter((i) => i.kind === item.kind);
+    return withStream(item, (resolved) => {
+      const l = list.map((x) => (x.id === resolved.id ? resolved : x));
+      openPlayer(resolved, l, l.findIndex((x) => x.id === resolved.id));
+    });
+  }
   if (item.kind === 'series') {
     loader(true, 'Cargando episodios…');
     try {
-      state.episodes = item.episodes || (state.xt ? await state.xt.episodes(item.seriesId) : []);
+      state.episodes = item.episodes || (stremio.parse(item.id) ? await stremio.episodes(await loadAddons(state.source), item)
+        : state.xt ? await state.xt.episodes(item.seriesId) : []);
       state.series = item;
       state.query = '';
       $('tabs').hidden = true; $('crumb').hidden = false; $('crumbTitle').textContent = item.name;
@@ -816,7 +875,7 @@ function openSheet(id, opts = {}) {
   sheetReturnFocus = document.activeElement;
   if (id === 'sourcesSheet') {
     const adding = opts.mode === 'add';
-    $('sourcesTitle').textContent = adding ? (opts.type === 'xtream' ? 'Cuenta Xtream Codes' : 'Lista M3U') : 'Mis listas';
+    $('sourcesTitle').textContent = adding ? (opts.type === 'xtream' ? 'Cuenta Xtream Codes' : opts.type === 'stremio' ? 'Extensiones Stremio' : 'Lista M3U') : 'Mis listas';
     $('sourcesManage').hidden = adding;
     $('sourcesSheet').querySelector('.seg').hidden = adding;
     $('formTitle').hidden = adding;
@@ -911,6 +970,17 @@ function playCurrent() {
  * Película: su ficha (get_vod_info); episodio: la ficha de su serie.
  */
 const subsMetaCache = new Map();
+/** Subtítulos de las extensiones de la lista abierta (para lo que vino de ellas). */
+async function addonSubtitles(item) {
+  const p = item && stremio.parse(item.id);
+  if (!p || state.source?.type !== 'stremio' || !/^tt/.test(p[1])) return [];
+  const want = (cfg().subLangs || 'es,en').split(/[\s,]+/).filter(Boolean);
+  const code = { spa: 'es', spl: 'es', eng: 'en', por: 'pt', pob: 'pt', fre: 'fr', fra: 'fr', ita: 'it', ger: 'de', deu: 'de' };
+  const list = await stremio.subtitles(await loadAddons(state.source), p[0] === 'series' ? 'series' : 'movie', p[1]).catch(() => []);
+  return list.map((s, i) => ({ provider: 'stremio', id: s.url, lang: code[s.lang] || s.lang, label: `Subtítulo ${i + 1}`, downloads: 0, source: s.addon }))
+    .filter((r) => want.includes(r.lang));
+}
+
 async function subtitleMeta(item) {
   const xt = state.xt;
   if (!xt || !item) return {};
@@ -1019,6 +1089,15 @@ function zap(delta) {
 }
 function playIndexAt(i) {
   if (i < 0 || i >= state.playList.length || i === state.playIndex) return;
+  // Siguiente o anterior de una extensión: se piden sus videos antes de cambiar
+  if (stremio.needsStream(state.playList[i])) {
+    return withStream(state.playList[i], (resolved) => {
+      const j = state.playList.findIndex((x) => x.id === resolved.id);
+      if (j < 0) return;
+      state.playList[j] = resolved;
+      playIndexAt(j);
+    });
+  }
   savePosition(state.playing);
   state.prevIndex = state.playIndex;
   state.playIndex = i;
@@ -1391,6 +1470,7 @@ async function searchSubs() {
   box.innerHTML = '<p class="hint">Buscando…</p>';
   try {
     const { results, errors } = await subs.searchSubtitles(state.playing || { name: '' }, $('subsQuery').value.trim(), { ...(await subtitleMeta(state.playing)), withHash: true });
+    results.push(...(await addonSubtitles(state.playing)));
     box.innerHTML = results.length ? '' : '<p class="hint">Sin resultados. Prueba con el título original (en inglés) o sin el año.</p>';
     results.slice(0, 60).forEach((r) => {
       const b = document.createElement('button');

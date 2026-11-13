@@ -94,6 +94,9 @@ fun App(vm: AppViewModel) {
             ) { PlayerScreen(vm) }
         }
 
+        // Extensiones de Stremio: elegir entre los videos que entregan
+        vm.streamPick?.let { p -> StreamPickerSheet(p, onPick = vm::pickStream) { vm.streamPick = null } }
+
         // Pasar listas desde el celular: en el celular, la ventana para enviar; en la TV, el código a escribir
         if (vm.showSendSources) SendSourcesSheet(vm) { vm.showSendSources = false }
         vm.pairCode?.let { (code, from) -> PairCodeOverlay(code, from) { vm.cancelPair() } }

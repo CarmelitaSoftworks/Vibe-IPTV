@@ -28,6 +28,8 @@ import java.util.zip.ZipInputStream
  *  - Podnapisi (sin clave)
  */
 class SubtitleSources(private val settings: () -> Settings) {
+    /** Subtítulos de las extensiones de Stremio de la lista abierta: (tipo, id) → subtítulos. Lo pone la app. */
+    @Volatile var addonSubs: ((String, String) -> List<Stremio.Sub>)? = null
 
     data class Query(
         val title: String, val series: Boolean, val season: Int = 0, val episode: Int = 0, val year: String = "",
@@ -43,6 +45,8 @@ class SubtitleSources(private val settings: () -> Settings) {
          * huella del archivo). Nada de búsquedas por texto parecido: mejor no cargar nada que cargar otra película.
          */
         val strict: Boolean = false,
+        /** Código IMDb ya conocido (lo de las extensiones de Stremio lo trae): no hay que adivinar por el nombre. */
+        val imdb: String = "",
     )
     data class Result(val provider: String, val source: String, val id: String, val lang: String, val label: String, val downloads: Int,
                       /** "S01E05": elige ese episodio si la descarga es un paquete de temporada. */
@@ -54,7 +58,18 @@ class SubtitleSources(private val settings: () -> Settings) {
     data class CatalogEntry(val name: String, val year: String, val id: String)
 
     private val ua = "VibeIPTVAndroid v1.0"
-    private val names = mapOf("stremio" to "OpenSubtitles", "opensubtitles" to "OpenSubtitles (cuenta)", "subdl" to "SubDL", "podnapisi" to "Podnapisi")
+    /** Subtítulos que entregan las extensiones de Stremio (se bajan igual que los de OpenSubtitles sin clave). */
+    private fun fromAddons(fn: (String, String) -> List<Stremio.Sub>, q: Query): List<Result> {
+        val type = if (q.series) "series" else "movie"
+        val id = if (q.series && q.season > 0) "${q.imdb}:${q.season}:${q.episode.coerceAtLeast(1)}" else q.imdb
+        val want = langs().flatMap { l -> (lang3[l] ?: listOf(l)).map { it to l } }.toMap() + langs().associateBy { it }
+        return fn(type, id).mapIndexedNotNull { i, sub ->
+            val l = want[sub.lang] ?: return@mapIndexedNotNull null
+            Result("stremio", sub.addon, sub.url, l, "Subtítulo ${i + 1}", 0)
+        }
+    }
+
+    private val names = mapOf("stremio" to "OpenSubtitles", "opensubtitles" to "OpenSubtitles (cuenta)", "subdl" to "SubDL", "podnapisi" to "Podnapisi", "addons" to "Extensiones")
     private val lang3 = mapOf("es" to listOf("spa", "spl", "ea"), "en" to listOf("eng"), "pt" to listOf("por", "pob"), "fr" to listOf("fre", "fra"), "it" to listOf("ita"), "de" to listOf("ger", "deu"))
 
     private fun langs() = settings().subLangs.lowercase().split(Regex("[\\s,]+")).filter { it.isNotBlank() }.ifEmpty { listOf("es", "en") }
@@ -74,6 +89,7 @@ class SubtitleSources(private val settings: () -> Settings) {
     // ---------- Proveedores ----------
     /** Código IMDb: primero con [Query.title] (título original o lo escrito), después con los otros nombres. */
     private fun imdbFor(q: Query): String? {
+        if (q.imdb.startsWith("tt")) return q.imdb
         for (t in (listOf(q.title) + q.alts).map { it.trim() }.filter { it.length >= 2 }.distinct()) imdbForTitle(t, q)?.let { return it }
         return null
     }
@@ -243,6 +259,7 @@ class SubtitleSources(private val settings: () -> Settings) {
             if (s.osApiKey.isNotBlank()) add("opensubtitles" to { opensubtitles(q) })
             if (s.subdlKey.isNotBlank()) add("subdl" to { subdl(q) })
             add("podnapisi" to { podnapisi(q) })
+            addonSubs?.let { fn -> if (q.imdb.startsWith("tt")) add("addons" to { fromAddons(fn, q) }) }
         }
         val results = coroutineScope {
             jobs.map { (name, fn) -> async { runCatching(fn).onFailure { errors[names.getValue(name)] = it.message ?: "error" }.getOrDefault(emptyList()) } }.awaitAll().flatten()

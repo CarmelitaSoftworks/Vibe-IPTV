@@ -48,7 +48,8 @@ fun splitGroup(group: String): Pair<String, String> {
 
 fun Item.withCategory(): Item = splitGroup(group).let { (c, s) -> copy(cat = c, sub = s) }
 
-enum class SourceType { M3U, XTREAM }
+/** M3U, cuenta Xtream Codes o extensiones de Stremio (en [Source.url], una dirección de manifest.json por línea). */
+enum class SourceType { M3U, XTREAM, STREMIO }
 
 data class Source(
     val id: String,

@@ -161,7 +161,7 @@ fun SourcesDialog(
         if (autoPickFile) try { picker.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { error = "Este dispositivo no tiene selector de archivos. Usa un enlace." }
     }
 
-    val title = when { !adding -> "Mis listas"; type == SourceType.XTREAM -> "Cuenta Xtream Codes"; else -> "Lista M3U" }
+    val title = when { !adding -> "Mis listas"; type == SourceType.XTREAM -> "Cuenta Xtream Codes"; type == SourceType.STREMIO -> "Extensiones Stremio"; else -> "Lista M3U" }
     Sheet(title, onDismiss, wide = true) {
         if (!adding && vm.sources.isEmpty()) Text("Aún no tienes listas guardadas.", color = c.inkSoft)
         if (!adding) vm.sources.forEach { s ->
@@ -176,7 +176,12 @@ fun SourcesDialog(
                 Column(Modifier.weight(1f)) {
                     Text(s.name, color = c.ink, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        if (s.type == SourceType.XTREAM) "Xtream · ${s.server}" else if (s.localFile) "Archivo local" else s.url,
+                        when {
+                            s.type == SourceType.XTREAM -> "Xtream · ${s.server}"
+                            s.type == SourceType.STREMIO -> "Extensiones Stremio · ${cl.iptv.player.data.Stremio.urls(s.url).size}"
+                            s.localFile -> "Archivo local"
+                            else -> s.url
+                        },
                         color = c.inkSoft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -193,15 +198,21 @@ fun SourcesDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill("M3U / M3U8", active = type == SourceType.M3U) { type = SourceType.M3U }
                 Pill("Xtream Codes", active = type == SourceType.XTREAM) { type = SourceType.XTREAM }
+                Pill("Extensiones Stremio", active = type == SourceType.STREMIO) { type = SourceType.STREMIO }
             }
             Spacer(Modifier.height(10.dp))
         }
         Field(name, { name = it }, "Nombre (ej: Mi proveedor)", highlight = "name" in filled)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+        if (type != SourceType.STREMIO) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 6.dp)) {
             ActionButton("📷 Rellenar desde una captura…", ghost = true) { pickShot() }
             if (reading) Text("Leyendo la captura…", color = c.accentDeep, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
-        if (type == SourceType.M3U) {
+        if (type == SourceType.STREMIO) {
+            Field(url, { url = it }, "Direcciones de las extensiones (manifest.json), separadas por espacio o coma", keyboard = KeyboardType.Uri)
+            Text("Sus catálogos se ven como categorías; al elegir algo se piden los videos a las extensiones que los entregan. " +
+                "Vibe IPTV no trae extensiones ni recomienda ninguna: agrega sólo las que tengas derecho a usar. Se reproducen enlaces de video directos (no torrents).",
+                color = c.inkSoft, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+        } else if (type == SourceType.M3U) {
             Field(url, { url = it; if (it.isNotBlank()) fileUri = null }, "URL de la lista .m3u / .m3u8", keyboard = KeyboardType.Uri, highlight = "url" in filled)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ActionButton("Cargar archivo…", ghost = true) {
@@ -215,7 +226,7 @@ fun SourcesDialog(
             Field(user, { user = it }, "Usuario", highlight = "user" in filled)
             Field(pass, { pass = it }, "Contraseña", password = !showPass, highlight = "pass" in filled)
         }
-        Field(epg, { epg = it }, "Guía EPG XMLTV (opcional, varias separadas por coma)", keyboard = KeyboardType.Uri, highlight = "epg" in filled)
+        if (type != SourceType.STREMIO) Field(epg, { epg = it }, "Guía EPG XMLTV (opcional, varias separadas por coma)", keyboard = KeyboardType.Uri, highlight = "epg" in filled)
         note?.let {
             Text(it, color = c.ink, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
                 .clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.10f)).padding(10.dp))
@@ -228,12 +239,13 @@ fun SourcesDialog(
                 error = when {
                     type == SourceType.M3U && url.isBlank() && fileUri == null && editing?.localFile != true -> "Indica la URL o carga un archivo"
                     type == SourceType.XTREAM && (server.isBlank() || user.isBlank()) -> "Completa servidor, usuario y contraseña"
+                    type == SourceType.STREMIO && url.isBlank() -> "Pega la dirección de al menos una extensión (termina en manifest.json)"
                     else -> null
                 }
                 if (error == null) {
                     val src = Source(
                         id = id, type = type, epgUrl = epg.trim(),
-                        name = name.trim().ifBlank { if (type == SourceType.XTREAM) server.removePrefix("http://").removePrefix("https://") else "Mi lista" },
+                        name = name.trim().ifBlank { when (type) { SourceType.XTREAM -> server.removePrefix("http://").removePrefix("https://"); SourceType.STREMIO -> "Mis extensiones"; else -> "Mi lista" } },
                         url = url.trim(), server = server.trim(), username = user.trim(), password = pass,
                         localFile = type == SourceType.M3U && url.isBlank() && (fileUri != null || editing?.localFile == true),
                     )

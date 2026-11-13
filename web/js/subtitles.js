@@ -1,5 +1,6 @@
 // Subtítulos: OpenSubtitles (la misma base que usa el plugin VLSub de VLC),
 // archivos .srt/.vtt externos y conversión SRT -> WebVTT.
+import { parse as stremioId } from './stremio.js';
 import { getSettings } from './storage.js';
 import { proxyBase } from './net.js';
 
@@ -81,6 +82,13 @@ export async function searchSubtitles(item, query, meta = {}) {
       url: item.kind === 'live' || !meta.withHash ? '' : item.url || '', ua: item.userAgent || '', ref: item.referrer || '',
       osKey: s.osApiKey || '', subdlKey: s.subdlKey || '', strict: meta.strict ? '1' : '',
     });
+    // De una extensión de Stremio: trae su código IMDb ("tt…" o "tt…:temporada:episodio"); con él no se adivina
+    const sid = !typed && stremioId(item.id)?.[1];
+    if (sid && /^tt/.test(sid)) {
+      const [imdb, se, ep] = sid.split(':');
+      p.set('imdb', imdb);
+      if (se) { p.set('type', 'series'); if (!item.season) p.set('season', se); if (!item.episode) p.set('episode', ep || ''); }
+    }
     const res = await fetch(`${proxyBase()}/proxy/subs/search?${p}`);
     if (!res.ok) throw new Error(decodeURIComponent(res.headers.get('x-proxy-error') || `error ${res.status}`));
     return res.json();

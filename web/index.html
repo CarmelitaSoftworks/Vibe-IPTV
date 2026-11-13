@@ -203,6 +203,12 @@
     <p class="hint">Busca en todas las categorías de la sección actual.</p>
   </div>
 
+  <!-- Extensiones de Stremio: elegir entre los videos que entregan -->
+  <div class="sheet wide" id="streamSheet" hidden>
+    <h2 id="streamTitle">Elige un video</h2>
+    <p class="hint" id="streamHint"></p>
+    <div class="stream-list" id="streamList"></div>
+  </div>
   <div class="sheet wide" id="sourcesSheet" hidden>
     <h2 id="sourcesTitle">Mis listas</h2>
     <div id="sourcesManage"><div class="source-list" id="sourceList"></div></div>
@@ -212,11 +218,16 @@
       <div class="seg" role="radiogroup">
         <label><input type="radio" name="type" value="m3u" checked><span data-nav tabindex="0">M3U / M3U8</span></label>
         <label><input type="radio" name="type" value="xtream"><span data-nav tabindex="0">Xtream Codes</span></label>
+        <label><input type="radio" name="type" value="stremio"><span data-nav tabindex="0">Extensiones Stremio</span></label>
       </div>
       <input class="field" name="name" placeholder="Nombre (opcional)" data-nav>
       <div class="only-m3u">
         <input class="field" name="url" placeholder="URL de la lista .m3u / .m3u8" data-nav>
         <label class="file-btn" data-nav tabindex="0">o cargar archivo…<input type="file" name="file" accept=".m3u,.m3u8,.txt" hidden></label> <span class="file-name" id="fileName"></span>
+      </div>
+      <div class="only-stremio" hidden>
+        <input class="field" name="addons" placeholder="Direcciones de las extensiones (manifest.json), separadas por espacio o coma" data-nav>
+        <p class="hint">Sus catálogos se ven como categorías; al elegir algo se piden los videos a las extensiones que los entregan. Vibe IPTV no trae extensiones ni recomienda ninguna: agrega sólo las que tengas derecho a usar. Se reproducen enlaces de video directos (no torrents).</p>
       </div>
       <div class="shot-row">
         <button type="button" class="file-btn" id="btnShot" data-nav>📷 Rellenar desde una captura…</button>

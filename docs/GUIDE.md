@@ -99,6 +99,17 @@ When a list opens you get **Home** with three big tiles (Live TV, Movies, Series
   - Quick: channel numbers, guide below the tiles, autoplay next episode, animations.
   - Lists & guide · Appearance (**language** Spanish/English; the menu is **white by default**; optional dark theme and accent color; tile size) · Playback · Subtitles · Network (web only) · App startup (last list, lists screen or last channel) · Data · About.
 
+## 5b. Stremio extensions
+
+Vibe IPTV can use **Stremio extensions** (Stremio's open add-on format) as one more list.
+
+- **Adding them:** My lists → *Add list* → **Stremio extensions**, and paste the address of each extension (the one ending in `manifest.json`; `stremio://…` works too), separated by space or comma. Several extensions make one list.
+- **How they look:** the extensions' catalogs show up as categories in Movies, Series and Live TV, with artwork; series bring their episodes with an image for each. Favorites, Search, *Continue watching* and every theme work.
+- **When you pick something** the app asks the extensions that provide videos (they can be other ones in the same list): if there's one it starts by itself; if there are several you choose in a window. With ▲▼ in the player you go to the next episode or movie and its videos are requested.
+- **Subtitles:** what comes from extensions already carries its IMDb code, so the subtitle search finds the exact movie; subtitles from extensions that provide them are added too.
+- **Limits:** **direct video links** (http/https) are played. Extensions that only provide torrents don't work (Vibe IPTV doesn't download or share torrents). Search-only extensions (no catalog to browse) don't show anything yet.
+- **Important:** Vibe IPTV doesn't include or recommend any extension. Add only those you have the right to use, just like your lists.
+
 ## 6. Player and cable-TV channels (AC-3, MP2, MPEG-2)
 
 **Controls (web):** previous/next, ±10 s, volume, side channel list with the guide (◄ on a live channel), subtitles, audio, quality, aspect ratio (fit, fill, stretch, zoom), speed, technical info (engine, resolution, codecs, buffer), favorite, picture-in-picture, "Open in VLC" and fullscreen. Keys: M mute, I info, L list, +/− volume.

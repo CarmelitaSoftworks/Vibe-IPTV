@@ -28,7 +28,10 @@ const val CAT_RECENT = "__recent__"
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val store = Storage(app)
     val subtitles = OpenSubtitles { settings }
-    val subtitleSources = SubtitleSources { settings }
+    val subtitleSources = SubtitleSources { settings }.also { src ->
+        // Subtítulos de las extensiones de la lista abierta (si es de extensiones de Stremio)
+        src.addonSubs = { type, id -> stremioCache?.second?.let { Stremio.subtitles(it, type, id) }.orEmpty() }
+    }
 
     /**
      * Búsqueda de subtítulos con todo lo que se sabe del archivo, para cuando el nombre de la lista no sirve:
@@ -42,6 +45,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val isSeries = item.seriesName.isNotBlank() || item.season > 0
         val base = SubtitleSources.Query(typed?.takeIf { it.isNotBlank() } ?: listTitle, isSeries, item.season, item.episode, year0)
         val userTyped = typed != null && typed.isNotBlank() && !typed.equals(listTitle, true)
+        // De una extensión de Stremio: trae su código IMDb ("tt…" o "tt…:temporada:episodio"); con él no se adivina
+        val stm = Stremio.parse(item.id)?.second?.takeIf { it.startsWith("tt") && !userTyped }
+        if (stm != null) {
+            val parts = stm.split(':')
+            return base.copy(imdb = parts[0], season = item.season.takeIf { it > 0 } ?: parts.getOrNull(1)?.toIntOrNull() ?: 0,
+                episode = item.episode.takeIf { it > 0 } ?: parts.getOrNull(2)?.toIntOrNull() ?: 0, series = isSeries || parts.size >= 3)
+        }
         val (provider, provYear) = if (userTyped) emptyList<String>() to "" else providerTitles(item, isSeries)
         // Lo más confiable va en title (lo que se busca por texto): el título original del proveedor; el de la lista queda de respaldo
         var q = if (provider.isEmpty()) base
@@ -390,7 +400,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (!fresh) {
                     if (cached != null) loading = null
                     val loaded: List<Item>
-                    if (x != null) {
+                    if (src.type == SourceType.STREMIO) {
+                        val errs = ArrayList<String>()
+                        val addons = stremioAddons(src, refresh = true, onError = { errs += it })
+                        loaded = uniqueIds(Stremio.loadAll(addons) { errs += it }.map { it.withCategory() })
+                        if (errs.isNotEmpty()) { logEvent("Extensiones: ${errs.joinToString(" · ")}"); message = "Algunas extensiones no respondieron: ${errs.joinToString(" · ").take(160)}" }
+                        if (loaded.isEmpty()) throw java.io.IOException(if (addons.isEmpty()) "No se pudo abrir ninguna extensión" else "Las extensiones no tienen catálogos para mostrar (las que sólo entregan videos se usan al elegir algo de otra extensión)")
+                    } else if (x != null) {
                         x.login()
                         xtreamAccount = x.account
                         warnAccount(x.account)
@@ -861,6 +877,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun activate(item: Item, fromList: List<Item>? = null) {
+        if (item.kind == Kind.SERIES && Stremio.parse(item.id) != null) {
+            val src = source ?: return
+            viewModelScope.launch {
+                loading = "Cargando episodios…"
+                try {
+                    episodes = Stremio.episodes(stremioAddons(src), item)
+                    series = item; query = ""
+                    recompute(true)
+                    if (episodes.none { it.logo != item.logo }) loadEpisodeStills(item)
+                } catch (e: Exception) { message = e.message }
+                loading = null
+            }
+            return
+        }
+        // Película o canal de una extensión: primero se piden los videos (y se elige uno si hay varios)
+        if (Stremio.needsStream(item)) { withStream(item) { activate(it, fromList) }; return }
         if (item.kind == Kind.SERIES) {
             if (item.episodes.isNotEmpty()) { episodes = item.episodes; series = item; query = ""; recompute(true); loadEpisodeStills(item); return }
             val x = xtream ?: return
@@ -878,10 +910,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         // Desde el inicio ("Seguir viendo") no hay vista: reproducir al menos ese elemento
-        val list = (fromList ?: view.filter { it.kind == item.kind }).let { l -> if (item in l) l else listOf(item) }
+        // El elemento puede venir con su video recién elegido (extensiones): se reemplaza por id en la lista
+        val list = (fromList ?: view.filter { it.kind == item.kind }).map { if (it.id == item.id) item else it }
+            .let { l -> if (l.any { it.id == item.id }) l else listOf(item) }
         store.lastItemId = item.id
         playList = list
-        playIndex = list.indexOf(item).coerceAtLeast(0)
+        playIndex = list.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
         previousIndex = null
         addRecent(item)
         screen = Screen.PLAYER
@@ -904,11 +938,60 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------- Extensiones de Stremio ----------
+    private var stremioCache: Pair<String, List<Stremio.Addon>>? = null
+    /** Las extensiones de la lista (sus manifiestos se leen una vez por lista abierta). */
+    private suspend fun stremioAddons(src: Source, refresh: Boolean = false, onError: (String) -> Unit = {}): List<Stremio.Addon> {
+        stremioCache?.takeIf { it.first == src.id + src.url && !refresh }?.let { return it.second }
+        val list = kotlinx.coroutines.coroutineScope {
+            Stremio.urls(src.url).map { u -> async { runCatching { Stremio.manifest(u) }.onFailure { onError("${u.substringAfter("://").substringBefore('/')}: ${it.message}") }.getOrNull() } }
+                .awaitAll().filterNotNull()
+        }
+        stremioCache = src.id + src.url to list
+        return list
+    }
+
+    /** Elegir entre varios videos que entregan las extensiones. */
+    class StreamPick(val item: Item, val streams: List<Stremio.Stream>, val then: (Item) -> Unit)
+    var streamPick by mutableStateOf<StreamPick?>(null)
+    fun pickStream(st: Stremio.Stream) {
+        val p = streamPick ?: return
+        streamPick = null
+        p.then(p.item.copy(url = st.url, userAgent = st.userAgent, referrer = st.referrer))
+    }
+
+    /** Pide los videos de un elemento de extensión; con uno solo sigue directo, con varios deja elegir. */
+    private fun withStream(item: Item, then: (Item) -> Unit) {
+        val src = source ?: return
+        viewModelScope.launch {
+            loading = "Buscando videos…"
+            val r = runCatching { Stremio.streams(stremioAddons(src), item) }
+            loading = null
+            val (list, torrents) = r.getOrElse { message = "No se pudieron pedir los videos: ${it.message}"; return@launch }
+            when {
+                list.isEmpty() -> message = if (torrents > 0) "Para esto las extensiones sólo entregan torrents: Vibe IPTV reproduce enlaces de video directos"
+                    else "Ninguna de tus extensiones entrega videos para «${item.name}»"
+                list.size == 1 -> then(item.copy(url = list[0].url, userAgent = list[0].userAgent, referrer = list[0].referrer))
+                else -> streamPick = StreamPick(item, list, then)
+            }
+        }
+    }
+
     /** Canal visto antes del actual (botón "Canal anterior" / tecla LAST del control). */
     var previousIndex by mutableStateOf<Int?>(null); private set
 
     fun playAt(index: Int) {
         if (index !in playList.indices || index == playIndex) return
+        // Siguiente o anterior de una extensión: se piden sus videos antes de cambiar
+        val target = playList[index]
+        if (Stremio.needsStream(target)) {
+            withStream(target) { resolved ->
+                val i = playList.indexOfFirst { it.id == resolved.id }.takeIf { it >= 0 } ?: return@withStream
+                playList = playList.toMutableList().also { it[i] = resolved }
+                playAt(i)
+            }
+            return
+        }
         previousIndex = playIndex
         playIndex = index
         playing?.let { store.lastItemId = it.id; addRecent(it) }

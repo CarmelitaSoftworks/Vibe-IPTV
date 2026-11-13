@@ -824,3 +824,7 @@ html.ios .plist, html.ios .pmenu { padding-bottom: env(safe-area-inset-bottom); 
   .tile:not(.empty-slot):hover:not(:focus):not(:focus-visible),
   .round-btn:hover:not(:focus-visible), .saved-card:hover:not(:focus):not(:focus-visible) { transform: none; }
 }
+
+/* Extensiones de Stremio: lista de videos para elegir */
+.stream-list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow: auto; }
+.stream-list .btn { text-align: left; white-space: normal; }

@@ -140,3 +140,16 @@ test('imágenes de episodios: sólo de la serie que calza (nunca de otra)', asyn
   assert.equal(pickSeries([{ name: 'Money Heist', releaseInfo: '2017–2021' }], 'La casa de papel', '2017')?.name, 'Money Heist');
   assert.equal(pickSeries([{ name: 'Otra serie', releaseInfo: '2015' }], 'Serie 123', ''), null);
 });
+
+test('extensiones de Stremio: direcciones, ids y qué atiende cada una', async () => {
+  const st = await import('../js/stremio.js');
+  assert.equal(st.normalize('stremio://x.ejemplo/abc/manifest.json'), 'https://x.ejemplo/abc');
+  assert.deepEqual(st.urls('https://a.ejemplo/manifest.json\nhttps://b.ejemplo, https://a.ejemplo'), ['https://a.ejemplo', 'https://b.ejemplo']);
+  assert.deepEqual(st.parse('stm:series:tt1:2:3'), ['series', 'tt1:2:3']);
+  const a = st.parseManifest('http://x', { name: 'Demo', types: ['movie'], idPrefixes: ['tt'], resources: ['catalog', { name: 'stream', types: ['movie', 'series'] }],
+    catalogs: [{ type: 'movie', id: 'top', name: 'Populares' }, { type: 'movie', id: 'buscar', extraRequired: ['search'] }] });
+  assert.equal(a.catalogs.length, 1);                              // el de sólo búsqueda no se lista
+  assert.equal(st.serves(a, 'stream', 'series', 'tt9'), true);
+  assert.equal(st.serves(a, 'stream', 'movie', 'kitsu:1'), false);   // otro tipo de id
+  assert.equal(st.needsStream({ id: 'stm:movie:tt1', kind: 'movie', url: '' }), true);
+});
