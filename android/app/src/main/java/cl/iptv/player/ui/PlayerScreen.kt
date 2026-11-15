@@ -129,6 +129,9 @@ private fun altFormat(url: String): String? {
 private fun subtitleScale(size: String) = when (size) { "small" -> 0.8f; "large" -> 1.3f; "xlarge" -> 1.6f; else -> 1f }
 
 @OptIn(UnstableApi::class)
+/** Para leer el torrent abierto en este equipo: sin límite de espera entre datos (pueden tardar en llegar). */
+private val torrentClient by lazy { Http.streamClient.newBuilder().readTimeout(0, java.util.concurrent.TimeUnit.SECONDS).build() }
+
 @Composable
 fun PlayerScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
@@ -374,7 +377,10 @@ fun PlayerScreen(vm: AppViewModel) {
         val pos = if (subtitle != null && player.currentMediaItem?.mediaId == item.id) player.currentPosition
             else if (saved != null && player.currentMediaItem?.mediaId != item.id) { vm.message = "Continuando desde ${fmtDur(saved.pos)}"; saved.pos }
             else C.TIME_UNSET
-        val http = OkHttpDataSource.Factory(Http.streamClient)
+        // Torrent: mientras llega una pieza el servidor local no envía nada; eso no es un corte (sin límite de espera,
+        // de eso se encarga el vigilante de más abajo, que sabe si hay personas compartiendo)
+        val isTorrent = cl.iptv.player.data.TorrentStream.isLocalUrl(playUrl)
+        val http = OkHttpDataSource.Factory(if (isTorrent) torrentClient else Http.streamClient)
             .setUserAgent(item.userAgent.ifBlank { Http.DEFAULT_UA })
             .apply { if (item.referrer.isNotBlank()) setDefaultRequestProperties(mapOf("Referer" to item.referrer)) }
         val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, http))
@@ -391,6 +397,22 @@ fun PlayerScreen(vm: AppViewModel) {
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(item.id, playUrl, engine, reloadKey) {
         started = false
+        if (cl.iptv.player.data.TorrentStream.isLocalUrl(playUrl)) {
+            // Torrent: partir puede tardar (hay que encontrar personas y bajar el principio). Se espera mientras haya
+            // movimiento, mostrando cómo va, y sin cambiar de motor ni de formato: el problema no es el reproductor
+            var quiet = 0
+            while (!started && error == null && cl.iptv.player.data.TorrentStream.isLocalUrl(playUrl)) {
+                delay(3000)
+                if (started || error != null) break
+                if (cl.iptv.player.data.TorrentStream.alive()) quiet = 0 else quiet += 3
+                cl.iptv.player.data.TorrentStream.status()?.let { vm.message = it }
+                if (quiet >= 120) {
+                    if (engine == "exo") player.stop() else alt?.pause()
+                    error = "Nadie está compartiendo este torrent ahora. Prueba otra opción o inténtalo más tarde."
+                }
+            }
+            return@LaunchedEffect
+        }
         delay(if (item.kind == Kind.LIVE) 20_000L else 30_000L)
         if (started || error != null) return@LaunchedEffect
         if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@LaunchedEffect
@@ -485,6 +507,7 @@ fun PlayerScreen(vm: AppViewModel) {
     var gestureAt by remember { mutableStateOf(0L) }
     LaunchedEffect(item.id, engine, player) {
         val d = cl.iptv.player.data.StallDetector(firstStartMs = Long.MAX_VALUE / 4)   // el arranque lo vigila el bloque anterior
+        var torrentPos = -1L; var torrentSince = System.currentTimeMillis(); var torrentQuiet = torrentSince
         d.reset(System.currentTimeMillis())
         while (true) {
             delay(2000)
@@ -492,6 +515,21 @@ fun PlayerScreen(vm: AppViewModel) {
             if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) { d.reset(System.currentTimeMillis()); continue }
             val k = if (useAlt) alt else exo
             if (k == null) continue
+            if (cl.iptv.player.data.TorrentStream.isLocalUrl(playUrl)) {
+                // Torrent: si se queda esperando es porque faltan pedazos, no porque el canal se cayó. No se recarga
+                // ni se cambia de motor: se muestra cómo va, y sólo se avisa si ya no queda nadie compartiendo
+                val now = System.currentTimeMillis(); val pos = k.position
+                if (userPaused || pos != torrentPos) { torrentPos = pos; torrentSince = now; torrentQuiet = now }
+                else if (now - torrentSince > 6000) {
+                    if (cl.iptv.player.data.TorrentStream.alive()) torrentQuiet = now
+                    cl.iptv.player.data.TorrentStream.status()?.let { vm.message = it }
+                    if (now - torrentQuiet > 180_000) {
+                        if (engine == "exo") player.stop() else alt?.pause()
+                        error = "Nadie está compartiendo este torrent ahora. Prueba otra opción o inténtalo más tarde."
+                    }
+                }
+                continue
+            }
             val next = nextEngine(engine)
             val canSwitch = vm.settings.engine == "auto" && next != null
             when (d.check(System.currentTimeMillis(), k.position, !userPaused, canSwitch)) {
@@ -572,6 +610,12 @@ fun PlayerScreen(vm: AppViewModel) {
                 if (it0.kind == Kind.LIVE && network && liveRetries < 3 && player.currentPosition > 0) {
                     liveRetries++
                     vm.viewModelScope.launch { delay(1000L * liveRetries); player.prepare(); player.play() }
+                    return
+                }
+                // Torrent: un corte de la lectura local se reintenta (seguir desde donde iba), sin cambiar de motor
+                if (network && cl.iptv.player.data.TorrentStream.isLocalUrl(it0.url) && liveRetries < 5) {
+                    liveRetries++
+                    vm.viewModelScope.launch { delay(1500); player.prepare(); player.play() }
                     return
                 }
                 if (altFormat(it0.url) != null && altFor != it0.id) { altFor = it0.id; return }   // probar el otro formato del canal

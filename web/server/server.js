@@ -690,6 +690,13 @@ async function handleTorrent(req, res, reqUrl) {
       const file = (Number.isInteger(wantIdx) && files[wantIdx]) || files.filter((f) => VIDEO_EXT.test(f.name)).sort((a, b) => b.length - a.length)[0]
         || files.slice().sort((a, b) => b.length - a.length)[0];
       if (!file) throw new Error('El torrent no trae archivos');
+      // El video se guarda entero en el disco mientras se ve: si no cabe, mejor avisar ahora que fallar a medias
+      const free = await new Promise((ok) => (fs.statfs ? fs.statfs(os.tmpdir(), (e, st) => ok(e ? 0 : st.bavail * st.bsize)) : ok(0)));
+      if (free > 0 && free < file.length + 300 * 1048576) {
+        const gb = (n) => (n / 1e9).toFixed(1);
+        throw new Error(L(`No hay espacio en el equipo para este video (pesa ${gb(file.length)} GB y hay ${gb(free)} GB libres): prueba una opción más liviana`,
+          `Not enough space on this device for this video (it is ${gb(file.length)} GB and ${gb(free)} GB are free): try a lighter option`));
+      }
       for (const f of files) if (f !== file) f.deselect();            // sólo el video elegido
       torrentCurrent = { id, torrent, file };
       torrentTouch();

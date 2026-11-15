@@ -55,6 +55,7 @@ object TorrentStream {
         }
     }
 
+    private const val SPACE_MARGIN = 300L * 1024 * 1024
     const val NO_VPN = "No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes"
 
     fun isTorrent(url: String) = url.startsWith("magnet:", true)
@@ -98,6 +99,10 @@ object TorrentStream {
             val idx = fileIdxOf(magnet)?.takeIf { it in 0 until fs.numFiles() }
                 ?: (0 until fs.numFiles()).filter { Regex(".*\\.($VIDEO)$", RegexOption.IGNORE_CASE).matches(fs.filePath(it)) }.maxByOrNull { fs.fileSize(it) }
                 ?: (0 until fs.numFiles()).maxByOrNull { fs.fileSize(it) } ?: throw IOException("El torrent no trae archivos")
+            // El video se guarda entero en el equipo mientras se ve: si no cabe, mejor avisar ahora que fallar a medias
+            val need = fs.fileSize(idx); val free = dir.usableSpace
+            if (free in 1 until need + SPACE_MARGIN) throw IOException(
+                "No hay espacio en el equipo para este video (pesa %.1f GB y hay %.1f GB libres): prueba una opción más liviana".format(need / 1e9, free / 1e9))
             val prios = Array(fs.numFiles()) { if (it == idx) Priority.DEFAULT else Priority.IGNORE }
             // Con el candado: el corte por VPN no puede pasar justo entre la revisión y el inicio de la bajada
             val a = synchronized(lock) {
@@ -181,6 +186,18 @@ object TorrentStream {
         if (active == null) runCatching { File(ctx.cacheDir, "torrent").deleteRecursively() }
     }
 
+    /** ¿Esta dirección es el torrent abierto? (el reproductor le tiene más paciencia que a un canal). */
+    fun isLocalUrl(url: String): Boolean {
+        val port = server?.localPort ?: return false
+        return active != null && url.startsWith("http://127.0.0.1:$port/")
+    }
+
+    /** ¿Hay alguien conectado o está bajando algo? Si no, esperar más no sirve. */
+    fun alive(): Boolean {
+        val st = runCatching { active?.handle?.status() }.getOrNull() ?: return false
+        return st.numPeers() > 0 || st.downloadRate() > 0
+    }
+
     /** Estado para el diagnóstico: personas conectadas y velocidades. */
     fun status(): String? {
         val a = active ?: return null
@@ -211,23 +228,38 @@ object TorrentStream {
     // ---------- Piezas ----------
     private fun pieceOf(a: Active, pos: Long) = ((a.offset + pos) / a.pieceLen).toInt()
 
-    /** Lo que viene desde [pos] se pide primero (con plazos cortos y crecientes). */
-    private fun prioritize(a: Active, pos: Long, ahead: Int = 24) {
+    /**
+     * Lo que viene desde [pos] se pide primero (con plazos cortos y crecientes). Con [clear] se olvidan los pedidos
+     * urgentes anteriores: sólo lo hace la lectura principal (los reproductores abren además lecturas cortas, por
+     * ejemplo del índice al final del archivo, que no deben quitarle la prioridad a lo que se está viendo).
+     */
+    private fun prioritize(a: Active, pos: Long, ahead: Int = 24, clear: Boolean = true) {
         val first = pieceOf(a, pos)
         val last = pieceOf(a, a.size - 1)
-        runCatching { a.handle.clearPieceDeadlines() }
+        if (clear) runCatching { a.handle.clearPieceDeadlines() }
         for ((i, p) in (first..minOf(last, first + ahead)).withIndex()) runCatching { a.handle.setPieceDeadline(p, 300 + i * 150) }
     }
 
-    /** Espera a que la pieza esté bajada (hasta [timeoutMs]); false si no llegó o el torrent se cerró. */
-    private fun waitPiece(a: Active, p: Int, timeoutMs: Long = 90_000): Boolean {
-        val end = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < end) {
+    /** La lectura que manda en las prioridades: la última que empezó y que no es sólo el final del archivo. */
+    private val reads = java.util.concurrent.atomic.AtomicLong()
+    @Volatile private var mainRead = 0L
+
+    /**
+     * Espera a que la pieza esté bajada; false si el torrent se cerró o si pasó [idleMs] sin nadie conectado ni nada
+     * bajando (mientras haya movimiento se sigue esperando: un torrent lento no es un error).
+     */
+    private fun waitPiece(a: Active, p: Int, idleMs: Long = 120_000): Boolean {
+        var lastAlive = System.currentTimeMillis()
+        var n = 0
+        while (true) {
             if (active !== a) return false
             if (runCatching { a.handle.havePiece(p) }.getOrDefault(false)) return true
             Thread.sleep(80)
+            if (++n % 25 == 0) {                                              // cada 2 s
+                val now = System.currentTimeMillis()
+                if (alive()) lastAlive = now else if (now - lastAlive > idleMs) return false
+            }
         }
-        return false
     }
 
     // ---------- Servidor local (sólo 127.0.0.1) ----------
@@ -267,8 +299,12 @@ object TorrentStream {
         val head = if (m != null) "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes $start-$end/${a.size}\r\n" else "HTTP/1.1 200 OK\r\n"
         out.write((head + "Content-Type: $type\r\nAccept-Ranges: bytes\r\nContent-Length: ${end - start + 1}\r\nConnection: close\r\n\r\n").toByteArray())
         if (first.startsWith("HEAD")) { out.flush(); return@use }
-        // Se adelantó (o empieza): lo que viene desde aquí va primero
-        prioritize(a, start)
+        // Se adelantó (o empieza): lo que viene desde aquí va primero. Una lectura del puro final (el índice del
+        // video) no toma el mando: se pide con urgencia pero sin quitarle la prioridad a lo que se está viendo
+        val id = reads.incrementAndGet()
+        val tail = start > 0 && pieceOf(a, a.size - 1) - pieceOf(a, start) <= 2
+        if (!tail) mainRead = id
+        prioritize(a, start, clear = !tail)
         var pos = start
         var raf: RandomAccessFile? = null
         val buf = ByteArray(64 * 1024)
@@ -277,7 +313,7 @@ object TorrentStream {
                 val p = pieceOf(a, pos)
                 if (!waitPiece(a, p)) break
                 // Pedir las que siguen mientras se entrega ésta
-                if ((pos - start) % (a.pieceLen.toLong() * 4) < buf.size) prioritize(a, pos)
+                if (mainRead == id && (pos - start) % (a.pieceLen.toLong() * 4) < buf.size) prioritize(a, pos)
                 val pieceEnd = (p.toLong() + 1) * a.pieceLen - a.offset - 1       // último byte del archivo en esta pieza
                 val chunkEnd = minOf(end, pieceEnd)
                 val f = raf ?: RandomAccessFile(a.file, "r").also { raf = it }
