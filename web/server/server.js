@@ -613,6 +613,7 @@ const PASSWORD = process.env.VIBE_PASSWORD || '';
 let torrentClient = null, torrentCurrent = null, torrentIdle = null, torrentVpnTimer = null, torrentVpnLost = false;
 let torrentGen = 0;            // cambia en cada cierre: un torrent que terminó de abrir tarde sabe que ya no corresponde
 const TORRENT_DIR = path.join(os.tmpdir(), 'vibe-torrent');
+const TORRENT_AHEAD = 64 * 1048576;        // cuánto se baja por delante de lo que se está viendo
 const VIDEO_EXT = /\.(mp4|mkv|avi|m4v|mov|webm|ts|wmv|flv|mpg|mpeg)$/i;
 // ¿El internet del equipo sale por una VPN? No basta con que exista un adaptador de VPN (macOS siempre tiene "utun"
 // del sistema, Windows "Teredo Tunneling", y una VPN con túnel dividido no lleva el tráfico): se pregunta al sistema
@@ -697,7 +698,10 @@ async function handleTorrent(req, res, reqUrl) {
         throw new Error(L(`No hay espacio en el equipo para este video (pesa ${gb(file.length)} GB y hay ${gb(free)} GB libres): prueba una opción más liviana`,
           `Not enough space on this device for this video (it is ${gb(file.length)} GB and ${gb(free)} GB are free): try a lighter option`));
       }
-      for (const f of files) if (f !== file) f.deselect();            // sólo el video elegido
+      // Sólo se baja lo que se va viendo (un tramo por delante de la lectura), no el torrent entero: por omisión
+      // WebTorrent lo pide todo, así que se quita ese pedido general y cada lectura pide su tramo
+      try { torrent.deselect(0, torrent.pieces.length - 1, false); } catch {}
+      for (const f of files) f.deselect();
       torrentCurrent = { id, torrent, file };
       torrentTouch();
       console.log(`[torrent] ${file.name} (${(file.length / 1048576).toFixed(0)} MB)`);
@@ -719,10 +723,21 @@ async function handleTorrent(req, res, reqUrl) {
     const type = { mp4: 'video/mp4', m4v: 'video/mp4', mkv: 'video/x-matroska', webm: 'video/webm', ts: 'video/mp2t', avi: 'video/x-msvideo', mov: 'video/quicktime' }[ext] || 'application/octet-stream';
     res.writeHead(r ? 206 : 200, { ...CORS, 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, ...(r ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}) });
     if (req.method === 'HEAD') return res.end();
-    const stream = f.createReadStream({ start, end });             // WebTorrent pide primero estas piezas
-    stream.on('error', () => res.destroy());
-    req.on('close', () => stream.destroy());
-    return stream.pipe(res);
+    // Se entrega por tramos: cada tramo pide sus piezas con prioridad y el siguiente recién se pide cuando el
+    // reproductor ya recibió el anterior. Así se baja lo que se ve más un tramo por delante, no la película entera
+    let pos = start, stream = null, closed = false;
+    const next = () => {
+      if (closed) return;
+      if (pos > end) return res.end();
+      const to = Math.min(end, pos + TORRENT_AHEAD - 1);
+      stream = f.createReadStream({ start: pos, end: to });
+      pos = to + 1;
+      stream.on('error', () => res.destroy());
+      stream.on('end', next);
+      stream.pipe(res, { end: false });
+    };
+    req.on('close', () => { closed = true; if (stream) stream.destroy(); });
+    return next();
   }
   return json(404, { error: 'No encontrado' });
 }

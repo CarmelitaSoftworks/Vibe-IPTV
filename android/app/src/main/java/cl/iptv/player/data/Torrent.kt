@@ -31,7 +31,11 @@ object TorrentStream {
     private class Active(
         val handle: TorrentHandle, val ti: TorrentInfo, val dir: File, val file: File,
         val offset: Long, val size: Long, val pieceLen: Int, val name: String,
-    )
+    ) {
+        /** Piezas pedidas por lecturas cortas (el índice al final del video…): se conservan fuera de la ventana. */
+        val extra: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+        @Volatile var windowFirst = -1
+    }
 
     private var session: SessionManager? = null
     @Volatile private var active: Active? = null
@@ -55,6 +59,7 @@ object TorrentStream {
         }
     }
 
+    private const val AHEAD_BYTES = 96L * 1024 * 1024       // cuánto se baja por delante de lo que se está viendo
     private const val SPACE_MARGIN = 300L * 1024 * 1024
     const val NO_VPN = "No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes"
 
@@ -114,9 +119,10 @@ object TorrentStream {
                     fs.filePath(idx).substringAfterLast('/')).also { active = it }
             }
             // Primero el principio y el final del archivo (muchos videos guardan ahí el índice para poder adelantar)
-            prioritize(a, 0, ahead = 12)
             val lastPiece = pieceOf(a, a.size - 1)
-            for (p in maxOf(pieceOf(a, 0), lastPiece - 1)..lastPiece) runCatching { a.handle.setPieceDeadline(p, 500) }
+            for (p in maxOf(pieceOf(a, 0), lastPiece - 1)..lastPiece) a.extra += p
+            prioritize(a, 0, ahead = 12)
+            for (p in a.extra) runCatching { a.handle.setPieceDeadline(p, 500) }
             onStatus("Preparando el video…")
             val port = startServer()
             check()
@@ -202,8 +208,9 @@ object TorrentStream {
     fun status(): String? {
         val a = active ?: return null
         val st = runCatching { a.handle.status() }.getOrNull() ?: return null
+        // Velocidades del video en sí (sin el tráfico de control) y cuánto del archivo se ha bajado de verdad
         return "Torrent: ${st.numPeers()} personas · ⬇ %.1f Mb/s · ⬆ %.0f KB/s · %.0f %%".format(
-            st.downloadRate() * 8 / 1e6, st.uploadRate() / 1024.0, st.progress() * 100)
+            st.downloadPayloadRate() * 8 / 1e6, st.uploadPayloadRate() / 1024.0, st.totalDone() * 100.0 / a.ti.totalSize().coerceAtLeast(1))
     }
 
     /** Deja de compartir, borra lo bajado y cierra el servidor local. */
@@ -236,8 +243,25 @@ object TorrentStream {
     private fun prioritize(a: Active, pos: Long, ahead: Int = 24, clear: Boolean = true) {
         val first = pieceOf(a, pos)
         val last = pieceOf(a, a.size - 1)
-        if (clear) runCatching { a.handle.clearPieceDeadlines() }
+        if (clear) { runCatching { a.handle.clearPieceDeadlines() }; window(a, first) }
+        else for (p in first..minOf(last, first + ahead)) { a.extra += p; runCatching { a.handle.piecePriority(p, Priority.DEFAULT) } }
         for ((i, p) in (first..minOf(last, first + ahead)).withIndex()) runCatching { a.handle.setPieceDeadline(p, 300 + i * 150) }
+    }
+
+    /**
+     * Sólo se baja lo que se va viendo: las piezas desde [first] hasta un tramo por delante (más las pedidas por
+     * lecturas cortas). El resto queda sin pedir, así ver 10 minutos no baja la película entera. Lo ya bajado se
+     * conserva (retroceder no vuelve a bajar).
+     */
+    private fun window(a: Active, first: Int) {
+        if (a.windowFirst == first) return
+        a.windowFirst = first
+        val last = pieceOf(a, a.size - 1)
+        val span = (AHEAD_BYTES / a.pieceLen).toInt().coerceAtLeast(26)       // nunca menos que las piezas con plazo
+        val pr = Array(a.ti.numPieces()) { Priority.IGNORE }
+        for (p in first..minOf(last, first + span)) pr[p] = Priority.DEFAULT
+        for (p in a.extra) if (p in pr.indices) pr[p] = Priority.DEFAULT
+        runCatching { a.handle.prioritizePieces(pr) }
     }
 
     /** La lectura que manda en las prioridades: la última que empezó y que no es sólo el final del archivo. */
@@ -311,9 +335,11 @@ object TorrentStream {
         try {
             while (pos <= end) {
                 val p = pieceOf(a, pos)
+                // Una lectura que no es la principal pide su pieza aparte (queda fuera de la ventana de lo que se ve)
+                if (mainRead != id && a.extra.add(p)) runCatching { a.handle.piecePriority(p, Priority.DEFAULT); a.handle.setPieceDeadline(p, 500) }
                 if (!waitPiece(a, p)) break
                 // Pedir las que siguen mientras se entrega ésta
-                if (mainRead == id && (pos - start) % (a.pieceLen.toLong() * 4) < buf.size) prioritize(a, pos)
+                if (mainRead == id) { if ((pos - start) % (a.pieceLen.toLong() * 4) < buf.size) prioritize(a, pos) else window(a, p) }
                 val pieceEnd = (p.toLong() + 1) * a.pieceLen - a.offset - 1       // último byte del archivo en esta pieza
                 val chunkEnd = minOf(end, pieceEnd)
                 val f = raf ?: RandomAccessFile(a.file, "r").also { raf = it }
