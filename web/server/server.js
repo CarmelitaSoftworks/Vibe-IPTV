@@ -613,7 +613,7 @@ const PASSWORD = process.env.VIBE_PASSWORD || '';
 let torrentClient = null, torrentCurrent = null, torrentIdle = null, torrentVpnTimer = null, torrentVpnLost = false;
 let torrentGen = 0;            // cambia en cada cierre: un torrent que terminó de abrir tarde sabe que ya no corresponde
 const TORRENT_DIR = path.join(os.tmpdir(), 'vibe-torrent');
-const TORRENT_AHEAD = 64 * 1048576;        // cuánto se baja por delante de lo que se está viendo
+const TORRENT_AHEAD = 48 * 1048576;        // tramo de entrega: se baja el que se está viendo y el siguiente
 const VIDEO_EXT = /\.(mp4|mkv|avi|m4v|mov|webm|ts|wmv|flv|mpg|mpeg)$/i;
 // ¿El internet del equipo sale por una VPN? No basta con que exista un adaptador de VPN (macOS siempre tiene "utun"
 // del sistema, Windows "Teredo Tunneling", y una VPN con túnel dividido no lleva el tráfico): se pregunta al sistema
@@ -635,13 +635,19 @@ function outboundIp() {
 async function vpnOn() { const ip = await outboundIp(); return !!ip && isVpnIface(vpnIfaceFor(ip)); }
 function torrentClose() {
   torrentGen++;
+  torrentReads = 0;
   clearTimeout(torrentIdle);
   clearInterval(torrentVpnTimer);
   if (torrentClient) { try { torrentClient.destroy(); } catch {} }
   torrentClient = null; torrentCurrent = null;
   fs.rm(TORRENT_DIR, { recursive: true, force: true }, () => {});
 }
-function torrentTouch() { clearTimeout(torrentIdle); torrentIdle = setTimeout(torrentClose, 180000); }
+// Se cierra solo tras 3 minutos sin ninguna lectura abierta (un video en pausa mantiene su lectura abierta: no cuenta)
+let torrentReads = 0;
+function torrentTouch() {
+  clearTimeout(torrentIdle);
+  torrentIdle = setTimeout(() => (torrentReads > 0 ? torrentTouch() : torrentClose()), 180000);
+}
 async function handleTorrent(req, res, reqUrl) {
   const json = (code, o) => { res.writeHead(code, { ...CORS, 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(o)); };
   const p = reqUrl.pathname;
@@ -701,7 +707,6 @@ async function handleTorrent(req, res, reqUrl) {
       // Sólo se baja lo que se va viendo (un tramo por delante de la lectura), no el torrent entero: por omisión
       // WebTorrent lo pide todo, así que se quita ese pedido general y cada lectura pide su tramo
       try { torrent.deselect(0, torrent.pieces.length - 1, false); } catch {}
-      for (const f of files) f.deselect();
       torrentCurrent = { id, torrent, file };
       torrentTouch();
       console.log(`[torrent] ${file.name} (${(file.length / 1048576).toFixed(0)} MB)`);
@@ -718,25 +723,39 @@ async function handleTorrent(req, res, reqUrl) {
     const f = torrentCurrent.file, size = f.length;
     const r = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
     const start = r && r[1] ? Number(r[1]) : 0, end = r && r[2] ? Math.min(Number(r[2]), size - 1) : size - 1;
-    if (start >= size) { res.writeHead(416, { ...CORS, 'Content-Range': `bytes */${size}` }); return res.end(); }
+    if (start >= size || start > end) { res.writeHead(416, { ...CORS, 'Content-Range': `bytes */${size}` }); return res.end(); }
     const ext = (f.name.split('.').pop() || '').toLowerCase();
     const type = { mp4: 'video/mp4', m4v: 'video/mp4', mkv: 'video/x-matroska', webm: 'video/webm', ts: 'video/mp2t', avi: 'video/x-msvideo', mov: 'video/quicktime' }[ext] || 'application/octet-stream';
     res.writeHead(r ? 206 : 200, { ...CORS, 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, ...(r ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}) });
     if (req.method === 'HEAD') return res.end();
     // Se entrega por tramos: cada tramo pide sus piezas con prioridad y el siguiente recién se pide cuando el
     // reproductor ya recibió el anterior. Así se baja lo que se ve más un tramo por delante, no la película entera
-    let pos = start, stream = null, closed = false;
+    // Mientras se entrega un tramo ya se va pidiendo el siguiente (sin prioridad), para no partir de cero en cada
+    // cambio de tramo.
+    const tor = torrentCurrent.torrent, pieceOf = (byte) => Math.floor((f.offset + byte) / tor.pieceLength);
+    let pos = start, stream = null, closed = false, pre = null;
+    const dropPre = () => { if (pre) { try { tor.deselect(pre[0], pre[1], false); } catch {} pre = null; } };
     const next = () => {
       if (closed) return;
+      dropPre();
       if (pos > end) return res.end();
       const to = Math.min(end, pos + TORRENT_AHEAD - 1);
       stream = f.createReadStream({ start: pos, end: to });
       pos = to + 1;
+      if (pos <= end) { pre = [pieceOf(pos), pieceOf(Math.min(end, pos + TORRENT_AHEAD - 1))]; try { tor.select(pre[0], pre[1], false); } catch { pre = null; } }
       stream.on('error', () => res.destroy());
       stream.on('end', next);
-      stream.pipe(res, { end: false });
+      // (a mano y no con pipe: al terminar un tramo no debe cerrarse la respuesta)
+      const st = stream;
+      st.on('data', (d) => { if (!res.write(d)) { st.pause(); res.once('drain', () => st.resume()); } });
     };
-    req.on('close', () => { closed = true; if (stream) stream.destroy(); });
+    torrentReads++;
+    const myGen = torrentGen;
+    res.on('close', () => {                                         // el reproductor cortó, o ya se entregó todo
+      closed = true;
+      if (myGen === torrentGen) { torrentReads = Math.max(0, torrentReads - 1); torrentTouch(); dropPre(); }   // (si ya es otro torrent, no tocar su cuenta)
+      if (stream) stream.destroy();
+    });
     return next();
   }
   return json(404, { error: 'No encontrado' });

@@ -32,9 +32,11 @@ object TorrentStream {
         val handle: TorrentHandle, val ti: TorrentInfo, val dir: File, val file: File,
         val offset: Long, val size: Long, val pieceLen: Int, val name: String,
     ) {
-        /** Piezas pedidas por lecturas cortas (el índice al final del video…): se conservan fuera de la ventana. */
-        val extra: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
-        @Volatile var windowFirst = -1
+        /** Piezas que siempre se piden (el principio y el final, donde los videos guardan su índice). */
+        val fixed: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+        /** Lecturas abiertas por el reproductor: número de lectura → pieza por la que va. */
+        val reads = java.util.concurrent.ConcurrentHashMap<Long, Int>()
+        var lastWanted: Set<Int> = emptySet()
     }
 
     private var session: SessionManager? = null
@@ -59,6 +61,7 @@ object TorrentStream {
         }
     }
 
+    private const val URGENT = 24                           // piezas con plazo por delante de cada lectura
     private const val AHEAD_BYTES = 96L * 1024 * 1024       // cuánto se baja por delante de lo que se está viendo
     private const val SPACE_MARGIN = 300L * 1024 * 1024
     const val NO_VPN = "No hay una VPN conectada: conéctala o desactiva «Torrents: sólo con VPN» en Ajustes"
@@ -89,7 +92,11 @@ object TorrentStream {
             val sm = synchronized(lock) {
                 check()                                               // (si la VPN ya se cortó, no se crea otro motor)
                 session ?: SessionManager(false).also { s ->
+                    // Al completar el tramo pedido no se sueltan las conexiones: se van a necesitar al avanzar
                     val pack = SettingsPack().uploadRateLimit(uploadKBps.coerceAtLeast(1) * 1024)
+                        .setBoolean(org.libtorrent4j.swig.settings_pack.bool_types.close_redundant_connections.swigValue(), false)
+                        // …y si alguna se cortó, se vuelve a intentar pronto (por omisión espera un minuto)
+                        .setInteger(org.libtorrent4j.swig.settings_pack.int_types.min_reconnect_time.swigValue(), 3)
                     s.start(SessionParams(pack))
                     session = s
                 }
@@ -120,9 +127,9 @@ object TorrentStream {
             }
             // Primero el principio y el final del archivo (muchos videos guardan ahí el índice para poder adelantar)
             val lastPiece = pieceOf(a, a.size - 1)
-            for (p in maxOf(pieceOf(a, 0), lastPiece - 1)..lastPiece) a.extra += p
-            prioritize(a, 0, ahead = 12)
-            for (p in a.extra) runCatching { a.handle.setPieceDeadline(p, 500) }
+            for (p in maxOf(pieceOf(a, 0), lastPiece - 1)..lastPiece) a.fixed += p
+            a.reads[0L] = pieceOf(a, 0)                    // mientras el reproductor conecta: empezar por el principio
+            refresh(a)
             onStatus("Preparando el video…")
             val port = startServer()
             check()
@@ -210,7 +217,7 @@ object TorrentStream {
         val st = runCatching { a.handle.status() }.getOrNull() ?: return null
         // Velocidades del video en sí (sin el tráfico de control) y cuánto del archivo se ha bajado de verdad
         return "Torrent: ${st.numPeers()} personas · ⬇ %.1f Mb/s · ⬆ %.0f KB/s · %.0f %%".format(
-            st.downloadPayloadRate() * 8 / 1e6, st.uploadPayloadRate() / 1024.0, st.totalDone() * 100.0 / a.ti.totalSize().coerceAtLeast(1))
+            st.downloadPayloadRate() * 8 / 1e6, st.uploadPayloadRate() / 1024.0, (st.totalDone() * 100.0 / a.size.coerceAtLeast(1)).coerceAtMost(100.0))
     }
 
     /** Deja de compartir, borra lo bajado y cierra el servidor local. */
@@ -236,43 +243,46 @@ object TorrentStream {
     private fun pieceOf(a: Active, pos: Long) = ((a.offset + pos) / a.pieceLen).toInt()
 
     /**
-     * Lo que viene desde [pos] se pide primero (con plazos cortos y crecientes). Con [clear] se olvidan los pedidos
-     * urgentes anteriores: sólo lo hace la lectura principal (los reproductores abren además lecturas cortas, por
-     * ejemplo del índice al final del archivo, que no deben quitarle la prioridad a lo que se está viendo).
+     * Sólo se baja lo que se va viendo: para cada lectura abierta por el reproductor, las piezas desde donde va hasta
+     * un tramo por delante (más el principio y el final del archivo). El resto queda sin pedir, así ver 10 minutos no
+     * baja la película entera; lo ya bajado se conserva. Las piezas más próximas de cada lectura llevan plazo, para que
+     * lleguen primero. Todo cambio pasa por aquí con candado: dos lecturas (al adelantar, la vieja y la nueva) no se
+     * pisan las prioridades.
      */
-    private fun prioritize(a: Active, pos: Long, ahead: Int = 24, clear: Boolean = true) {
-        val first = pieceOf(a, pos)
+    private fun refresh(a: Active, jump: Boolean = true) = synchronized(a) {
+        if (active !== a) return@synchronized
         val last = pieceOf(a, a.size - 1)
-        if (clear) { runCatching { a.handle.clearPieceDeadlines() }; window(a, first) }
-        else for (p in first..minOf(last, first + ahead)) { a.extra += p; runCatching { a.handle.piecePriority(p, Priority.DEFAULT) } }
-        for ((i, p) in (first..minOf(last, first + ahead)).withIndex()) runCatching { a.handle.setPieceDeadline(p, 300 + i * 150) }
+        val span = (AHEAD_BYTES / a.pieceLen).toInt().coerceAtLeast(URGENT + 2)
+        val starts = a.reads.values.toSet()
+        val wanted = HashSet<Int>(a.fixed)
+        for (f in starts) for (p in f..minOf(last, f + span)) wanted += p
+        if (wanted != a.lastWanted) {
+            a.lastWanted = wanted
+            val pr = Array(a.ti.numPieces()) { if (it in wanted) Priority.DEFAULT else Priority.IGNORE }
+            runCatching { a.handle.prioritizePieces(pr) }
+        }
+        // Los plazos sólo se rehacen cuando cambia qué se lee (empezó o terminó una lectura, se adelantó). En el avance
+        // normal basta con sumar la pieza siguiente (ver [advance]): rehacerlos en cada pieza frena la bajada
+        if (!jump) return@synchronized
+        runCatching { a.handle.clearPieceDeadlines() }
+        for (p in a.fixed) runCatching { a.handle.setPieceDeadline(p, 800) }
+        for (f in starts) for ((i, p) in (f..minOf(last, f + URGENT)).withIndex()) runCatching { a.handle.setPieceDeadline(p, 300 + i * 150) }
     }
 
-    /**
-     * Sólo se baja lo que se va viendo: las piezas desde [first] hasta un tramo por delante (más las pedidas por
-     * lecturas cortas). El resto queda sin pedir, así ver 10 minutos no baja la película entera. Lo ya bajado se
-     * conserva (retroceder no vuelve a bajar).
-     */
-    private fun window(a: Active, first: Int) {
-        if (a.windowFirst == first) return
-        a.windowFirst = first
-        val last = pieceOf(a, a.size - 1)
-        val span = (AHEAD_BYTES / a.pieceLen).toInt().coerceAtLeast(26)       // nunca menos que las piezas con plazo
-        val pr = Array(a.ti.numPieces()) { Priority.IGNORE }
-        for (p in first..minOf(last, first + span)) pr[p] = Priority.DEFAULT
-        for (p in a.extra) if (p in pr.indices) pr[p] = Priority.DEFAULT
-        runCatching { a.handle.prioritizePieces(pr) }
+    /** Una lectura pasó a la pieza [p]: plazo para la que entra al tramo urgente y, cada tanto, se corre la ventana. */
+    private fun advance(a: Active, p: Int) {
+        val far = p + URGENT
+        if (far <= pieceOf(a, a.size - 1)) runCatching { a.handle.setPieceDeadline(far, 300 + URGENT * 150) }
+        if (p % 4 == 0) refresh(a, jump = false)
     }
 
-    /** La lectura que manda en las prioridades: la última que empezó y que no es sólo el final del archivo. */
-    private val reads = java.util.concurrent.atomic.AtomicLong()
-    @Volatile private var mainRead = 0L
+    private val readIds = java.util.concurrent.atomic.AtomicLong()
 
     /**
      * Espera a que la pieza esté bajada; false si el torrent se cerró o si pasó [idleMs] sin nadie conectado ni nada
      * bajando (mientras haya movimiento se sigue esperando: un torrent lento no es un error).
      */
-    private fun waitPiece(a: Active, p: Int, idleMs: Long = 120_000): Boolean {
+    private fun waitPiece(a: Active, p: Int, sock: Socket, idleMs: Long = 120_000): Boolean {
         var lastAlive = System.currentTimeMillis()
         var n = 0
         while (true) {
@@ -280,11 +290,18 @@ object TorrentStream {
             if (runCatching { a.handle.havePiece(p) }.getOrDefault(false)) return true
             Thread.sleep(80)
             if (++n % 25 == 0) {                                              // cada 2 s
+                if (gone(sock)) return false                                  // el reproductor ya cortó (adelantó o cerró)
                 val now = System.currentTimeMillis()
                 if (alive()) lastAlive = now else if (now - lastAlive > idleMs) return false
             }
         }
     }
+
+    /** ¿El reproductor cerró esta conexión? (ya envió su pedido completo: si se puede leer "fin", cortó). */
+    private fun gone(sock: Socket): Boolean = try {
+        sock.soTimeout = 1
+        sock.getInputStream().read() < 0
+    } catch (_: java.net.SocketTimeoutException) { false } catch (_: IOException) { true }
 
     // ---------- Servidor local (sólo 127.0.0.1) ----------
     private fun startServer(): Int {
@@ -323,23 +340,18 @@ object TorrentStream {
         val head = if (m != null) "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes $start-$end/${a.size}\r\n" else "HTTP/1.1 200 OK\r\n"
         out.write((head + "Content-Type: $type\r\nAccept-Ranges: bytes\r\nContent-Length: ${end - start + 1}\r\nConnection: close\r\n\r\n").toByteArray())
         if (first.startsWith("HEAD")) { out.flush(); return@use }
-        // Se adelantó (o empieza): lo que viene desde aquí va primero. Una lectura del puro final (el índice del
-        // video) no toma el mando: se pide con urgencia pero sin quitarle la prioridad a lo que se está viendo
-        val id = reads.incrementAndGet()
-        val tail = start > 0 && pieceOf(a, a.size - 1) - pieceOf(a, start) <= 2
-        if (!tail) mainRead = id
-        prioritize(a, start, clear = !tail)
+        // Esta lectura se anota con la pieza por la que va: de ahí sale qué se baja y qué va primero
+        val id = readIds.incrementAndGet()
+        a.reads.remove(0L)
         var pos = start
         var raf: RandomAccessFile? = null
         val buf = ByteArray(64 * 1024)
         try {
             while (pos <= end) {
                 val p = pieceOf(a, pos)
-                // Una lectura que no es la principal pide su pieza aparte (queda fuera de la ventana de lo que se ve)
-                if (mainRead != id && a.extra.add(p)) runCatching { a.handle.piecePriority(p, Priority.DEFAULT); a.handle.setPieceDeadline(p, 500) }
-                if (!waitPiece(a, p)) break
-                // Pedir las que siguen mientras se entrega ésta
-                if (mainRead == id) { if ((pos - start) % (a.pieceLen.toLong() * 4) < buf.size) prioritize(a, pos) else window(a, p) }
+                val before = a.reads.put(id, p)
+                if (before == null) refresh(a) else if (before != p) advance(a, p)
+                if (!waitPiece(a, p, sock)) break
                 val pieceEnd = (p.toLong() + 1) * a.pieceLen - a.offset - 1       // último byte del archivo en esta pieza
                 val chunkEnd = minOf(end, pieceEnd)
                 val f = raf ?: RandomAccessFile(a.file, "r").also { raf = it }
@@ -355,6 +367,9 @@ object TorrentStream {
             out.flush()
         } catch (_: IOException) {
             // El reproductor cortó (adelantó o cerró): normal
-        } finally { runCatching { raf?.close() } }
+        } finally {
+            runCatching { raf?.close() }
+            if (a.reads.remove(id) != null && a.reads.isNotEmpty()) refresh(a)      // sin lecturas se deja lo último pedido
+        }
     }
 }
